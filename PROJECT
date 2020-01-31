@@ -1,0 +1,3 @@
+domain: sdk.operator-framework.io
+repo: github.com/operator-framework/helm-operator
+version: "2"
