@@ -1,0 +1,5 @@
+helm:
+  - group: apache.sdk.operator-framework.io
+    version: v1
+    kind: Tomcat
+    chartPath: ./helm-charts/tomcat-0.4.0.tgz

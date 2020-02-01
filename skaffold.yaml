@@ -1,0 +1,11 @@
+apiVersion: skaffold/v2alpha2
+kind: Config
+metadata:
+  name: helm-operator
+build:
+  artifacts:
+  - image: controller
+    docker: {}
+deploy:
+  kustomize:
+   path: ./config/default
