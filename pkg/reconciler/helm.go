@@ -24,6 +24,7 @@ import (
 	"io"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/go-logr/logr"
 	"gopkg.in/yaml.v2"
@@ -38,12 +39,14 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/operator-framework/helm-operator/internal/controllerutil"
@@ -249,6 +252,16 @@ func (r *helm) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		if err := r.removeUninstallFinalizer(ctx, &obj); err != nil {
 			return ctrl.Result{}, plainError{err}
 		}
+
+		// Since the client is hitting a cache, waiting for the
+		// deletion here will guarantee that the next reconciliation
+		// will see that the CR has been deleted and that there's
+		// nothing left to do.
+		if err := r.waitForDeletion(&obj); err != nil {
+			log.Info("Failed waiting for CR deletion")
+			return reconcile.Result{}, err
+		}
+
 	case statusUnchanged:
 		if err := helmClient.Reconcile(deployedRelease); err != nil {
 			return ctrl.Result{}, plainError{err}
@@ -449,4 +462,24 @@ func (r *helm) setupDependentWatches(mgr manager.Manager, c controller.Controlle
 		}
 	}
 	r.addWatchesFor = addWatchesFunc
+}
+
+func (r *helm) waitForDeletion(o runtime.Object) error {
+	key, err := client.ObjectKeyFromObject(o)
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	return wait.PollImmediateUntil(time.Millisecond*10, func() (bool, error) {
+		err := r.client.Get(ctx, key, o)
+		if apierrors.IsNotFound(err) {
+			return true, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		return false, nil
+	}, ctx.Done())
 }

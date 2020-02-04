@@ -28,6 +28,7 @@ import (
 	zapl "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/operator-framework/helm-operator/pkg/reconciler"
+	"github.com/operator-framework/helm-operator/pkg/reconcilerutil"
 	"github.com/operator-framework/helm-operator/pkg/watches"
 	// +kubebuilder:scaffold:imports
 )
@@ -64,6 +65,7 @@ func main() {
 		MetricsBindAddress: metricsAddr,
 		LeaderElection:     enableLeaderElection,
 		Port:               9443,
+		NewClient:          reconcilerutil.NewDelegatingClientFunc(),
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
