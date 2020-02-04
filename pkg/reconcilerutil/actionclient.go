@@ -44,7 +44,7 @@ type actionClientGetter struct {
 }
 
 func (hcg *actionClientGetter) ActionClientFor(obj Object) (ActionInterface, error) {
-	actionConfig, err := hcg.acg.GetActionConfigFor(obj)
+	actionConfig, err := hcg.acg.ActionConfigFor(obj)
 	if err != nil {
 		return nil, err
 	}

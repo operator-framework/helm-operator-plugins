@@ -21,9 +21,6 @@ import (
 	"os"
 
 	"go.uber.org/zap"
-
-	"k8s.io/apimachinery/pkg/runtime/schema"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -31,6 +28,7 @@ import (
 	zapl "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/operator-framework/helm-operator/pkg/reconciler"
+	"github.com/operator-framework/helm-operator/pkg/watches"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -72,24 +70,31 @@ func main() {
 		os.Exit(1)
 	}
 
-	r, err := reconciler.NewHelm(
-		reconciler.WithLog(ctrl.Log.WithName("controllers").WithName("Helm")),
-		reconciler.WithChartPath("./helm-charts/tomcat"),
-		reconciler.WithGVK(schema.GroupVersionKind{
-			Group:   "apache.sdk.operator-framework.io",
-			Version: "v1",
-			Kind:    "Tomcat",
-		}),
-	)
+	watches, err := watches.Load("./watches.yaml")
 	if err != nil {
-		setupLog.Error(err, "unable to create helm reconciler", "controller", "Helm")
+		setupLog.Error(err, "unable to load watches.yaml")
 		os.Exit(1)
 	}
 
-	if err := r.SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Helm")
-		os.Exit(1)
+	for _, w := range watches {
+		r, err := reconciler.NewHelm(
+			reconciler.WithLog(ctrl.Log.WithName("controllers").WithName("Helm")),
+			reconciler.WithChart(w.Chart),
+			reconciler.WithGroupVersionKind(w.GroupVersionKind),
+			reconciler.WithOverrideValues(w.OverrideValues),
+			reconciler.WithDependentWatchesEnabled(w.WatchDependentResources),
+		)
+		if err != nil {
+			setupLog.Error(err, "unable to create helm reconciler", "controller", "Helm")
+			os.Exit(1)
+		}
+
+		if err := r.SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Helm")
+			os.Exit(1)
+		}
 	}
+
 	// +kubebuilder:scaffold:builder
 
 	setupLog.Info("starting manager")

@@ -1,5 +1,7 @@
-helm:
-  - group: apache.sdk.operator-framework.io
-    version: v1
-    kind: Tomcat
-    chartPath: ./helm-charts/tomcat-0.4.0.tgz
+- group: apache.sdk.operator-framework.io
+  version: v1
+  kind: Tomcat
+  chart: ./helm-charts/tomcat
+  overrideValues:
+    image.tomcat.tag: "8.0"
+    replicaCount: 1

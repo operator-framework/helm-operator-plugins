@@ -21,7 +21,7 @@ type Object interface {
 }
 
 type ActionConfigGetter interface {
-	GetActionConfigFor(obj Object) (*action.Configuration, error)
+	ActionConfigFor(obj Object) (*action.Configuration, error)
 }
 
 func NewActionConfigGetter(cfg *rest.Config, rm meta.RESTMapper, log logr.Logger) ActionConfigGetter {
@@ -40,7 +40,7 @@ type actionConfigGetter struct {
 	log        logr.Logger
 }
 
-func (acg *actionConfigGetter) GetActionConfigFor(obj Object) (*action.Configuration, error) {
+func (acg *actionConfigGetter) ActionConfigFor(obj Object) (*action.Configuration, error) {
 	// Create a RESTClientGetter
 	rcg, err := newRESTClientGetter(obj.GetNamespace(), acg.cfg, acg.restMapper)
 	if err != nil {

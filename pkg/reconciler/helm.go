@@ -29,7 +29,6 @@ import (
 	"gopkg.in/yaml.v2"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
-	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/storage/driver"
 	corev1 "k8s.io/api/core/v1"
@@ -49,20 +48,23 @@ import (
 
 	"github.com/operator-framework/helm-operator/internal/controllerutil"
 	"github.com/operator-framework/helm-operator/internal/predicate"
+	"github.com/operator-framework/helm-operator/internal/values"
 	"github.com/operator-framework/helm-operator/pkg/reconcilerutil"
 )
 
 // helm reconciles a Helm object
 type helm struct {
-	client        client.Client
-	scheme        *runtime.Scheme
-	aig           reconcilerutil.ActionClientGetter
-	eventRecorder record.EventRecorder
+	client             client.Client
+	scheme             *runtime.Scheme
+	actionClientGetter reconcilerutil.ActionClientGetter
+	eventRecorder      record.EventRecorder
 
-	log           logr.Logger
-	gvk           *schema.GroupVersionKind
-	chrt          *chart.Chart
-	addWatchesFor func(*release.Release) error
+	log             logr.Logger
+	gvk             *schema.GroupVersionKind
+	chrt            *chart.Chart
+	overrideValues  map[string]string
+	addWatchesFor   func(*release.Release) error
+	watchDependents *bool
 }
 
 type HelmOption func(r *helm) error
@@ -81,9 +83,16 @@ func WithScheme(scheme *runtime.Scheme) HelmOption {
 	}
 }
 
-func WithActionInterfaceGetter(aig reconcilerutil.ActionClientGetter) HelmOption {
+func WithActionClientGetter(actionClientGetter reconcilerutil.ActionClientGetter) HelmOption {
 	return func(r *helm) error {
-		r.aig = aig
+		r.actionClientGetter = actionClientGetter
+		return nil
+	}
+}
+
+func WithEventRecorder(er record.EventRecorder) HelmOption {
+	return func(r *helm) error {
+		r.eventRecorder = er
 		return nil
 	}
 }
@@ -95,25 +104,38 @@ func WithLog(log logr.Logger) HelmOption {
 	}
 }
 
-func WithGVK(gvk schema.GroupVersionKind) HelmOption {
+func WithGroupVersionKind(gvk schema.GroupVersionKind) HelmOption {
 	return func(r *helm) error {
 		r.gvk = &gvk
 		return nil
 	}
 }
 
-func WithChartPath(chartPath string) HelmOption {
+func WithChart(chrt *chart.Chart) HelmOption {
 	return func(r *helm) error {
-		chartLoader, err := loader.Loader(chartPath)
-		if err != nil {
+		r.chrt = chrt
+		return nil
+	}
+}
+
+func WithOverrideValues(overrides map[string]string) HelmOption {
+	return func(r *helm) error {
+		// Validate that overrides can be parsed and applied
+		// so that we fail fast during operator setup rather
+		// than during the first reconciliation.
+		m := values.New(map[string]interface{}{})
+		if err := m.ApplyOverrides(overrides); err != nil {
 			return err
 		}
 
-		chrt, err := chartLoader.Load()
-		if err != nil {
-			return err
-		}
-		r.chrt = chrt
+		r.overrideValues = overrides
+		return nil
+	}
+}
+
+func WithDependentWatchesEnabled(enable bool) HelmOption {
+	return func(r *helm) error {
+		r.watchDependents = &enable
 		return nil
 	}
 }
@@ -126,6 +148,10 @@ func NewHelm(opts ...HelmOption) (*helm, error) {
 		}
 	}
 
+	trueVal := true
+	if r.watchDependents == nil {
+		r.watchDependents = &trueVal
+	}
 	if r.log == nil {
 		return nil, errors.New("log must not be nil")
 	}
@@ -135,6 +161,7 @@ func NewHelm(opts ...HelmOption) (*helm, error) {
 	if r.chrt == nil {
 		return nil, errors.New("chart must not be nil")
 	}
+
 	return r, nil
 }
 
@@ -154,17 +181,20 @@ func (r *helm) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, plainError{err}
 	}
 
-	client, err := r.aig.ActionClientFor(&obj)
+	helmClient, err := r.actionClientGetter.ActionClientFor(&obj)
 	if err != nil {
 		return ctrl.Result{}, plainError{err}
 	}
 
-	deployedRelease, state, err := r.getReleaseStatus(client, obj)
-	if err != nil {
+	vals := values.New(obj.Object["spec"].(map[string]interface{}))
+	if err := vals.ApplyOverrides(r.overrideValues); err != nil {
 		return ctrl.Result{}, plainError{err}
 	}
 
-	vals := obj.Object["spec"].(map[string]interface{})
+	deployedRelease, state, err := r.getReleaseStatus(helmClient, obj, vals.Map())
+	if err != nil {
+		return ctrl.Result{}, plainError{err}
+	}
 
 	if state == statusNoAction {
 		return ctrl.Result{}, nil
@@ -178,25 +208,37 @@ func (r *helm) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 	switch state {
 	case statusNeedsInstall:
-		rel, err := client.Install(obj.GetName(), obj.GetNamespace(), r.chrt, vals)
+		rel, err := helmClient.Install(obj.GetName(), obj.GetNamespace(), r.chrt, vals.Map())
 		if err != nil {
 			return ctrl.Result{}, plainError{err}
 		}
-		if err := r.addWatchesFor(rel); err != nil {
-			log.Error(err, "failed to watch release resources", "name", rel.Name, "version", rel.Version)
+		for k, v := range r.overrideValues {
+			r.eventRecorder.Eventf(&obj, "Warning", "ValueOverridden",
+				"Chart value %q overridden to %q by operator", k, v)
+		}
+		if *r.watchDependents {
+			if err := r.addWatchesFor(rel); err != nil {
+				log.Error(err, "failed to watch release resources", "name", rel.Name, "version", rel.Version)
+			}
 		}
 		log.Info("Release installed", "name", rel.Name, "version", rel.Version)
 	case statusNeedsUpgrade:
-		rel, err := client.Upgrade(obj.GetName(), obj.GetNamespace(), r.chrt, vals)
+		rel, err := helmClient.Upgrade(obj.GetName(), obj.GetNamespace(), r.chrt, vals.Map())
 		if err != nil {
 			return ctrl.Result{}, plainError{err}
 		}
-		if err := r.addWatchesFor(rel); err != nil {
-			log.Error(err, "failed to watch release resources", "name", rel.Name, "version", rel.Version)
+		for k, v := range r.overrideValues {
+			r.eventRecorder.Eventf(&obj, "Warning", "ValueOverridden",
+				"Chart value %q overridden to %q by operator", k, v)
+		}
+		if *r.watchDependents {
+			if err := r.addWatchesFor(rel); err != nil {
+				log.Error(err, "failed to watch release resources", "name", rel.Name, "version", rel.Version)
+			}
 		}
 		log.Info("Release upgraded", "name", rel.Name, "version", rel.Version)
 	case statusNeedsUninstall:
-		resp, err := client.Uninstall(obj.GetName())
+		resp, err := helmClient.Uninstall(obj.GetName())
 		if err != nil {
 			if !errors.Is(err, driver.ErrReleaseNotFound) {
 				return ctrl.Result{}, plainError{err}
@@ -208,11 +250,13 @@ func (r *helm) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			return ctrl.Result{}, plainError{err}
 		}
 	case statusUnchanged:
-		if err := client.Reconcile(deployedRelease); err != nil {
+		if err := helmClient.Reconcile(deployedRelease); err != nil {
 			return ctrl.Result{}, plainError{err}
 		}
-		if err := r.addWatchesFor(deployedRelease); err != nil {
-			log.Error(err, "failed to watch release resources", "name", deployedRelease.Name, "version", deployedRelease.Version)
+		if *r.watchDependents {
+			if err := r.addWatchesFor(deployedRelease); err != nil {
+				log.Error(err, "failed to watch release resources", "name", deployedRelease.Name, "version", deployedRelease.Version)
+			}
 		}
 		log.Info("Release reconciled", "name", deployedRelease.Name, "version", deployedRelease.Version)
 	default:
@@ -223,21 +267,25 @@ func (r *helm) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 }
 
 func (r *helm) SetupWithManager(mgr ctrl.Manager) error {
+	controllerName := fmt.Sprintf("%v-controller", strings.ToLower(r.gvk.Kind))
+
 	if r.client == nil {
 		r.client = mgr.GetClient()
 	}
-	if r.aig == nil {
-		acg := reconcilerutil.NewActionConfigGetter(mgr.GetConfig(), mgr.GetRESTMapper(), r.log)
-		r.aig = reconcilerutil.NewActionClientGetter(acg)
+	if r.actionClientGetter == nil {
+		actionConfigGetter := reconcilerutil.NewActionConfigGetter(mgr.GetConfig(), mgr.GetRESTMapper(), r.log)
+		r.actionClientGetter = reconcilerutil.NewActionClientGetter(actionConfigGetter)
 	}
 	if r.scheme == nil {
 		r.scheme = mgr.GetScheme()
+	}
+	if r.eventRecorder == nil {
+		r.eventRecorder = mgr.GetEventRecorderFor(controllerName)
 	}
 
 	mgr.GetScheme().AddKnownTypeWithName(*r.gvk, &unstructured.Unstructured{})
 	metav1.AddToGroupVersion(mgr.GetScheme(), r.gvk.GroupVersion())
 
-	controllerName := fmt.Sprintf("%v-controller", strings.ToLower(r.gvk.Kind))
 	c, err := controller.New(controllerName, mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: 4})
 	if err != nil {
 		return err
@@ -285,7 +333,7 @@ const (
 	statusError          helmReleaseStatus = "error"
 )
 
-func (r *helm) getReleaseStatus(client reconcilerutil.ActionInterface, obj unstructured.Unstructured) (*release.Release, helmReleaseStatus, error) {
+func (r *helm) getReleaseStatus(client reconcilerutil.ActionInterface, obj unstructured.Unstructured, vals map[string]interface{}) (*release.Release, helmReleaseStatus, error) {
 	deployedRelease, err := client.Status(obj.GetName())
 	if err != nil && !errors.Is(err, driver.ErrReleaseNotFound) {
 		return nil, statusError, err
@@ -301,7 +349,6 @@ func (r *helm) getReleaseStatus(client reconcilerutil.ActionInterface, obj unstr
 		return nil, statusNeedsInstall, nil
 	}
 
-	vals := obj.Object["spec"].(map[string]interface{})
 	specRelease, err := client.Upgrade(obj.GetName(), obj.GetNamespace(), r.chrt, vals, func(u *action.Upgrade) error {
 		u.DryRun = true
 		return nil
