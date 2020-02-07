@@ -11,6 +11,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/discovery"
+	cached "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/rest"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
@@ -24,28 +26,32 @@ type ActionConfigGetter interface {
 	ActionConfigFor(obj Object) (*action.Configuration, error)
 }
 
-func NewActionConfigGetter(cfg *rest.Config, rm meta.RESTMapper, log logr.Logger) ActionConfigGetter {
+func NewActionConfigGetter(cfg *rest.Config, rm meta.RESTMapper, log logr.Logger) (ActionConfigGetter, error) {
+	dc, err := discovery.NewDiscoveryClientForConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+	cdc := cached.NewMemCacheClient(dc)
 	return &actionConfigGetter{
 		cfg:        cfg,
+		cdc:        cdc,
 		restMapper: rm,
 		log:        log,
-	}
+	}, nil
 }
 
 var _ ActionConfigGetter = &actionConfigGetter{}
 
 type actionConfigGetter struct {
 	cfg        *rest.Config
+	cdc        discovery.CachedDiscoveryInterface
 	restMapper meta.RESTMapper
 	log        logr.Logger
 }
 
 func (acg *actionConfigGetter) ActionConfigFor(obj Object) (*action.Configuration, error) {
 	// Create a RESTClientGetter
-	rcg, err := newRESTClientGetter(obj.GetNamespace(), acg.cfg, acg.restMapper)
-	if err != nil {
-		return nil, err
-	}
+	rcg := newRESTClientGetter(acg.cfg, acg.cdc, acg.restMapper, obj.GetNamespace())
 
 	// Setup the debug log function that Helm will use
 	debugLog := func(format string, v ...interface{}) {
@@ -56,8 +62,9 @@ func (acg *actionConfigGetter) ActionConfigFor(obj Object) (*action.Configuratio
 	// The passed object is used as an owner reference on every
 	// object the client creates.
 	kc := kube.New(rcg)
+	kc.Log = debugLog
 	ownerRef := metav1.NewControllerRef(obj, obj.GetObjectKind().GroupVersionKind())
-	oric := newOwnerRefInjectingClient(*kc, *ownerRef)
+	ownerRefClient := newOwnerRefInjectingClient(*kc, *ownerRef)
 
 	// Create the Kubernetes Secrets client. The passed object is
 	// also used as an owner reference in the release secrets
@@ -80,7 +87,7 @@ func (acg *actionConfigGetter) ActionConfigFor(obj Object) (*action.Configuratio
 	return &action.Configuration{
 		RESTClientGetter: rcg,
 		Releases:         s,
-		KubeClient:       oric,
+		KubeClient:       ownerRefClient,
 		Log:              debugLog,
 	}, nil
 }

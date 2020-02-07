@@ -1,4 +1,5 @@
 # Checklist
 
-- [ ] Add deployed release to status
-- [ ] Add conditions to status
+- [x] Add deployed release to status
+- [x] Add conditions to status
+- [ ] Auto-migrate releases from Helm 2 to Helm 3

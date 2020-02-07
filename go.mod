@@ -5,15 +5,11 @@ go 1.13
 require (
 	github.com/go-logr/logr v0.1.0
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
-	github.com/onsi/ginkgo v1.10.1
-	github.com/onsi/gomega v1.7.0
-	github.com/prometheus/common v0.7.0
 	go.uber.org/zap v1.9.1
 	gomodules.xyz/jsonpatch/v2 v2.0.1
 	gopkg.in/yaml.v2 v2.2.4
 	helm.sh/helm/v3 v3.0.3
 	k8s.io/api v0.0.0-20191016110408-35e52d86657a
-	k8s.io/apiextensions-apiserver v0.0.0-20191016113550-5357c4baaf65
 	k8s.io/apimachinery v0.0.0-20191004115801-a2eda9f80ab8
 	k8s.io/cli-runtime v0.0.0-20191016114015-74ad18325ed5
 	k8s.io/client-go v0.0.0-20191016111102-bec269661e48
@@ -35,6 +31,8 @@ replace (
 	// to the one oras needs. If oras is updated the version should be updated
 	// as well.
 	github.com/miekg/dns => github.com/miekg/dns v0.0.0-20181005163659-0d29b283ac0f
+
+	github.com/pkg/errors => github.com/pkg/errors v0.9.1
 	gopkg.in/inf.v0 v0.9.1 => github.com/go-inf/inf v0.9.1
 	gopkg.in/square/go-jose.v2 v2.3.0 => github.com/square/go-jose v2.3.0+incompatible
 

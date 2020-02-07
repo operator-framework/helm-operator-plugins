@@ -4,7 +4,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/discovery"
-	cached "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -12,26 +11,20 @@ import (
 
 var _ genericclioptions.RESTClientGetter = &restClientGetter{}
 
-type restClientGetter struct {
-	restConfig      *rest.Config
-	discoveryClient discovery.CachedDiscoveryInterface
-	restMapper      meta.RESTMapper
-	namespaceConfig clientcmd.ClientConfig
+func newRESTClientGetter(cfg *rest.Config, cdc discovery.CachedDiscoveryInterface, rm meta.RESTMapper, ns string) genericclioptions.RESTClientGetter {
+	return &restClientGetter{
+		restConfig:            cfg,
+		cachedDiscoveryClient: cdc,
+		restMapper:            rm,
+		namespaceConfig:       &namespaceClientConfig{ns},
+	}
 }
 
-func newRESTClientGetter(ns string, cfg *rest.Config, rm meta.RESTMapper) (genericclioptions.RESTClientGetter, error) {
-	dc, err := discovery.NewDiscoveryClientForConfig(cfg)
-	if err != nil {
-		return nil, err
-	}
-	cdc := cached.NewMemCacheClient(dc)
-
-	return &restClientGetter{
-		restConfig:      cfg,
-		discoveryClient: cdc,
-		restMapper:      rm,
-		namespaceConfig: &namespaceClientConfig{ns},
-	}, nil
+type restClientGetter struct {
+	restConfig            *rest.Config
+	cachedDiscoveryClient discovery.CachedDiscoveryInterface
+	restMapper            meta.RESTMapper
+	namespaceConfig       clientcmd.ClientConfig
 }
 
 func (c *restClientGetter) ToRESTConfig() (*rest.Config, error) {
@@ -39,7 +32,7 @@ func (c *restClientGetter) ToRESTConfig() (*rest.Config, error) {
 }
 
 func (c *restClientGetter) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
-	return c.discoveryClient, nil
+	return c.cachedDiscoveryClient, nil
 }
 
 func (c *restClientGetter) ToRESTMapper() (meta.RESTMapper, error) {
@@ -57,11 +50,11 @@ type namespaceClientConfig struct {
 }
 
 func (c namespaceClientConfig) RawConfig() (clientcmdapi.Config, error) {
-	panic("not implemented")
+	return clientcmdapi.Config{}, nil
 }
 
 func (c namespaceClientConfig) ClientConfig() (*rest.Config, error) {
-	panic("not implemented")
+	return nil, nil
 }
 
 func (c namespaceClientConfig) Namespace() (string, bool, error) {
@@ -69,5 +62,5 @@ func (c namespaceClientConfig) Namespace() (string, bool, error) {
 }
 
 func (c namespaceClientConfig) ConfigAccess() clientcmd.ConfigAccess {
-	panic("not implemented")
+	return nil
 }

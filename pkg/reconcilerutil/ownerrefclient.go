@@ -15,7 +15,7 @@ import (
 
 var _ kube.Interface = &ownerRefInjectingClient{}
 
-func newOwnerRefInjectingClient(base kube.Client, ownerRef metav1.OwnerReference) kube.Interface {
+func newOwnerRefInjectingClient(base kube.Client, ownerRef metav1.OwnerReference) *ownerRefInjectingClient {
 	return &ownerRefInjectingClient{
 		refs:   []metav1.OwnerReference{ownerRef},
 		Client: base,

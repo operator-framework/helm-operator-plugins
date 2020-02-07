@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand"
 	"strings"
 	"sync"
 	"time"
@@ -30,6 +31,7 @@ import (
 	"gopkg.in/yaml.v2"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
+	"helm.sh/helm/v3/pkg/chartutil"
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/storage/driver"
 	corev1 "k8s.io/api/core/v1"
@@ -46,11 +48,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/operator-framework/helm-operator/internal/controllerutil"
 	"github.com/operator-framework/helm-operator/internal/predicate"
+	"github.com/operator-framework/helm-operator/internal/status"
+	"github.com/operator-framework/helm-operator/internal/updater"
 	"github.com/operator-framework/helm-operator/internal/values"
 	"github.com/operator-framework/helm-operator/pkg/reconcilerutil"
 )
@@ -66,7 +69,7 @@ type helm struct {
 	gvk             *schema.GroupVersionKind
 	chrt            *chart.Chart
 	overrideValues  map[string]string
-	addWatchesFor   func(*release.Release) error
+	addWatchesFor   func(*release.Release, logr.Logger) error
 	watchDependents *bool
 }
 
@@ -170,111 +173,197 @@ func NewHelm(opts ...HelmOption) (*helm, error) {
 
 func (r *helm) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
-	log := r.log.WithValues(strings.ToLower(r.gvk.Kind), req.NamespacedName)
+	log := r.log.WithValues(strings.ToLower(r.gvk.Kind), req.NamespacedName, "id", rand.Int())
 
-	obj := unstructured.Unstructured{}
+	obj := &unstructured.Unstructured{}
 	obj.SetGroupVersionKind(*r.gvk)
-	err := r.client.Get(ctx, req.NamespacedName, &obj)
-
+	err := r.client.Get(ctx, req.NamespacedName, obj)
 	if apierrors.IsNotFound(err) {
 		return ctrl.Result{}, nil
 	}
-
 	if err != nil {
 		return ctrl.Result{}, plainError{err}
 	}
 
-	helmClient, err := r.actionClientGetter.ActionClientFor(&obj)
+	res, err := r.doReconcile(ctx, obj, log)
 	if err != nil {
-		return ctrl.Result{}, plainError{err}
+		return res, plainError{err}
 	}
+	return res, nil
+}
 
-	vals := values.New(obj.Object["spec"].(map[string]interface{}))
-	if err := vals.ApplyOverrides(r.overrideValues); err != nil {
-		return ctrl.Result{}, plainError{err}
-	}
+func (r *helm) doReconcile(ctx context.Context, obj *unstructured.Unstructured, log logr.Logger) (res ctrl.Result, err error) {
+	u := updater.New(r.client, obj)
 
-	deployedRelease, state, err := r.getReleaseStatus(helmClient, obj, vals.Map())
+	helmClient, err := r.actionClientGetter.ActionClientFor(obj)
 	if err != nil {
-		return ctrl.Result{}, plainError{err}
+		return ctrl.Result{}, err
 	}
 
-	if state == statusNoAction {
+	crVals, err := values.FromUnstructured(obj)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if err := crVals.ApplyOverrides(r.overrideValues); err != nil {
+		return ctrl.Result{}, err
+	}
+	vals, err := chartutil.CoalesceValues(r.chrt, crVals.Map())
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	rel, state, err := r.getReleaseState(helmClient, obj, vals.AsMap())
+	if err != nil {
+		u.UpdateStatus(updater.EnsureCondition(irreconcilableCondition(err)))
+		return ctrl.Result{}, err
+	}
+	u.UpdateStatus(updater.RemoveCondition(irreconcilableConditionType))
+
+	if state == stateAlreadyUninstalled {
+		log.Info("Resource is terminated, skipping reconciliation")
 		return ctrl.Result{}, nil
 	}
 
-	if state != statusNeedsUninstall {
-		if err := r.ensureUninstallFinalizer(ctx, &obj); err != nil {
-			return ctrl.Result{}, plainError{err}
-		}
-	}
-
-	switch state {
-	case statusNeedsInstall:
-		rel, err := helmClient.Install(obj.GetName(), obj.GetNamespace(), r.chrt, vals.Map())
-		if err != nil {
-			return ctrl.Result{}, plainError{err}
-		}
-		for k, v := range r.overrideValues {
-			r.eventRecorder.Eventf(&obj, "Warning", "ValueOverridden",
-				"Chart value %q overridden to %q by operator", k, v)
-		}
-		if *r.watchDependents {
-			if err := r.addWatchesFor(rel); err != nil {
-				log.Error(err, "failed to watch release resources", "name", rel.Name, "version", rel.Version)
+	if state == stateNeedsUninstall {
+		if err := func() (err error) {
+			defer func() {
+				updateErr := u.Apply(ctx, obj)
+				if err == nil {
+					err = updateErr
+				}
+			}()
+			resp, err := helmClient.Uninstall(obj.GetName())
+			if errors.Is(err, driver.ErrReleaseNotFound) {
+				log.Info("Release not found, removing finalizer")
+			} else if err != nil {
+				log.Error(err, "Failed to uninstall release")
+				u.UpdateStatus(updater.EnsureCondition(status.Condition{
+					Type:    "ReleaseFailed",
+					Status:  corev1.ConditionTrue,
+					Reason:  "UninstallError",
+					Message: err.Error(),
+				}))
+				return err
+			} else {
+				log.Info("Release uninstalled", "name", resp.Release.Name, "version", resp.Release.Version)
 			}
-		}
-		log.Info("Release installed", "name", rel.Name, "version", rel.Version)
-	case statusNeedsUpgrade:
-		rel, err := helmClient.Upgrade(obj.GetName(), obj.GetNamespace(), r.chrt, vals.Map())
-		if err != nil {
-			return ctrl.Result{}, plainError{err}
-		}
-		for k, v := range r.overrideValues {
-			r.eventRecorder.Eventf(&obj, "Warning", "ValueOverridden",
-				"Chart value %q overridden to %q by operator", k, v)
-		}
-		if *r.watchDependents {
-			if err := r.addWatchesFor(rel); err != nil {
-				log.Error(err, "failed to watch release resources", "name", rel.Name, "version", rel.Version)
-			}
-		}
-		log.Info("Release upgraded", "name", rel.Name, "version", rel.Version)
-	case statusNeedsUninstall:
-		resp, err := helmClient.Uninstall(obj.GetName())
-		if err != nil {
-			if !errors.Is(err, driver.ErrReleaseNotFound) {
-				return ctrl.Result{}, plainError{err}
-			}
-		} else {
-			log.Info("Release uninstalled", "name", resp.Release.Name, "version", resp.Release.Version)
-		}
-		if err := r.removeUninstallFinalizer(ctx, &obj); err != nil {
-			return ctrl.Result{}, plainError{err}
+			u.Update(updater.RemoveFinalizer(uninstallFinalizer))
+			u.UpdateStatus(
+				updater.RemoveCondition("ReleaseFailed"),
+				updater.EnsureCondition(status.Condition{
+					Type:   "Deployed",
+					Status: corev1.ConditionFalse,
+					Reason: "UninstallSuccessful",
+				}),
+				updater.RemoveDeployedRelease(),
+			)
+			return nil
+		}(); err != nil {
+			return ctrl.Result{}, err
 		}
 
 		// Since the client is hitting a cache, waiting for the
 		// deletion here will guarantee that the next reconciliation
 		// will see that the CR has been deleted and that there's
 		// nothing left to do.
-		if err := r.waitForDeletion(&obj); err != nil {
-			log.Info("Failed waiting for CR deletion")
-			return reconcile.Result{}, err
+		if err := r.waitForDeletion(obj); err != nil {
+			return ctrl.Result{}, err
 		}
 
-	case statusUnchanged:
-		if err := helmClient.Reconcile(deployedRelease); err != nil {
-			return ctrl.Result{}, plainError{err}
+		return ctrl.Result{}, nil
+	}
+
+	defer func() {
+		updateErr := u.Apply(ctx, obj)
+		if err == nil {
+			err = updateErr
 		}
-		if *r.watchDependents {
-			if err := r.addWatchesFor(deployedRelease); err != nil {
-				log.Error(err, "failed to watch release resources", "name", deployedRelease.Name, "version", deployedRelease.Version)
-			}
+	}()
+	u.Update(updater.EnsureFinalizer(uninstallFinalizer))
+	u.UpdateStatus(
+		updater.EnsureCondition(status.Condition{
+			Type:   "Initialized",
+			Status: corev1.ConditionTrue,
+		}),
+		updater.EnsureDeployedRelease(rel),
+	)
+
+	switch state {
+	case stateNeedsInstall:
+		rel, err = helmClient.Install(obj.GetName(), obj.GetNamespace(), r.chrt, vals.AsMap())
+		if err != nil {
+			u.UpdateStatus(updater.EnsureCondition(status.Condition{
+				Type:    "ReleaseFailed",
+				Status:  corev1.ConditionTrue,
+				Reason:  "InstallError",
+				Message: err.Error(),
+			}))
+			return ctrl.Result{}, err
 		}
-		log.Info("Release reconciled", "name", deployedRelease.Name, "version", deployedRelease.Version)
+		for k, v := range r.overrideValues {
+			r.eventRecorder.Eventf(obj, "Warning", "ValueOverridden",
+				"Chart value %q overridden to %q by operator", k, v)
+		}
+		u.UpdateStatus(updater.EnsureCondition(status.Condition{
+			Type:    "Deployed",
+			Status:  corev1.ConditionTrue,
+			Reason:  "InstallSuccessful",
+			Message: rel.Info.Notes,
+		}))
+		log.Info("Release installed", "name", rel.Name, "version", rel.Version)
+
+	case stateNeedsUpgrade:
+		rel, err = helmClient.Upgrade(obj.GetName(), obj.GetNamespace(), r.chrt, vals.AsMap())
+		if err != nil {
+			u.UpdateStatus(updater.EnsureCondition(status.Condition{
+				Type:    "ReleaseFailed",
+				Status:  corev1.ConditionTrue,
+				Reason:  "UpgradeError",
+				Message: err.Error(),
+			}))
+			return ctrl.Result{}, err
+		}
+		for k, v := range r.overrideValues {
+			r.eventRecorder.Eventf(obj, "Warning", "ValueOverridden",
+				"Chart value %q overridden to %q by operator", k, v)
+		}
+		u.UpdateStatus(updater.EnsureCondition(status.Condition{
+			Type:    "Deployed",
+			Status:  corev1.ConditionTrue,
+			Reason:  "UpgradeSuccessful",
+			Message: rel.Info.Notes,
+		}))
+		log.Info("Release upgraded", "name", rel.Name, "version", rel.Version)
+
+	case stateUnchanged:
+		// If a change is made to the CR spec that causes a release failure, a
+		// ConditionReleaseFailed is added to the status conditions. If that change
+		// is then reverted to its previous state, the operator will stop
+		// attempting the release and will resume reconciling. In this case, we
+		// need to remove the ConditionReleaseFailed because the failing release is
+		// no longer being attempted.
+		u.UpdateStatus(updater.RemoveCondition("ReleaseFailed"))
+
+		if err := helmClient.Reconcile(rel); err != nil {
+			u.UpdateStatus(updater.EnsureCondition(irreconcilableCondition(err)))
+			return ctrl.Result{}, err
+		}
+		u.UpdateStatus(updater.RemoveCondition(irreconcilableConditionType))
+
+		log.Info("Release reconciled", "name", rel.Name, "version", rel.Version)
 	default:
 		return ctrl.Result{}, fmt.Errorf("unexpected release state: %s", state)
 	}
+
+	if *r.watchDependents {
+		if err := r.addWatchesFor(rel, log); err != nil {
+			log.Error(err, "failed to watch release resources", "name", rel.Name, "version", rel.Version)
+		}
+	}
+	u.UpdateStatus(
+		updater.RemoveCondition("ReleaseFailed"),
+		updater.EnsureDeployedRelease(rel),
+	)
 
 	return ctrl.Result{}, nil
 }
@@ -286,7 +375,10 @@ func (r *helm) SetupWithManager(mgr ctrl.Manager) error {
 		r.client = mgr.GetClient()
 	}
 	if r.actionClientGetter == nil {
-		actionConfigGetter := reconcilerutil.NewActionConfigGetter(mgr.GetConfig(), mgr.GetRESTMapper(), r.log)
+		actionConfigGetter, err := reconcilerutil.NewActionConfigGetter(mgr.GetConfig(), mgr.GetRESTMapper(), r.log)
+		if err != nil {
+			return err
+		}
 		r.actionClientGetter = reconcilerutil.NewActionClientGetter(actionConfigGetter)
 	}
 	if r.scheme == nil {
@@ -314,8 +406,15 @@ func (r *helm) SetupWithManager(mgr ctrl.Manager) error {
 		return err
 	}
 
+	secret := &corev1.Secret{}
+	secret.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "",
+		Version: "v1",
+		Kind:    "Secret",
+	})
+
 	if err := c.Watch(
-		&source.Kind{Type: &corev1.Secret{}},
+		&source.Kind{Type: secret},
 		&handler.EnqueueRequestForOwner{
 			OwnerType:    obj,
 			IsController: true,
@@ -335,31 +434,31 @@ func (r *helm) SetupWithManager(mgr ctrl.Manager) error {
 	return nil
 }
 
-type helmReleaseStatus string
+type helmReleaseState string
 
 const (
-	statusNeedsInstall   helmReleaseStatus = "needs install"
-	statusNeedsUpgrade   helmReleaseStatus = "needs upgrade"
-	statusNeedsUninstall helmReleaseStatus = "needs uninstall"
-	statusUnchanged      helmReleaseStatus = "unchanged"
-	statusNoAction       helmReleaseStatus = "no action"
-	statusError          helmReleaseStatus = "error"
+	stateNeedsInstall       helmReleaseState = "needs install"
+	stateNeedsUpgrade       helmReleaseState = "needs upgrade"
+	stateNeedsUninstall     helmReleaseState = "needs uninstall"
+	stateUnchanged          helmReleaseState = "unchanged"
+	stateAlreadyUninstalled helmReleaseState = "already uninstalled"
+	stateError              helmReleaseState = "error"
 )
 
-func (r *helm) getReleaseStatus(client reconcilerutil.ActionInterface, obj unstructured.Unstructured, vals map[string]interface{}) (*release.Release, helmReleaseStatus, error) {
-	deployedRelease, err := client.Status(obj.GetName())
+func (r *helm) getReleaseState(client reconcilerutil.ActionInterface, obj *unstructured.Unstructured, vals map[string]interface{}) (*release.Release, helmReleaseState, error) {
+	deployedRelease, err := client.Get(obj.GetName())
 	if err != nil && !errors.Is(err, driver.ErrReleaseNotFound) {
-		return nil, statusError, err
+		return nil, stateError, err
 	}
 
 	if obj.GetDeletionTimestamp() != nil {
-		if controllerutil.ContainsFinalizer(&obj, r.getUninstallFinalizer()) {
-			return deployedRelease, statusNeedsUninstall, nil
+		if controllerutil.ContainsFinalizer(obj, uninstallFinalizer) {
+			return deployedRelease, stateNeedsUninstall, nil
 		}
-		return deployedRelease, statusNoAction, nil
+		return deployedRelease, stateAlreadyUninstalled, nil
 	}
 	if errors.Is(err, driver.ErrReleaseNotFound) {
-		return nil, statusNeedsInstall, nil
+		return nil, stateNeedsInstall, nil
 	}
 
 	specRelease, err := client.Upgrade(obj.GetName(), obj.GetNamespace(), r.chrt, vals, func(u *action.Upgrade) error {
@@ -367,27 +466,15 @@ func (r *helm) getReleaseStatus(client reconcilerutil.ActionInterface, obj unstr
 		return nil
 	})
 	if err != nil {
-		return deployedRelease, statusError, err
+		return deployedRelease, stateError, err
 	}
 	if specRelease.Manifest != deployedRelease.Manifest {
-		return deployedRelease, statusNeedsUpgrade, nil
+		return deployedRelease, stateNeedsUpgrade, nil
 	}
-	return deployedRelease, statusUnchanged, nil
+	return deployedRelease, stateUnchanged, nil
 }
 
-func (r *helm) ensureUninstallFinalizer(ctx context.Context, obj *unstructured.Unstructured) error {
-	controllerutil.AddFinalizer(obj, r.getUninstallFinalizer())
-	return r.client.Update(ctx, obj)
-}
-
-func (r *helm) removeUninstallFinalizer(ctx context.Context, obj *unstructured.Unstructured) error {
-	controllerutil.RemoveFinalizer(obj, r.getUninstallFinalizer())
-	return r.client.Update(ctx, obj)
-}
-
-func (r *helm) getUninstallFinalizer() string {
-	return fmt.Sprintf("%s/uninstall", r.gvk.Group)
-}
+const uninstallFinalizer = "uninstall-helm-release"
 
 type plainError struct {
 	e error
@@ -408,7 +495,7 @@ func (r *helm) setupDependentWatches(mgr manager.Manager, c controller.Controlle
 
 	var m sync.RWMutex
 	watches := map[schema.GroupVersionKind]struct{}{}
-	addWatchesFunc := func(rel *release.Release) error {
+	addWatchesFunc := func(rel *release.Release, log logr.Logger) error {
 		dec := yaml.NewDecoder(bytes.NewBufferString(rel.Manifest))
 		for {
 			var obj unstructured.Unstructured
@@ -445,8 +532,8 @@ func (r *helm) setupDependentWatches(mgr manager.Manager, c controller.Controlle
 				m.Lock()
 				watches[gvk] = struct{}{}
 				m.Unlock()
-				r.log.Info("Cannot watch cluster-scoped dependent resource for namespace-scoped owner. Changes to this dependent resource type will not be reconciled",
-					"ownerApiVersion", r.gvk.GroupVersion(), "ownerKind", r.gvk.Kind, "apiVersion", gvk.GroupVersion(), "kind", gvk.Kind)
+				log.Info("Cannot watch cluster-scoped dependent resource for namespace-scoped owner. Changes to this dependent resource type will not be reconciled",
+					"dependentAPIVersion", gvk.GroupVersion(), "dependentKind", gvk.Kind)
 				continue
 			}
 
@@ -458,7 +545,7 @@ func (r *helm) setupDependentWatches(mgr manager.Manager, c controller.Controlle
 			m.Lock()
 			watches[gvk] = struct{}{}
 			m.Unlock()
-			r.log.V(1).Info("Watching dependent resource", "ownerApiVersion", r.gvk.GroupVersion(), "ownerKind", r.gvk.Kind, "apiVersion", gvk.GroupVersion(), "kind", gvk.Kind)
+			log.V(1).Info("Watching dependent resource", "dependentAPIVersion", gvk.GroupVersion(), "dependentKind", gvk.Kind)
 		}
 	}
 	r.addWatchesFor = addWatchesFunc
@@ -482,4 +569,15 @@ func (r *helm) waitForDeletion(o runtime.Object) error {
 		}
 		return false, nil
 	}, ctx.Done())
+}
+
+const irreconcilableConditionType = "Irreconcilable"
+
+func irreconcilableCondition(err error) status.Condition {
+	return status.Condition{
+		Type:    irreconcilableConditionType,
+		Status:  corev1.ConditionTrue,
+		Reason:  "ReconcileError",
+		Message: err.Error(),
+	}
 }

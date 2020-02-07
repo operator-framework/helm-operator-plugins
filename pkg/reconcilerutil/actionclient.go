@@ -23,14 +23,14 @@ type ActionClientGetter interface {
 }
 
 type ActionInterface interface {
-	Status(name string, opts ...StatusOption) (*release.Release, error)
+	Get(name string, opts ...GetOption) (*release.Release, error)
 	Install(name, namespace string, chrt *chart.Chart, vals map[string]interface{}, opts ...InstallOption) (*release.Release, error)
 	Upgrade(name, namespace string, chrt *chart.Chart, vals map[string]interface{}, opts ...UpgradeOption) (*release.Release, error)
 	Uninstall(name string, opts ...UninstallOption) (*release.UninstallReleaseResponse, error)
 	Reconcile(rel *release.Release) error
 }
 
-type StatusOption func(*action.Status) error
+type GetOption func(*action.Get) error
 type InstallOption func(*action.Install) error
 type UpgradeOption func(*action.Upgrade) error
 type UninstallOption func(*action.Uninstall) error
@@ -55,14 +55,14 @@ type actionClient struct {
 	conf *action.Configuration
 }
 
-func (c *actionClient) Status(name string, opts ...StatusOption) (*release.Release, error) {
-	status := action.NewStatus(c.conf)
+func (c *actionClient) Get(name string, opts ...GetOption) (*release.Release, error) {
+	get := action.NewGet(c.conf)
 	for _, o := range opts {
-		if err := o(status); err != nil {
+		if err := o(get); err != nil {
 			return nil, err
 		}
 	}
-	return status.Run(name)
+	return get.Run(name)
 }
 
 func (c *actionClient) Install(name, namespace string, chrt *chart.Chart, vals map[string]interface{}, opts ...InstallOption) (*release.Release, error) {
@@ -74,8 +74,10 @@ func (c *actionClient) Install(name, namespace string, chrt *chart.Chart, vals m
 	}
 	install.ReleaseName = name
 	install.Namespace = namespace
+	c.conf.Log("Starting install")
 	rel, err := install.Run(chrt, vals)
 	if err != nil {
+		c.conf.Log("Install failed")
 		if rel != nil {
 			// Uninstall the failed release installation so that we can retry
 			// the installation again during the next reconciliation. In many
