@@ -1,4 +1,4 @@
-package reconcilerutil
+package client
 
 import (
 	"k8s.io/client-go/rest"

@@ -1,4 +1,4 @@
-package reconcilerutil
+package client
 
 import (
 	"fmt"
@@ -63,6 +63,7 @@ func (acg *actionConfigGetter) ActionConfigFor(obj Object) (*action.Configuratio
 	// object the client creates.
 	kc := kube.New(rcg)
 	kc.Log = debugLog
+
 	ownerRef := metav1.NewControllerRef(obj, obj.GetObjectKind().GroupVersionKind())
 	ownerRefClient := newOwnerRefInjectingClient(*kc, *ownerRef)
 

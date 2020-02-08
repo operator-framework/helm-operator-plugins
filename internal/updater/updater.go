@@ -14,8 +14,8 @@ import (
 	"github.com/operator-framework/helm-operator/internal/status"
 )
 
-func New(client client.Client, obj *unstructured.Unstructured) *Updater {
-	return &Updater{
+func New(client client.Client, obj *unstructured.Unstructured) Updater {
+	return Updater{
 		client: client,
 	}
 }
