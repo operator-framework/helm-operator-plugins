@@ -4,15 +4,20 @@ go 1.13
 
 require (
 	github.com/go-logr/logr v0.1.0
+	github.com/helm/helm-2to3 v0.2.2
+	github.com/jmoiron/sqlx v1.2.0 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
+	github.com/lib/pq v1.3.0 // indirect
+	github.com/rubenv/sql-migrate v0.0.0-20200119084958-8794cecc920c // indirect
 	go.uber.org/zap v1.9.1
 	gomodules.xyz/jsonpatch/v2 v2.0.1
-	gopkg.in/yaml.v2 v2.2.4
+	gopkg.in/yaml.v2 v2.2.5
 	helm.sh/helm/v3 v3.0.3
 	k8s.io/api v0.0.0-20191016110408-35e52d86657a
 	k8s.io/apimachinery v0.0.0-20191004115801-a2eda9f80ab8
 	k8s.io/cli-runtime v0.0.0-20191016114015-74ad18325ed5
 	k8s.io/client-go v0.0.0-20191016111102-bec269661e48
+	k8s.io/helm v2.16.1+incompatible
 	k8s.io/klog v1.0.0
 	k8s.io/kubectl v0.0.0-20191016120415-2ed914427d51
 	sigs.k8s.io/controller-runtime v0.4.0
