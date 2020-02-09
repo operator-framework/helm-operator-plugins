@@ -1,36 +1,40 @@
-package hooks
+// Copyright 2020 The Operator-SDK Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package hook
 
 import (
 	"bytes"
 	"io"
 	"sync"
 
-	"k8s.io/apimachinery/pkg/runtime"
-
-	"k8s.io/apimachinery/pkg/api/meta"
-
 	"github.com/go-logr/logr"
-	"github.com/operator-framework/helm-operator/internal/predicate"
 	"gopkg.in/yaml.v2"
 	"helm.sh/helm/v3/pkg/release"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	"github.com/operator-framework/helm-operator/internal/predicate"
+	"github.com/operator-framework/helm-operator/pkg/hook"
 )
 
-type ReleaseHook interface {
-	Exec(*release.Release) error
-}
-
-type ReleaseHookFunc func(*release.Release) error
-
-func (r ReleaseHookFunc) Exec(rel *release.Release) error {
-	return r(rel)
-}
-
-func NewDependentResourceWatcher(c controller.Controller, rm meta.RESTMapper, owner runtime.Object, log logr.Logger) ReleaseHook {
+func NewDependentResourceWatcher(c controller.Controller, rm meta.RESTMapper, owner runtime.Object, log logr.Logger) hook.Hook {
 	return &dependentResourceWatcher{
 		Controller: c,
 		Owner:      owner,

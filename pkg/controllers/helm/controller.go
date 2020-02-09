@@ -1,18 +1,16 @@
-/*
-Copyright 2020 The Operator-SDK Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+// Copyright 2020 The Operator-SDK Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package helm
 
@@ -24,9 +22,6 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
-	"github.com/operator-framework/helm-operator/internal/conditions"
-	helmclient "github.com/operator-framework/helm-operator/pkg/client"
-	"github.com/operator-framework/helm-operator/pkg/hooks"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chartutil"
@@ -45,10 +40,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	"github.com/operator-framework/helm-operator/internal/conditions"
 	"github.com/operator-framework/helm-operator/internal/controllerutil"
+	internalhook "github.com/operator-framework/helm-operator/internal/hook"
 	"github.com/operator-framework/helm-operator/internal/predicate"
 	"github.com/operator-framework/helm-operator/internal/updater"
 	"github.com/operator-framework/helm-operator/internal/values"
+	helmclient "github.com/operator-framework/helm-operator/pkg/client"
+	"github.com/operator-framework/helm-operator/pkg/hook"
 )
 
 // reconciler reconciles a Helm object
@@ -57,7 +56,7 @@ type reconciler struct {
 	scheme             *runtime.Scheme
 	actionClientGetter helmclient.ActionClientGetter
 	eventRecorder      record.EventRecorder
-	hooks              []hooks.ReleaseHook
+	hooks              []hook.Hook
 
 	log             logr.Logger
 	gvk             *schema.GroupVersionKind
@@ -236,9 +235,9 @@ func (r *reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	if state == stateNeedsUninstall {
 		if err := func() (err error) {
 			defer func() {
-				updateErr := u.Apply(ctx, obj)
+				applyErr := u.Apply(ctx, obj)
 				if err == nil {
-					err = updateErr
+					err = applyErr
 				}
 			}()
 			resp, err := helmClient.Uninstall(obj.GetName())
@@ -274,9 +273,9 @@ func (r *reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 
 	defer func() {
-		updateErr := u.Apply(ctx, obj)
+		applyErr := u.Apply(ctx, obj)
 		if err == nil {
-			err = updateErr
+			err = applyErr
 		}
 	}()
 	u.Update(updater.EnsureFinalizer(uninstallFinalizer))
@@ -460,7 +459,7 @@ func (r *reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) err
 	}
 
 	if *r.watchDependents {
-		r.hooks = append([]hooks.ReleaseHook{hooks.NewDependentResourceWatcher(c, mgr.GetRESTMapper(), obj, r.log)}, r.hooks...)
+		r.hooks = append([]hook.Hook{internalhook.NewDependentResourceWatcher(c, mgr.GetRESTMapper(), obj, r.log)}, r.hooks...)
 	}
 	return nil
 }
