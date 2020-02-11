@@ -28,8 +28,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	zapl "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/operator-framework/helm-operator/pkg/client"
-	"github.com/operator-framework/helm-operator/pkg/controllers/helm"
+	"github.com/operator-framework/helm-operator/pkg/manager"
+	"github.com/operator-framework/helm-operator/pkg/reconciler"
 	"github.com/operator-framework/helm-operator/pkg/watches"
 	// +kubebuilder:scaffold:imports
 )
@@ -67,7 +67,7 @@ func main() {
 		MetricsBindAddress: metricsAddr,
 		LeaderElection:     enableLeaderElection,
 		Port:               9443,
-		NewClient:          client.NewDelegatingClientFunc(),
+		NewClient:          manager.NewDelegatingClientFunc(),
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -81,12 +81,11 @@ func main() {
 	}
 
 	for _, w := range watches {
-		r, err := helm.New(
-			helm.WithLog(ctrl.Log.WithName("controllers").WithName("Helm")),
-			helm.WithChart(w.Chart),
-			helm.WithGroupVersionKind(w.GroupVersionKind),
-			helm.WithOverrideValues(w.OverrideValues),
-			helm.WithDependentWatchesEnabled(w.WatchDependentResources),
+		r, err := reconciler.New(
+			reconciler.WithChart(w.Chart),
+			reconciler.WithGroupVersionKind(w.GroupVersionKind),
+			reconciler.WithOverrideValues(w.OverrideValues),
+			reconciler.WithDependentWatchesEnabled(w.WatchDependentResources),
 		)
 		if err != nil {
 			setupLog.Error(err, "unable to create helm reconciler", "controller", "Helm")

@@ -16,6 +16,7 @@ package values
 
 import (
 	"fmt"
+	"os"
 
 	"helm.sh/helm/v3/pkg/strvals"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -50,7 +51,7 @@ func (v *Values) Map() map[string]interface{} {
 
 func (v *Values) ApplyOverrides(in map[string]string) error {
 	for inK, inV := range in {
-		val := fmt.Sprintf("%s=%s", inK, inV)
+		val := fmt.Sprintf("%s=%s", inK, os.ExpandEnv(inV))
 		if err := strvals.ParseInto(val, v.m); err != nil {
 			return err
 		}

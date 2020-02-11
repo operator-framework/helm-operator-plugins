@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package helm
+package reconciler
 
 import (
 	"context"
@@ -70,6 +70,19 @@ type reconciler struct {
 	watchDependents *bool
 }
 
+// New creates a new Reconciler that reconciles custom resources that
+// define a Helm release. New takes variadic ReconcilerOption arguments
+// that are used to configure the Reconciler.
+//
+// Required options are:
+//   - WithGroupVersionKind
+//   - WithChart
+//
+// Other options are defaulted to sane defaults when SetupWithManager
+// is called.
+//
+// If an error occurs configuring or validating the reconciler, it is
+// returned.
 func New(opts ...ReconcilerOption) (*reconciler, error) {
 	r := &reconciler{}
 	for _, o := range opts {
@@ -84,6 +97,12 @@ func New(opts ...ReconcilerOption) (*reconciler, error) {
 	return r, nil
 }
 
+// SetupWithManager configures a controller for the reconciler and registers
+// watches. It also uses the passed Manager to initialize default values for the
+// reconciler and sets up the manager's scheme with the reconciler's configured
+// GroupVersionKind.
+//
+// If an error occurs setting up the reconciler with the manager, it is returned.
 func (r *reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	controllerName := fmt.Sprintf("%v-controller", strings.ToLower(r.gvk.Kind))
 
@@ -111,8 +130,15 @@ func (r *reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return nil
 }
 
+// ReoncilerOption is a function that configures the
+// helm reconciler.
 type ReconcilerOption func(r *reconciler) error
 
+// WithClient is a ReconcilerOption that configures
+// a reconciler's client.
+//
+// By default, manager.GetClient() is used if this
+// option is not configured.
 func WithClient(cl client.Client) ReconcilerOption {
 	return func(r *reconciler) error {
 		r.client = cl
@@ -120,6 +146,11 @@ func WithClient(cl client.Client) ReconcilerOption {
 	}
 }
 
+// WithScheme is a ReconcilerOption that configures
+// a reconciler's scheme.
+//
+// By default, manager.GetScheme() is used if this
+// option is not configured.
 func WithScheme(scheme *runtime.Scheme) ReconcilerOption {
 	return func(r *reconciler) error {
 		r.scheme = scheme
@@ -127,6 +158,11 @@ func WithScheme(scheme *runtime.Scheme) ReconcilerOption {
 	}
 }
 
+// WithActionClientGetter is a ReconcilerOption that
+// configures a reconciler's ActionClientGetter.
+//
+// A default ActionClientGetter is used if this
+// option is not configured.
 func WithActionClientGetter(actionClientGetter helmclient.ActionClientGetter) ReconcilerOption {
 	return func(r *reconciler) error {
 		r.actionClientGetter = actionClientGetter
@@ -134,6 +170,11 @@ func WithActionClientGetter(actionClientGetter helmclient.ActionClientGetter) Re
 	}
 }
 
+// WithEventRecorder is a ReconcilerOption that configures a
+// reconciler's EventRecorder.
+//
+// By default, manager.GetEventRecorderFor() is used if this
+// option is not configured.
 func WithEventRecorder(er record.EventRecorder) ReconcilerOption {
 	return func(r *reconciler) error {
 		r.eventRecorder = er
@@ -141,6 +182,11 @@ func WithEventRecorder(er record.EventRecorder) ReconcilerOption {
 	}
 }
 
+// WithLog is a ReconcilerOption that configures
+// a reconciler's logger.
+//
+// A default logger is used if this option is
+// not configured.
 func WithLog(log logr.Logger) ReconcilerOption {
 	return func(r *reconciler) error {
 		r.log = log
@@ -148,6 +194,10 @@ func WithLog(log logr.Logger) ReconcilerOption {
 	}
 }
 
+// WithGroupVersionKind is a ReconcilerOption that
+// configures a reconciler's GroupVersionKind.
+//
+// This option is required.
 func WithGroupVersionKind(gvk schema.GroupVersionKind) ReconcilerOption {
 	return func(r *reconciler) error {
 		r.gvk = &gvk
@@ -155,6 +205,10 @@ func WithGroupVersionKind(gvk schema.GroupVersionKind) ReconcilerOption {
 	}
 }
 
+// WithChart is a ReconcilerOption that configures
+// a reconciler's helm chart.
+//
+// This option is required.
 func WithChart(chrt *chart.Chart) ReconcilerOption {
 	return func(r *reconciler) error {
 		r.chrt = chrt
@@ -162,6 +216,21 @@ func WithChart(chrt *chart.Chart) ReconcilerOption {
 	}
 }
 
+// WithOverrideValues is a ReconcilerOption that configures
+// a reconciler's override values.
+//
+// Override values can be used to enforce that certain values
+// provided by the chart's default values.yaml or by a CR spec
+// are always overridden when rendering the chart. If a value
+// in overrides is set by a CR, it is overridden by the override
+// value. The override value can be static but can also refer to
+// an environment variable.
+//
+// If an environment variable reference is listed in override
+// values but is not present in the environment when this function
+// runs, it will resolve to an empty string and override all other
+// values. Therefore, when using environment variable expansion,
+// ensure that the environment variable is set.
 func WithOverrideValues(overrides map[string]string) ReconcilerOption {
 	return func(r *reconciler) error {
 		// Validate that overrides can be parsed and applied
@@ -177,6 +246,11 @@ func WithOverrideValues(overrides map[string]string) ReconcilerOption {
 	}
 }
 
+// WithDependentWatchesEnabled is a ReconcilerOption that configures
+// whether the reconciler will register watches for dependent objects
+// in releases and trigger reconciliations when they change.
+//
+// By default, dependent watches are enabled.
 func WithDependentWatchesEnabled(enable bool) ReconcilerOption {
 	return func(r *reconciler) error {
 		r.watchDependents = &enable
@@ -184,6 +258,36 @@ func WithDependentWatchesEnabled(enable bool) ReconcilerOption {
 	}
 }
 
+// Reconcile reconciles a CR that defines a Helm v3 release.
+//
+// If a v2 release exists for the CR, it is automatically migrated to the
+// v3 storage format, and the old v2 release is deleted if the migration
+// succeeds.
+//
+//   - If a release does not exist for this CR, a new release is installed.
+//   - If a release exists and the CR spec has changed since the last,
+//     reconciliation, the release is upgraded.
+//   - If a release exists and the CR spec has not changed since the last
+//     reconciliation, the release is reconciled. Any dependent resources that
+//     have diverged from the release manifest are re-created or patched so
+//     that they are re-aligned with the release.
+//   - If the CR has been deleted, the release will be uninstalled. The
+//     reconciler uses a finalizer to ensure the release uninstall succeeds
+//     before CR deletion occurs.
+//
+// If an error occurs during release installation or upgrade, the change will
+// be rolled back to restore the previous state.
+//
+// Reconcile also manages the status field of the custom resource. It includes
+// the release name and manifest in `status.deployedRelease`, and it updates
+// `status.conditions` based on reconciliation progress and success. Condition
+// types include:
+//
+//   - Initialized - initial reconciler-managed fields added (e.g. the uninstall
+//                   finalizer
+//   - Deployed - a release for this CR is deployed (but not necessarily ready).
+//   - ReleaseFailed - an installation or upgrade failed.
+//   -
 func (r *reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 	ctx := context.Background()
 	log := r.log.WithValues(strings.ToLower(r.gvk.Kind), req.NamespacedName, "id", rand.Int())
@@ -420,9 +524,6 @@ func (r *reconciler) doUninstall(helmClient helmclient.ActionInterface, u *updat
 }
 
 func (r *reconciler) validate() error {
-	if r.log == nil {
-		return errors.New("log must not be nil")
-	}
 	if r.gvk == nil {
 		return errors.New("gvk must not be nil")
 	}
@@ -437,9 +538,11 @@ func (r *reconciler) addDefaults(mgr ctrl.Manager, controllerName string) error 
 	if r.watchDependents == nil {
 		r.watchDependents = &trueVal
 	}
-
 	if r.client == nil {
 		r.client = mgr.GetClient()
+	}
+	if r.log == nil {
+		r.log = ctrl.Log.WithName("controllers").WithName("Helm")
 	}
 	if r.actionClientGetter == nil {
 		actionConfigGetter, err := helmclient.NewActionConfigGetter(mgr.GetConfig(), mgr.GetRESTMapper(), r.log)
