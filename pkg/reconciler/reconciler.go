@@ -55,12 +55,13 @@ const uninstallFinalizer = "uninstall-reconciler-release"
 
 // reconciler reconciles a Helm object
 type reconciler struct {
-	client             client.Client
-	scheme             *runtime.Scheme
-	actionClientGetter helmclient.ActionClientGetter
-	eventRecorder      record.EventRecorder
-	hooks              []hook.Hook
-	migratorGetter     migrator.MigratorGetter
+	client                  client.Client
+	scheme                  *runtime.Scheme
+	actionClientGetter      helmclient.ActionClientGetter
+	eventRecorder           record.EventRecorder
+	hooks                   []hook.Hook
+	migratorGetter          migrator.MigratorGetter
+	maxConcurrentReconciles int
 
 	log             logr.Logger
 	gvk             *schema.GroupVersionKind
@@ -112,7 +113,7 @@ func (r *reconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	r.setupScheme(mgr)
 
-	c, err := controller.New(controllerName, mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: 4})
+	c, err := controller.New(controllerName, mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: r.maxConcurrentReconciles})
 	if err != nil {
 		return err
 	}
@@ -254,6 +255,13 @@ func WithOverrideValues(overrides map[string]string) ReconcilerOption {
 func WithDependentWatchesEnabled(enable bool) ReconcilerOption {
 	return func(r *reconciler) error {
 		r.watchDependents = &enable
+		return nil
+	}
+}
+
+func WithMaxConcurrentReconciles(max int) ReconcilerOption {
+	return func(r *reconciler) error {
+		r.maxConcurrentReconciles = max
 		return nil
 	}
 }
