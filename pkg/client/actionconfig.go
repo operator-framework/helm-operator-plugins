@@ -22,11 +22,13 @@ import (
 	"helm.sh/helm/v3/pkg/kube"
 	"helm.sh/helm/v3/pkg/storage"
 	"helm.sh/helm/v3/pkg/storage/driver"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/discovery"
 	cached "k8s.io/client-go/discovery/cached"
+	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
@@ -78,9 +80,6 @@ func (acg *actionConfigGetter) ActionConfigFor(obj Object) (*action.Configuratio
 	kc := kube.New(rcg)
 	kc.Log = debugLog
 
-	ownerRef := metav1.NewControllerRef(obj, obj.GetObjectKind().GroupVersionKind())
-	ownerRefClient := newOwnerRefInjectingClient(*kc, *ownerRef)
-
 	// Create the Kubernetes Secrets client. The passed object is
 	// also used as an owner reference in the release secrets
 	// created by this client.
@@ -88,6 +87,8 @@ func (acg *actionConfigGetter) ActionConfigFor(obj Object) (*action.Configuratio
 	if err != nil {
 		return nil, err
 	}
+
+	ownerRef := metav1.NewControllerRef(obj, obj.GetObjectKind().GroupVersionKind())
 	d := driver.NewSecrets(&ownerRefSecretClient{
 		SecretInterface: kcs.CoreV1().Secrets(obj.GetNamespace()),
 		refs:            []metav1.OwnerReference{*ownerRef},
@@ -102,7 +103,24 @@ func (acg *actionConfigGetter) ActionConfigFor(obj Object) (*action.Configuratio
 	return &action.Configuration{
 		RESTClientGetter: rcg,
 		Releases:         s,
-		KubeClient:       ownerRefClient,
+		KubeClient:       kc,
 		Log:              debugLog,
 	}, nil
+}
+
+var _ v1.SecretInterface = &ownerRefSecretClient{}
+
+type ownerRefSecretClient struct {
+	v1.SecretInterface
+	refs []metav1.OwnerReference
+}
+
+func (c *ownerRefSecretClient) Create(in *corev1.Secret) (*corev1.Secret, error) {
+	in.OwnerReferences = append(in.OwnerReferences, c.refs...)
+	return c.SecretInterface.Create(in)
+}
+
+func (c *ownerRefSecretClient) Update(in *corev1.Secret) (*corev1.Secret, error) {
+	in.OwnerReferences = append(in.OwnerReferences, c.refs...)
+	return c.SecretInterface.Update(in)
 }

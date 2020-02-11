@@ -20,6 +20,15 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ghodss/yaml"
+
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	"helm.sh/helm/v3/pkg/kube"
+
+	"helm.sh/helm/v3/pkg/postrender"
+
 	"gomodules.xyz/jsonpatch/v2"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
@@ -62,11 +71,13 @@ func (hcg *actionClientGetter) ActionClientFor(obj Object) (ActionInterface, err
 	if err != nil {
 		return nil, err
 	}
-	return &actionClient{actionConfig}, nil
+	postRenderer := createPostRenderer(actionConfig.KubeClient, obj)
+	return &actionClient{actionConfig, postRenderer}, nil
 }
 
 type actionClient struct {
-	conf *action.Configuration
+	conf         *action.Configuration
+	postRenderer postrender.PostRenderer
 }
 
 func (c *actionClient) Get(name string, opts ...GetOption) (*release.Release, error) {
@@ -81,6 +92,7 @@ func (c *actionClient) Get(name string, opts ...GetOption) (*release.Release, er
 
 func (c *actionClient) Install(name, namespace string, chrt *chart.Chart, vals map[string]interface{}, opts ...InstallOption) (*release.Release, error) {
 	install := action.NewInstall(c.conf)
+	install.PostRenderer = c.postRenderer
 	for _, o := range opts {
 		if err := o(install); err != nil {
 			return nil, err
@@ -118,6 +130,7 @@ func (c *actionClient) Install(name, namespace string, chrt *chart.Chart, vals m
 
 func (c *actionClient) Upgrade(name, namespace string, chrt *chart.Chart, vals map[string]interface{}, opts ...UpgradeOption) (*release.Release, error) {
 	upgrade := action.NewUpgrade(c.conf)
+	upgrade.PostRenderer = c.postRenderer
 	for _, o := range opts {
 		if err := o(upgrade); err != nil {
 			return nil, err
@@ -228,4 +241,49 @@ func generatePatch(existing, expected runtime.Object) ([]byte, error) {
 	}
 
 	return json.Marshal(patchOps)
+}
+
+func createPostRenderer(kubeClient kube.Interface, obj Object) postrender.PostRenderer {
+	ownerRef := metav1.NewControllerRef(obj, obj.GetObjectKind().GroupVersionKind())
+	return &ownerRefPostRenderer{kubeClient, ownerRef}
+}
+
+type ownerRefPostRenderer struct {
+	kubeClient kube.Interface
+	ownerRef   *metav1.OwnerReference
+}
+
+func (pr *ownerRefPostRenderer) Run(in *bytes.Buffer) (*bytes.Buffer, error) {
+	resourceList, err := pr.kubeClient.Build(in, false)
+	if err != nil {
+		return nil, err
+	}
+	out := bytes.Buffer{}
+
+	err = resourceList.Visit(func(r *resource.Info, err error) error {
+		if err != nil {
+			return err
+		}
+		objMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(r.Object)
+		if err != nil {
+			return err
+		}
+		u := &unstructured.Unstructured{Object: objMap}
+		if r.ResourceMapping().Scope == meta.RESTScopeNamespace {
+			ownerRefs := append(u.GetOwnerReferences(), *pr.ownerRef)
+			u.SetOwnerReferences(ownerRefs)
+		}
+		outData, err := yaml.Marshal(u.Object)
+		if err != nil {
+			return err
+		}
+		if _, err := out.Write(outData); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
 }
