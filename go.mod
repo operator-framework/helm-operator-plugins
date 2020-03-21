@@ -14,7 +14,7 @@ require (
 	go.uber.org/zap v1.10.0
 	gomodules.xyz/jsonpatch/v2 v2.0.1
 	gopkg.in/yaml.v2 v2.2.5
-	helm.sh/helm/v3 v3.1.0-rc.2
+	helm.sh/helm/v3 v3.1.0
 	k8s.io/api v0.17.2
 	k8s.io/apimachinery v0.17.2
 	k8s.io/cli-runtime v0.17.2
