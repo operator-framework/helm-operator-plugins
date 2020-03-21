@@ -72,20 +72,18 @@ type reconciler struct {
 	reconcilePeriod         time.Duration
 }
 
-// New creates a new Reconciler that reconciles custom resources that
-// define a Helm release. New takes variadic ReconcilerOption arguments
-// that are used to configure the Reconciler.
+// New creates a new Reconciler that reconciles custom resources that define a
+// Helm release. New takes variadic Option arguments that are used to configure
+// the Reconciler.
 //
 // Required options are:
 //   - WithGroupVersionKind
 //   - WithChart
 //
-// Other options are defaulted to sane defaults when SetupWithManager
-// is called.
+// Other options are defaulted to sane defaults when SetupWithManager is called.
 //
-// If an error occurs configuring or validating the reconciler, it is
-// returned.
-func New(opts ...ReconcilerOption) (*reconciler, error) {
+// If an error occurs configuring or validating the reconciler, it is returned.
+func New(opts ...Option) (*reconciler, error) {
 	r := &reconciler{}
 	for _, o := range opts {
 		if err := o(r); err != nil {
@@ -104,7 +102,8 @@ func New(opts ...ReconcilerOption) (*reconciler, error) {
 // reconciler and sets up the manager's scheme with the reconciler's configured
 // GroupVersionKind.
 //
-// If an error occurs setting up the reconciler with the manager, it is returned.
+// If an error occurs setting up the reconciler with the manager, it is
+// returned.
 func (r *reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	controllerName := fmt.Sprintf("%v-controller", strings.ToLower(r.gvk.Kind))
 
@@ -132,108 +131,96 @@ func (r *reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return nil
 }
 
-// ReoncilerOption is a function that configures the
-// helm reconciler.
-type ReconcilerOption func(r *reconciler) error
+// Option is a function that configures the helm reconciler.
+type Option func(r *reconciler) error
 
-// WithClient is a ReconcilerOption that configures
-// a reconciler's client.
+// WithClient is an Option that configures a reconciler's client.
 //
-// By default, manager.GetClient() is used if this
-// option is not configured.
-func WithClient(cl client.Client) ReconcilerOption {
+// By default, manager.GetClient() is used if this option is not configured.
+func WithClient(cl client.Client) Option {
 	return func(r *reconciler) error {
 		r.client = cl
 		return nil
 	}
 }
 
-// WithScheme is a ReconcilerOption that configures
-// a reconciler's scheme.
+// WithScheme is an Option that configures a reconciler's scheme.
 //
-// By default, manager.GetScheme() is used if this
-// option is not configured.
-func WithScheme(scheme *runtime.Scheme) ReconcilerOption {
+// By default, manager.GetScheme() is used if this option is not configured.
+func WithScheme(scheme *runtime.Scheme) Option {
 	return func(r *reconciler) error {
 		r.scheme = scheme
 		return nil
 	}
 }
 
-// WithActionClientGetter is a ReconcilerOption that
-// configures a reconciler's ActionClientGetter.
+// WithActionClientGetter is an Option that configures a reconciler's
+// ActionClientGetter.
 //
-// A default ActionClientGetter is used if this
-// option is not configured.
-func WithActionClientGetter(actionClientGetter helmclient.ActionClientGetter) ReconcilerOption {
+// A default ActionClientGetter is used if this option is not configured.
+func WithActionClientGetter(actionClientGetter helmclient.ActionClientGetter) Option {
 	return func(r *reconciler) error {
 		r.actionClientGetter = actionClientGetter
 		return nil
 	}
 }
 
-// WithEventRecorder is a ReconcilerOption that configures a
-// reconciler's EventRecorder.
+// WithEventRecorder is an Option that configures a reconciler's EventRecorder.
 //
-// By default, manager.GetEventRecorderFor() is used if this
-// option is not configured.
-func WithEventRecorder(er record.EventRecorder) ReconcilerOption {
+// By default, manager.GetEventRecorderFor() is used if this option is not
+// configured.
+func WithEventRecorder(er record.EventRecorder) Option {
 	return func(r *reconciler) error {
 		r.eventRecorder = er
 		return nil
 	}
 }
 
-// WithLog is a ReconcilerOption that configures
-// a reconciler's logger.
+// WithLog is an Option that configures a reconciler's logger.
 //
-// A default logger is used if this option is
-// not configured.
-func WithLog(log logr.Logger) ReconcilerOption {
+// A default logger is used if this option is not configured.
+func WithLog(log logr.Logger) Option {
 	return func(r *reconciler) error {
 		r.log = log
 		return nil
 	}
 }
 
-// WithGroupVersionKind is a ReconcilerOption that
-// configures a reconciler's GroupVersionKind.
+// WithGroupVersionKind is an Option that configures a reconciler's
+// GroupVersionKind.
 //
 // This option is required.
-func WithGroupVersionKind(gvk schema.GroupVersionKind) ReconcilerOption {
+func WithGroupVersionKind(gvk schema.GroupVersionKind) Option {
 	return func(r *reconciler) error {
 		r.gvk = &gvk
 		return nil
 	}
 }
 
-// WithChart is a ReconcilerOption that configures
-// a reconciler's helm chart.
+// WithChart is an Option that configures a reconciler's helm chart.
 //
 // This option is required.
-func WithChart(chrt *chart.Chart) ReconcilerOption {
+func WithChart(chrt *chart.Chart) Option {
 	return func(r *reconciler) error {
 		r.chrt = chrt
 		return nil
 	}
 }
 
-// WithOverrideValues is a ReconcilerOption that configures
-// a reconciler's override values.
+// WithOverrideValues is an Option that configures a reconciler's override
+// values.
 //
-// Override values can be used to enforce that certain values
-// provided by the chart's default values.yaml or by a CR spec
-// are always overridden when rendering the chart. If a value
-// in overrides is set by a CR, it is overridden by the override
-// value. The override value can be static but can also refer to
-// an environment variable.
+// Override values can be used to enforce that certain values provided by the
+// chart's default values.yaml or by a CR spec are always overridden when
+// rendering the chart. If a value in overrides is set by a CR, it is
+// overridden by the override value. The override value can be static but can
+// also refer to an environment variable.
 //
-// If an environment variable reference is listed in override
-// values but is not present in the environment when this function
-// runs, it will resolve to an empty string and override all other
-// values. Therefore, when using environment variable expansion,
-// ensure that the environment variable is set.
-func WithOverrideValues(overrides map[string]string) ReconcilerOption {
+// If an environment variable reference is listed in override values but is not
+// present in the environment when this function runs, it will resolve to an
+// empty string and override all other values. Therefore, when using
+// environment variable expansion, ensure that the environment variable is set.
+func WithOverrideValues(overrides map[string]string) Option {
 	return func(r *reconciler) error {
 		// Validate that overrides can be parsed and applied
 		// so that we fail fast during operator setup rather
@@ -248,19 +235,23 @@ func WithOverrideValues(overrides map[string]string) ReconcilerOption {
 	}
 }
 
-// WithDependentWatchesEnabled is a ReconcilerOption that configures
-// whether the reconciler will register watches for dependent objects
-// in releases and trigger reconciliations when they change.
+// WithDependentWatchesEnabled is an Option that configures whether the
+// reconciler will register watches for dependent objects in releases and
+// trigger reconciliations when they change.
 //
 // By default, dependent watches are enabled.
-func WithDependentWatchesEnabled(enable bool) ReconcilerOption {
+func WithDependentWatchesEnabled(enable bool) Option {
 	return func(r *reconciler) error {
 		r.watchDependents = &enable
 		return nil
 	}
 }
 
-func WithMaxConcurrentReconciles(max int) ReconcilerOption {
+// WithMaxConcurrentReconciles is an Option that configures the number of
+// concurrent reconciles that the controller will run.
+//
+// The default is 1.
+func WithMaxConcurrentReconciles(max int) Option {
 	return func(r *reconciler) error {
 		if max < 1 {
 			return errors.New("maxConcurrentReconciles must be at least 1")
@@ -270,7 +261,11 @@ func WithMaxConcurrentReconciles(max int) ReconcilerOption {
 	}
 }
 
-func WithReconcilePeriod(rp time.Duration) ReconcilerOption {
+// WithReconcilePeriod is an Option that configures the reconcile period of the
+// controller. This will cause the controller to reconcile CRs at least once
+// every period. By default, the reconcile period is set to 0, which means no
+// time-based reconciliations will occur.
+func WithReconcilePeriod(rp time.Duration) Option {
 	return func(r *reconciler) error {
 		if rp < 0 {
 			return errors.New("reconcile period must not be negative")
@@ -282,23 +277,22 @@ func WithReconcilePeriod(rp time.Duration) ReconcilerOption {
 
 // Reconcile reconciles a CR that defines a Helm v3 release.
 //
-// If a v2 release exists for the CR, it is automatically migrated to the
-// v3 storage format, and the old v2 release is deleted if the migration
-// succeeds.
+// If a v2 release exists for the CR, it is automatically migrated to the v3
+// storage format, and the old v2 release is deleted if the migration succeeds.
 //
 //   - If a release does not exist for this CR, a new release is installed.
 //   - If a release exists and the CR spec has changed since the last,
 //     reconciliation, the release is upgraded.
 //   - If a release exists and the CR spec has not changed since the last
 //     reconciliation, the release is reconciled. Any dependent resources that
-//     have diverged from the release manifest are re-created or patched so
-//     that they are re-aligned with the release.
+//     have diverged from the release manifest are re-created or patched so that
+//     they are re-aligned with the release.
 //   - If the CR has been deleted, the release will be uninstalled. The
 //     reconciler uses a finalizer to ensure the release uninstall succeeds
 //     before CR deletion occurs.
 //
-// If an error occurs during release installation or upgrade, the change will
-// be rolled back to restore the previous state.
+// If an error occurs during release installation or upgrade, the change will be
+// rolled back to restore the previous state.
 //
 // Reconcile also manages the status field of the custom resource. It includes
 // the release name and manifest in `status.deployedRelease`, and it updates
