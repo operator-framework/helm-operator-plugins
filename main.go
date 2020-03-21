@@ -19,6 +19,7 @@ package main
 import (
 	"flag"
 	"os"
+	"time"
 
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -46,11 +47,23 @@ func init() {
 }
 
 func main() {
-	var metricsAddr string
-	var enableLeaderElection bool
+	var (
+		metricsAddr          string
+		enableLeaderElection bool
+
+		watchesFile             string
+		maxConcurrentReconciles int
+		reconcilePeriod         time.Duration
+	)
+
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
+
+	flag.StringVar(&watchesFile, "watches-file", "./watches.yaml", "Path to watches.yaml file.")
+	flag.IntVar(&maxConcurrentReconciles, "max-concurrent-reconciles", 1, "Default maximum number of concurrent reconciles for controllers.")
+	flag.DurationVar(&reconcilePeriod, "reconcile-period", time.Minute, "Default reconcile period for controllers.")
+
 	klog.InitFlags(flag.CommandLine)
 	flag.Parse()
 
@@ -74,18 +87,26 @@ func main() {
 		os.Exit(1)
 	}
 
-	watches, err := watches.Load("./watches.yaml")
+	watches, err := watches.Load(watchesFile)
 	if err != nil {
-		setupLog.Error(err, "unable to load watches.yaml")
+		setupLog.Error(err, "unable to load watches.yaml", "path", watchesFile)
 		os.Exit(1)
 	}
 
 	for _, w := range watches {
+		if w.ReconcilePeriod != nil {
+			reconcilePeriod = *w.ReconcilePeriod
+		}
+		if w.MaxConcurrentReconciles != nil {
+			maxConcurrentReconciles = *w.MaxConcurrentReconciles
+		}
 		r, err := reconciler.New(
 			reconciler.WithChart(w.Chart),
 			reconciler.WithGroupVersionKind(w.GroupVersionKind),
 			reconciler.WithOverrideValues(w.OverrideValues),
 			reconciler.WithDependentWatchesEnabled(w.WatchDependentResources),
+			reconciler.WithMaxConcurrentReconciles(maxConcurrentReconciles),
+			reconciler.WithReconcilePeriod(reconcilePeriod),
 		)
 		if err != nil {
 			setupLog.Error(err, "unable to create helm reconciler", "controller", "Helm")
@@ -96,6 +117,7 @@ func main() {
 			setupLog.Error(err, "unable to create controller", "controller", "Helm")
 			os.Exit(1)
 		}
+		setupLog.Info("configured watch", "gvk", w.GroupVersionKind, "chartPath", w.ChartPath, "maxConcurrentReconciles", maxConcurrentReconciles, "reconcilePeriod", reconcilePeriod)
 	}
 
 	// +kubebuilder:scaffold:builder

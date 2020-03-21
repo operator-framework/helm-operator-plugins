@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math/rand"
 	"strings"
+	"time"
 
 	"github.com/go-logr/logr"
 	"helm.sh/helm/v3/pkg/action"
@@ -55,20 +56,20 @@ const uninstallFinalizer = "uninstall-reconciler-release"
 
 // reconciler reconciles a Helm object
 type reconciler struct {
-	client                  client.Client
-	scheme                  *runtime.Scheme
-	actionClientGetter      helmclient.ActionClientGetter
-	eventRecorder           record.EventRecorder
-	hooks                   []hook.Hook
-	migratorGetter          migrator.MigratorGetter
-	maxConcurrentReconciles int
+	client             client.Client
+	scheme             *runtime.Scheme
+	actionClientGetter helmclient.ActionClientGetter
+	eventRecorder      record.EventRecorder
+	hooks              []hook.Hook
+	migratorGetter     migrator.MigratorGetter
 
-	log             logr.Logger
-	gvk             *schema.GroupVersionKind
-	chrt            *chart.Chart
-	overrideValues  map[string]string
-	addWatchesFor   func(*release.Release) error
-	watchDependents *bool
+	log                     logr.Logger
+	gvk                     *schema.GroupVersionKind
+	chrt                    *chart.Chart
+	overrideValues          map[string]string
+	watchDependents         *bool
+	maxConcurrentReconciles int
+	reconcilePeriod         time.Duration
 }
 
 // New creates a new Reconciler that reconciles custom resources that
@@ -261,7 +262,20 @@ func WithDependentWatchesEnabled(enable bool) ReconcilerOption {
 
 func WithMaxConcurrentReconciles(max int) ReconcilerOption {
 	return func(r *reconciler) error {
+		if max < 1 {
+			return errors.New("maxConcurrentReconciles must be at least 1")
+		}
 		r.maxConcurrentReconciles = max
+		return nil
+	}
+}
+
+func WithReconcilePeriod(rp time.Duration) ReconcilerOption {
+	return func(r *reconciler) error {
+		if rp < 0 {
+			return errors.New("reconcile period must not be negative")
+		}
+		r.reconcilePeriod = rp
 		return nil
 	}
 }
@@ -295,7 +309,7 @@ func WithMaxConcurrentReconciles(max int) ReconcilerOption {
 //                   finalizer
 //   - Deployed - a release for this CR is deployed (but not necessarily ready).
 //   - ReleaseFailed - an installation or upgrade failed.
-//   -
+//   - Irreconcilable - an error occurred during reconciliation
 func (r *reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 	ctx := context.Background()
 	log := r.log.WithValues(strings.ToLower(r.gvk.Kind), req.NamespacedName, "id", rand.Int())
@@ -408,7 +422,7 @@ func (r *reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 		updater.EnsureDeployedRelease(rel),
 	)
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{RequeueAfter: r.reconcilePeriod}, nil
 }
 
 func (r *reconciler) getValues(obj *unstructured.Unstructured) (*chartutil.Values, error) {

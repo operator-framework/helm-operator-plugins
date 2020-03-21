@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"time"
 
 	"gopkg.in/yaml.v2"
 	"helm.sh/helm/v3/pkg/chart"
@@ -27,28 +28,23 @@ import (
 )
 
 type Watch struct {
-	GroupVersionKind        schema.GroupVersionKind
-	Chart                   *chart.Chart `json:"chart"`
-	WatchDependentResources bool
-	OverrideValues          map[string]string
-}
+	GroupVersionKind schema.GroupVersionKind `yaml:",inline"`
+	ChartPath        string                  `yaml:"chart"`
+	Chart            *chart.Chart            `yaml:"-"`
 
-type yamlWatch struct {
-	Group                   string            `yaml:"group"`
-	Version                 string            `yaml:"version"`
-	Kind                    string            `yaml:"kind"`
-	Chart                   string            `yaml:"chart"`
 	WatchDependentResources bool              `yaml:"watchDependentResources"`
 	OverrideValues          map[string]string `yaml:"overrideValues"`
+	ReconcilePeriod         *time.Duration    `yaml:"reconcilePeriod"`
+	MaxConcurrentReconciles *int              `yaml:"maxConcurrentReconciles"`
 }
 
-func (w *yamlWatch) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (w *Watch) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	// by default, the operator will watch dependent resources
 	w.WatchDependentResources = true
 
 	// hide watch data in plain struct to prevent unmarshal from calling
 	// UnmarshalYAML again
-	type plain yamlWatch
+	type plain Watch
 
 	return unmarshal((*plain)(w))
 }
@@ -63,42 +59,31 @@ func Load(path string) ([]Watch, error) {
 		return nil, err
 	}
 
-	yamlWatches := []yamlWatch{}
-	err = yaml.Unmarshal(b, &yamlWatches)
+	watches := []Watch{}
+	err = yaml.Unmarshal(b, &watches)
 	if err != nil {
 		return nil, err
 	}
 
-	watches := []Watch{}
 	watchesMap := make(map[schema.GroupVersionKind]Watch)
-	for _, w := range yamlWatches {
-		gvk := schema.GroupVersionKind{
-			Group:   w.Group,
-			Version: w.Version,
-			Kind:    w.Kind,
+	for i, w := range watches {
+		if err := verifyGVK(w.GroupVersionKind); err != nil {
+			return nil, fmt.Errorf("invalid GVK: %s: %w", w.GroupVersionKind, err)
 		}
 
-		if err := verifyGVK(gvk); err != nil {
-			return nil, fmt.Errorf("invalid GVK: %s: %w", gvk, err)
-		}
-
-		cl, err := loader.Load(w.Chart)
+		cl, err := loader.Load(w.ChartPath)
 		if err != nil {
-			return nil, fmt.Errorf("invalid chart %s: %w", w.Chart, err)
+			return nil, fmt.Errorf("invalid chart %s: %w", w.ChartPath, err)
+		}
+		w.Chart = cl
+		w.OverrideValues = expandOverrideEnvs(w.OverrideValues)
+
+		if _, ok := watchesMap[w.GroupVersionKind]; ok {
+			return nil, fmt.Errorf("duplicate GVK: %s", w.GroupVersionKind)
 		}
 
-		if _, ok := watchesMap[gvk]; ok {
-			return nil, fmt.Errorf("duplicate GVK: %s", gvk)
-		}
-
-		watch := Watch{
-			GroupVersionKind:        gvk,
-			Chart:                   cl,
-			WatchDependentResources: w.WatchDependentResources,
-			OverrideValues:          expandOverrideEnvs(w.OverrideValues),
-		}
-		watchesMap[gvk] = watch
-		watches = append(watches, watch)
+		watchesMap[w.GroupVersionKind] = w
+		watches[i] = w
 	}
 	return watches, nil
 }
