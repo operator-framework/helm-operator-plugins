@@ -29,7 +29,6 @@ type GenerationChangedPredicate = crtpredicate.GenerationChangedPredicate
 
 // DependentPredicateFuncs returns functions defined for filtering events
 func DependentPredicateFuncs() crtpredicate.Funcs {
-
 	dependentPredicate := crtpredicate.Funcs{
 		// We don't need to reconcile dependent resource creation events
 		// because dependent resources are only ever created during

@@ -41,27 +41,27 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	"github.com/operator-framework/helm-operator/internal/conditions"
-	"github.com/operator-framework/helm-operator/internal/controllerutil"
-	internalhook "github.com/operator-framework/helm-operator/internal/hook"
-	"github.com/operator-framework/helm-operator/internal/migrator"
-	"github.com/operator-framework/helm-operator/internal/predicate"
-	"github.com/operator-framework/helm-operator/internal/updater"
-	"github.com/operator-framework/helm-operator/internal/values"
 	helmclient "github.com/operator-framework/helm-operator/pkg/client"
 	"github.com/operator-framework/helm-operator/pkg/hook"
+	"github.com/operator-framework/helm-operator/pkg/reconciler/internal/conditions"
+	"github.com/operator-framework/helm-operator/pkg/reconciler/internal/controllerutil"
+	internalhook "github.com/operator-framework/helm-operator/pkg/reconciler/internal/hook"
+	"github.com/operator-framework/helm-operator/pkg/reconciler/internal/migrator"
+	"github.com/operator-framework/helm-operator/pkg/reconciler/internal/predicate"
+	"github.com/operator-framework/helm-operator/pkg/reconciler/internal/updater"
+	"github.com/operator-framework/helm-operator/pkg/reconciler/internal/values"
 )
 
 const uninstallFinalizer = "uninstall-reconciler-release"
 
-// reconciler reconciles a Helm object
-type reconciler struct {
+// Reconciler reconciles a Helm object
+type Reconciler struct {
 	client             client.Client
 	scheme             *runtime.Scheme
 	actionClientGetter helmclient.ActionClientGetter
 	eventRecorder      record.EventRecorder
 	hooks              []hook.Hook
-	migratorGetter     migrator.MigratorGetter
+	migratorGetter     migrator.Getter
 
 	log                     logr.Logger
 	gvk                     *schema.GroupVersionKind
@@ -82,9 +82,9 @@ type reconciler struct {
 //
 // Other options are defaulted to sane defaults when SetupWithManager is called.
 //
-// If an error occurs configuring or validating the reconciler, it is returned.
-func New(opts ...Option) (*reconciler, error) {
-	r := &reconciler{}
+// If an error occurs configuring or validating the Reconciler, it is returned.
+func New(opts ...Option) (*Reconciler, error) {
+	r := &Reconciler{}
 	for _, o := range opts {
 		if err := o(r); err != nil {
 			return nil, err
@@ -97,14 +97,14 @@ func New(opts ...Option) (*reconciler, error) {
 	return r, nil
 }
 
-// SetupWithManager configures a controller for the reconciler and registers
+// SetupWithManager configures a controller for the Reconciler and registers
 // watches. It also uses the passed Manager to initialize default values for the
-// reconciler and sets up the manager's scheme with the reconciler's configured
+// Reconciler and sets up the manager's scheme with the Reconciler's configured
 // GroupVersionKind.
 //
-// If an error occurs setting up the reconciler with the manager, it is
+// If an error occurs setting up the Reconciler with the manager, it is
 // returned.
-func (r *reconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	controllerName := fmt.Sprintf("%v-controller", strings.ToLower(r.gvk.Kind))
 
 	if err := r.addDefaults(mgr, controllerName); err != nil {
@@ -131,83 +131,83 @@ func (r *reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return nil
 }
 
-// Option is a function that configures the helm reconciler.
-type Option func(r *reconciler) error
+// Option is a function that configures the helm Reconciler.
+type Option func(r *Reconciler) error
 
-// WithClient is an Option that configures a reconciler's client.
+// WithClient is an Option that configures a Reconciler's client.
 //
 // By default, manager.GetClient() is used if this option is not configured.
 func WithClient(cl client.Client) Option {
-	return func(r *reconciler) error {
+	return func(r *Reconciler) error {
 		r.client = cl
 		return nil
 	}
 }
 
-// WithScheme is an Option that configures a reconciler's scheme.
+// WithScheme is an Option that configures a Reconciler's scheme.
 //
 // By default, manager.GetScheme() is used if this option is not configured.
 func WithScheme(scheme *runtime.Scheme) Option {
-	return func(r *reconciler) error {
+	return func(r *Reconciler) error {
 		r.scheme = scheme
 		return nil
 	}
 }
 
-// WithActionClientGetter is an Option that configures a reconciler's
+// WithActionClientGetter is an Option that configures a Reconciler's
 // ActionClientGetter.
 //
 // A default ActionClientGetter is used if this option is not configured.
 func WithActionClientGetter(actionClientGetter helmclient.ActionClientGetter) Option {
-	return func(r *reconciler) error {
+	return func(r *Reconciler) error {
 		r.actionClientGetter = actionClientGetter
 		return nil
 	}
 }
 
-// WithEventRecorder is an Option that configures a reconciler's EventRecorder.
+// WithEventRecorder is an Option that configures a Reconciler's EventRecorder.
 //
 // By default, manager.GetEventRecorderFor() is used if this option is not
 // configured.
 func WithEventRecorder(er record.EventRecorder) Option {
-	return func(r *reconciler) error {
+	return func(r *Reconciler) error {
 		r.eventRecorder = er
 		return nil
 	}
 }
 
-// WithLog is an Option that configures a reconciler's logger.
+// WithLog is an Option that configures a Reconciler's logger.
 //
 // A default logger is used if this option is not configured.
 func WithLog(log logr.Logger) Option {
-	return func(r *reconciler) error {
+	return func(r *Reconciler) error {
 		r.log = log
 		return nil
 	}
 }
 
-// WithGroupVersionKind is an Option that configures a reconciler's
+// WithGroupVersionKind is an Option that configures a Reconciler's
 // GroupVersionKind.
 //
 // This option is required.
 func WithGroupVersionKind(gvk schema.GroupVersionKind) Option {
-	return func(r *reconciler) error {
+	return func(r *Reconciler) error {
 		r.gvk = &gvk
 		return nil
 	}
 }
 
-// WithChart is an Option that configures a reconciler's helm chart.
+// WithChart is an Option that configures a Reconciler's helm chart.
 //
 // This option is required.
 func WithChart(chrt *chart.Chart) Option {
-	return func(r *reconciler) error {
+	return func(r *Reconciler) error {
 		r.chrt = chrt
 		return nil
 	}
 }
 
-// WithOverrideValues is an Option that configures a reconciler's override
+// WithOverrideValues is an Option that configures a Reconciler's override
 // values.
 //
 // Override values can be used to enforce that certain values provided by the
@@ -221,7 +221,7 @@ func WithChart(chrt *chart.Chart) Option {
 // empty string and override all other values. Therefore, when using
 // environment variable expansion, ensure that the environment variable is set.
 func WithOverrideValues(overrides map[string]string) Option {
-	return func(r *reconciler) error {
+	return func(r *Reconciler) error {
 		// Validate that overrides can be parsed and applied
 		// so that we fail fast during operator setup rather
 		// than during the first reconciliation.
@@ -236,12 +236,12 @@ func WithOverrideValues(overrides map[string]string) Option {
 }
 
 // WithDependentWatchesEnabled is an Option that configures whether the
-// reconciler will register watches for dependent objects in releases and
+// Reconciler will register watches for dependent objects in releases and
 // trigger reconciliations when they change.
 //
 // By default, dependent watches are enabled.
 func WithDependentWatchesEnabled(enable bool) Option {
-	return func(r *reconciler) error {
+	return func(r *Reconciler) error {
 		r.watchDependents = &enable
 		return nil
 	}
@@ -252,7 +252,7 @@ func WithDependentWatchesEnabled(enable bool) Option {
 //
 // The default is 1.
 func WithMaxConcurrentReconciles(max int) Option {
-	return func(r *reconciler) error {
+	return func(r *Reconciler) error {
 		if max < 1 {
 			return errors.New("maxConcurrentReconciles must be at least 1")
 		}
@@ -266,7 +266,7 @@ func WithMaxConcurrentReconciles(max int) Option {
 // every period. By default, the reconcile period is set to 0, which means no
 // time-based reconciliations will occur.
 func WithReconcilePeriod(rp time.Duration) Option {
-	return func(r *reconciler) error {
+	return func(r *Reconciler) error {
 		if rp < 0 {
 			return errors.New("reconcile period must not be negative")
 		}
@@ -288,7 +288,7 @@ func WithReconcilePeriod(rp time.Duration) Option {
 //     have diverged from the release manifest are re-created or patched so that
 //     they are re-aligned with the release.
 //   - If the CR has been deleted, the release will be uninstalled. The
-//     reconciler uses a finalizer to ensure the release uninstall succeeds
+//     Reconciler uses a finalizer to ensure the release uninstall succeeds
 //     before CR deletion occurs.
 //
 // If an error occurs during release installation or upgrade, the change will be
@@ -299,12 +299,12 @@ func WithReconcilePeriod(rp time.Duration) Option {
 // `status.conditions` based on reconciliation progress and success. Condition
 // types include:
 //
-//   - Initialized - initial reconciler-managed fields added (e.g. the uninstall
+//   - Initialized - initial Reconciler-managed fields added (e.g. the uninstall
 //                   finalizer
 //   - Deployed - a release for this CR is deployed (but not necessarily ready).
 //   - ReleaseFailed - an installation or upgrade failed.
 //   - Irreconcilable - an error occurred during reconciliation
-func (r *reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
+func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 	ctx := context.Background()
 	log := r.log.WithValues(strings.ToLower(r.gvk.Kind), req.NamespacedName, "id", rand.Int())
 
@@ -419,7 +419,7 @@ func (r *reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 	return ctrl.Result{RequeueAfter: r.reconcilePeriod}, nil
 }
 
-func (r *reconciler) getValues(obj *unstructured.Unstructured) (*chartutil.Values, error) {
+func (r *Reconciler) getValues(obj *unstructured.Unstructured) (*chartutil.Values, error) {
 	crVals, err := values.FromUnstructured(obj)
 	if err != nil {
 		return nil, err
@@ -442,7 +442,7 @@ const (
 	stateError              helmReleaseState = "error"
 )
 
-func (r *reconciler) getReleaseState(client helmclient.ActionInterface, obj *unstructured.Unstructured, vals map[string]interface{}) (*release.Release, helmReleaseState, error) {
+func (r *Reconciler) getReleaseState(client helmclient.ActionInterface, obj metav1.Object, vals map[string]interface{}) (*release.Release, helmReleaseState, error) {
 	deployedRelease, err := client.Get(obj.GetName())
 	if err != nil && !errors.Is(err, driver.ErrReleaseNotFound) {
 		return nil, stateError, err
@@ -471,37 +471,38 @@ func (r *reconciler) getReleaseState(client helmclient.ActionInterface, obj *uns
 	return deployedRelease, stateUnchanged, nil
 }
 
-func (r *reconciler) doInstall(helmClient helmclient.ActionInterface, u *updater.Updater, obj *unstructured.Unstructured, vals map[string]interface{}, log logr.Logger) (*release.Release, error) {
+func (r *Reconciler) doInstall(helmClient helmclient.ActionInterface, u *updater.Updater, obj *unstructured.Unstructured, vals map[string]interface{}, log logr.Logger) (*release.Release, error) {
 	rel, err := helmClient.Install(obj.GetName(), obj.GetNamespace(), r.chrt, vals)
 	if err != nil {
 		u.UpdateStatus(updater.EnsureCondition(conditions.ReleaseFailed(conditions.ReasonInstallError, err)))
 		return nil, err
 	}
-	for k, v := range r.overrideValues {
-		r.eventRecorder.Eventf(obj, "Warning", "ValueOverridden",
-			"Chart value %q overridden to %q by operator", k, v)
-	}
+	r.reportOverrideEvents(obj)
 	u.UpdateStatus(updater.EnsureCondition(conditions.Deployed(corev1.ConditionTrue, conditions.ReasonInstallSuccessful, rel.Info.Notes)))
 	log.Info("Release installed", "name", rel.Name, "version", rel.Version)
 	return rel, nil
 }
 
-func (r *reconciler) doUpgrade(helmClient helmclient.ActionInterface, u *updater.Updater, obj *unstructured.Unstructured, vals map[string]interface{}, log logr.Logger) (*release.Release, error) {
+func (r *Reconciler) doUpgrade(helmClient helmclient.ActionInterface, u *updater.Updater, obj *unstructured.Unstructured, vals map[string]interface{}, log logr.Logger) (*release.Release, error) {
 	rel, err := helmClient.Upgrade(obj.GetName(), obj.GetNamespace(), r.chrt, vals)
 	if err != nil {
 		u.UpdateStatus(updater.EnsureCondition(conditions.ReleaseFailed(conditions.ReasonUpgradeError, err)))
 		return nil, err
 	}
-	for k, v := range r.overrideValues {
-		r.eventRecorder.Eventf(obj, "Warning", "ValueOverridden",
-			"Chart value %q overridden to %q by operator", k, v)
-	}
+	r.reportOverrideEvents(obj)
 	u.UpdateStatus(updater.EnsureCondition(conditions.Deployed(corev1.ConditionTrue, conditions.ReasonUpgradeSuccessful, rel.Info.Notes)))
 	log.Info("Release upgraded", "name", rel.Name, "version", rel.Version)
 	return rel, nil
 }
 
-func (r *reconciler) doReconcile(helmClient helmclient.ActionInterface, u *updater.Updater, rel *release.Release, log logr.Logger) error {
+func (r *Reconciler) reportOverrideEvents(obj runtime.Object) {
+	for k, v := range r.overrideValues {
+		r.eventRecorder.Eventf(obj, "Warning", "ValueOverridden",
+			"Chart value %q overridden to %q by operator", k, v)
+	}
+}
+
+func (r *Reconciler) doReconcile(helmClient helmclient.ActionInterface, u *updater.Updater, rel *release.Release, log logr.Logger) error {
 	// If a change is made to the CR spec that causes a release failure, a
 	// ConditionReleaseFailed is added to the status conditions. If that change
 	// is then reverted to its previous state, the operator will stop
@@ -519,7 +520,7 @@ func (r *reconciler) doReconcile(helmClient helmclient.ActionInterface, u *updat
 	return nil
 }
 
-func (r *reconciler) doUninstall(helmClient helmclient.ActionInterface, u *updater.Updater, obj *unstructured.Unstructured, log logr.Logger) error {
+func (r *Reconciler) doUninstall(helmClient helmclient.ActionInterface, u *updater.Updater, obj *unstructured.Unstructured, log logr.Logger) error {
 	resp, err := helmClient.Uninstall(obj.GetName())
 	if errors.Is(err, driver.ErrReleaseNotFound) {
 		log.Info("Release not found, removing finalizer")
@@ -539,7 +540,7 @@ func (r *reconciler) doUninstall(helmClient helmclient.ActionInterface, u *updat
 	return nil
 }
 
-func (r *reconciler) validate() error {
+func (r *Reconciler) validate() error {
 	if r.gvk == nil {
 		return errors.New("gvk must not be nil")
 	}
@@ -549,7 +550,7 @@ func (r *reconciler) validate() error {
 	return nil
 }
 
-func (r *reconciler) addDefaults(mgr ctrl.Manager, controllerName string) error {
+func (r *Reconciler) addDefaults(mgr ctrl.Manager, controllerName string) error {
 	trueVal := true
 	if r.watchDependents == nil {
 		r.watchDependents = &trueVal
@@ -583,12 +584,12 @@ func (r *reconciler) addDefaults(mgr ctrl.Manager, controllerName string) error 
 	return nil
 }
 
-func (r *reconciler) setupScheme(mgr ctrl.Manager) {
+func (r *Reconciler) setupScheme(mgr ctrl.Manager) {
 	mgr.GetScheme().AddKnownTypeWithName(*r.gvk, &unstructured.Unstructured{})
 	metav1.AddToGroupVersion(mgr.GetScheme(), r.gvk.GroupVersion())
 }
 
-func (r *reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) error {
+func (r *Reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) error {
 	obj := &unstructured.Unstructured{}
 	obj.SetGroupVersionKind(*r.gvk)
 	if err := c.Watch(

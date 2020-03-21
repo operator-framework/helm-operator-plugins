@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	"k8s.io/client-go/rest"
@@ -11,16 +12,15 @@ import (
 	helm2to3 "github.com/helm/helm-2to3/pkg/v3"
 	storagev3 "helm.sh/helm/v3/pkg/storage"
 	driverv3 "helm.sh/helm/v3/pkg/storage/driver"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	storagev2 "k8s.io/helm/pkg/storage"
 	driverv2 "k8s.io/helm/pkg/storage/driver"
 )
 
-type MigratorGetter interface {
-	MigratorFor(obj *unstructured.Unstructured) Migrator
+type Getter interface {
+	MigratorFor(obj metav1.Object) Migrator
 }
 
-func NewMigratorGetter(cfg *rest.Config) (MigratorGetter, error) {
+func NewMigratorGetter(cfg *rest.Config) (Getter, error) {
 	client, err := v1.NewForConfig(cfg)
 	if err != nil {
 		return nil, err
@@ -32,7 +32,7 @@ type migratorV2toV3Getter struct {
 	client v1.CoreV1Interface
 }
 
-func (m *migratorV2toV3Getter) MigratorFor(obj *unstructured.Unstructured) Migrator {
+func (m *migratorV2toV3Getter) MigratorFor(obj metav1.Object) Migrator {
 	driverV2 := driverv2.NewSecrets(m.client.Secrets(obj.GetNamespace()))
 	driverV3 := driverv3.NewSecrets(m.client.Secrets(obj.GetNamespace()))
 	return &migratorV2toV3{

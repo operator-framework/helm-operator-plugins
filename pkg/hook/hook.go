@@ -21,9 +21,3 @@ import (
 type Hook interface {
 	Exec(*release.Release) error
 }
-
-type HookFunc func(*release.Release) error
-
-func (h HookFunc) Exec(rel *release.Release) error {
-	return h(rel)
-}

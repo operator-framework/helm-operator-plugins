@@ -30,19 +30,29 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	"github.com/operator-framework/helm-operator/internal/predicate"
 	"github.com/operator-framework/helm-operator/pkg/hook"
+	"github.com/operator-framework/helm-operator/pkg/reconciler/internal/predicate"
 )
 
 func NewDependentResourceWatcher(c controller.Controller, rm meta.RESTMapper, owner runtime.Object, log logr.Logger) hook.Hook {
 	return &dependentResourceWatcher{
-		Controller: c,
-		Owner:      owner,
-		RESTMapper: rm,
-		Log:        log,
+		controller: c,
+		owner:      owner,
+		restMapper: rm,
+		log:        log,
 		m:          sync.Mutex{},
 		watches:    make(map[schema.GroupVersionKind]struct{}),
 	}
+}
+
+type dependentResourceWatcher struct {
+	controller controller.Controller
+	owner      runtime.Object
+	restMapper meta.RESTMapper
+	log        logr.Logger
+
+	m       sync.Mutex
+	watches map[schema.GroupVersionKind]struct{}
 }
 
 func (d *dependentResourceWatcher) Exec(rel *release.Release) error {
@@ -67,33 +77,23 @@ func (d *dependentResourceWatcher) Exec(rel *release.Release) error {
 			continue
 		}
 
-		if ok, err := isValidRelationship(d.RESTMapper, d.Owner.GetObjectKind().GroupVersionKind(), depGVK); err != nil {
+		if ok, err := isValidRelationship(d.restMapper, d.owner.GetObjectKind().GroupVersionKind(), depGVK); err != nil {
 			return err
 		} else if !ok {
 			d.watches[depGVK] = struct{}{}
-			d.Log.Info("Cannot watch cluster-scoped dependent resource for namespace-scoped owner. Changes to this dependent resource type will not be reconciled",
+			d.log.Info("Cannot watch cluster-scoped dependent resource for namespace-scoped owner. Changes to this dependent resource type will not be reconciled",
 				"dependentAPIVersion", depGVK.GroupVersion(), "dependentKind", depGVK.Kind)
 			continue
 		}
 
-		err = d.Controller.Watch(&source.Kind{Type: &obj}, &handler.EnqueueRequestForOwner{OwnerType: d.Owner}, dependentPredicate)
+		err = d.controller.Watch(&source.Kind{Type: &obj}, &handler.EnqueueRequestForOwner{OwnerType: d.owner}, dependentPredicate)
 		if err != nil {
 			return err
 		}
 
 		d.watches[depGVK] = struct{}{}
-		d.Log.V(1).Info("Watching dependent resource", "dependentAPIVersion", depGVK.GroupVersion(), "dependentKind", depGVK.Kind)
+		d.log.V(1).Info("Watching dependent resource", "dependentAPIVersion", depGVK.GroupVersion(), "dependentKind", depGVK.Kind)
 	}
-}
-
-type dependentResourceWatcher struct {
-	Controller controller.Controller
-	Owner      runtime.Object
-	RESTMapper meta.RESTMapper
-	Log        logr.Logger
-
-	m       sync.Mutex
-	watches map[schema.GroupVersionKind]struct{}
 }
 
 func isValidRelationship(restMapper meta.RESTMapper, owner, dependent schema.GroupVersionKind) (bool, error) {
