@@ -73,7 +73,7 @@ func (d *dependentResourceWatcher) Exec(rel *release.Release) error {
 		}
 
 		depGVK := obj.GroupVersionKind()
-		if _, ok := d.watches[depGVK]; ok {
+		if _, ok := d.watches[depGVK]; ok || depGVK.Empty() {
 			continue
 		}
 
