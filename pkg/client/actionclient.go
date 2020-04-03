@@ -21,24 +21,21 @@ import (
 	"fmt"
 
 	"github.com/ghodss/yaml"
-
-	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-
-	"helm.sh/helm/v3/pkg/kube"
-
-	"helm.sh/helm/v3/pkg/postrender"
-
-	"gomodules.xyz/jsonpatch/v2"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
+	"helm.sh/helm/v3/pkg/kube"
+	"helm.sh/helm/v3/pkg/postrender"
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/storage/driver"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	apitypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/kubectl/pkg/scheme"
 )
 
 type ActionClientGetter interface {
@@ -66,6 +63,8 @@ type actionClientGetter struct {
 	acg ActionConfigGetter
 }
 
+var _ ActionClientGetter = &actionClientGetter{}
+
 func (hcg *actionClientGetter) ActionClientFor(obj Object) (ActionInterface, error) {
 	actionConfig, err := hcg.acg.ActionConfigFor(obj)
 	if err != nil {
@@ -79,6 +78,8 @@ type actionClient struct {
 	conf         *action.Configuration
 	postRenderer postrender.PostRenderer
 }
+
+var _ ActionInterface = &actionClient{}
 
 func (c *actionClient) Get(name string, opts ...GetOption) (*release.Release, error) {
 	get := action.NewGet(c.conf)
@@ -180,7 +181,7 @@ func (c *actionClient) Reconcile(rel *release.Release) error {
 
 		helper := resource.NewHelper(expected.Client, expected.Mapping)
 
-		existing, err := helper.Get(expected.Namespace, expected.Name, false)
+		existing, err := helper.Get(expected.Namespace, expected.Name, expected.Export)
 		if apierrors.IsNotFound(err) {
 			if _, err := helper.Create(expected.Namespace, true, expected.Object, &metav1.CreateOptions{}); err != nil {
 				return fmt.Errorf("create error: %w", err)
@@ -190,16 +191,20 @@ func (c *actionClient) Reconcile(rel *release.Release) error {
 			return err
 		}
 
-		patch, err := generatePatch(existing, expected.Object)
+		expectedObj, err := asVersioned(expected)
 		if err != nil {
-			return fmt.Errorf("failed to marshal JSON patch: %w", err)
+			return fmt.Errorf("could not get versioned object: %w", err)
+		}
+		patch, err := generateStrategicMergePatch(existing, expectedObj)
+		if err != nil {
+			return fmt.Errorf("failed to generate strategic merge patch: %w", err)
 		}
 
 		if patch == nil {
 			return nil
 		}
 
-		_, err = helper.Patch(expected.Namespace, expected.Name, apitypes.JSONPatchType, patch, &metav1.PatchOptions{})
+		_, err = helper.Patch(expected.Namespace, expected.Name, apitypes.StrategicMergePatchType, patch, &metav1.PatchOptions{})
 		if err != nil {
 			return fmt.Errorf("patch error: %w", err)
 		}
@@ -207,7 +212,15 @@ func (c *actionClient) Reconcile(rel *release.Release) error {
 	})
 }
 
-func generatePatch(existing, expected runtime.Object) ([]byte, error) {
+func asVersioned(info *resource.Info) (runtime.Object, error) {
+	if info.Mapping == nil {
+		return nil, fmt.Errorf("failed to get GroupVersion mapping for resource: %s", info)
+	}
+	gv := info.Mapping.GroupVersionKind.GroupVersion()
+	return runtime.ObjectConvertor(scheme.Scheme).ConvertToVersion(info.Object, gv)
+}
+
+func generateStrategicMergePatch(existing, expected runtime.Object) ([]byte, error) {
 	existingJSON, err := json.Marshal(existing)
 	if err != nil {
 		return nil, err
@@ -217,30 +230,11 @@ func generatePatch(existing, expected runtime.Object) ([]byte, error) {
 		return nil, err
 	}
 
-	ops, err := jsonpatch.CreatePatch(existingJSON, expectedJSON)
+	patchMeta, err := strategicpatch.NewPatchMetaFromStruct(expected)
 	if err != nil {
 		return nil, err
 	}
-
-	// We ignore the "remove" operations from the full patch because they are
-	// fields added by Kubernetes or by the user after the existing release
-	// resource has been applied. The goal for this patch is to make sure that
-	// the fields managed by the Helm chart are applied.
-	patchOps := make([]jsonpatch.JsonPatchOperation, 0)
-	for _, op := range ops {
-		if op.Operation != "remove" {
-			patchOps = append(patchOps, op)
-		}
-	}
-
-	// If there are no patch operations, return nil. Callers are expected
-	// to check for a nil response and skip the patch operation to avoid
-	// unnecessary chatter with the API server.
-	if len(patchOps) == 0 {
-		return nil, nil
-	}
-
-	return json.Marshal(patchOps)
+	return strategicpatch.CreateThreeWayMergePatch(expectedJSON, expectedJSON, existingJSON, patchMeta, true)
 }
 
 func createPostRenderer(kubeClient kube.Interface, obj Object) postrender.PostRenderer {
