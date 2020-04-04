@@ -50,6 +50,9 @@ fmt:
 vet:
 	go vet ./...
 
+lint: golangci-lint
+	$(GOLANGCI_LINT) run
+
 # Generate code
 generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile=./hack/boilerplate.go.txt paths="./..."
@@ -64,6 +67,20 @@ docker-push:
 
 # find or download controller-gen
 # download controller-gen if necessary
+golangci-lint:
+ifeq (, $(shell which golangci-lint))
+	@{ \
+	set -e ;\
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v1.24.0 ;\
+	}
+GOLANGCI_LINT=$(shell go env GOPATH)/bin/golangci-lint
+else
+GOLANGCI_LINT=$(shell which golangci-lint)
+endif
+
+
+# find or download controller-gen
+# download controller-gen if necessary
 controller-gen:
 ifeq (, $(shell which controller-gen))
 	@{ \
@@ -74,7 +91,7 @@ ifeq (, $(shell which controller-gen))
 	go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.2.4 ;\
 	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
 	}
-CONTROLLER_GEN=$(GOBIN)/controller-gen
+CONTROLLER_GEN=$(shell go env GOPATH)/bin/controller-gen
 else
 CONTROLLER_GEN=$(shell which controller-gen)
 endif
