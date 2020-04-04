@@ -52,7 +52,7 @@ import (
 	"github.com/operator-framework/helm-operator/pkg/reconciler/internal/values"
 )
 
-const uninstallFinalizer = "uninstall-reconciler-release"
+const uninstallFinalizer = "uninstall-helm-release"
 
 // Reconciler reconciles a Helm object
 type Reconciler struct {
