@@ -17,7 +17,7 @@ package conditions
 import (
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/operator-framework/helm-operator/pkg/reconciler/internal/status"
+	"github.com/joelanford/helm-operator/pkg/reconciler/internal/status"
 )
 
 const (

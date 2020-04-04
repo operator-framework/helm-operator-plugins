@@ -30,8 +30,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	"github.com/operator-framework/helm-operator/pkg/hook"
-	"github.com/operator-framework/helm-operator/pkg/reconciler/internal/predicate"
+	"github.com/joelanford/helm-operator/pkg/hook"
+	"github.com/joelanford/helm-operator/pkg/reconciler/internal/predicate"
 )
 
 func NewDependentResourceWatcher(c controller.Controller, rm meta.RESTMapper, owner runtime.Object, log logr.Logger) hook.Hook {

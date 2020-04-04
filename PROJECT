@@ -1,6 +1,6 @@
 version: "2"
 domain: sdk.operator-framework.io
-repo: github.com/operator-framework/helm-operator
+repo: github.com/joelanford/helm-operator
 resources:
 - group: apache
   version: v1

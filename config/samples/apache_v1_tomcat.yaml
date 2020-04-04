@@ -2,6 +2,11 @@ apiVersion: apache.sdk.operator-framework.io/v1
 kind: Tomcat
 metadata:
   name: tomcat-sample
+  annotations:
+    helm.sdk.operator-framework.io/upgrade-force: "true"
+    helm.sdk.operator-framework.io/install-disable-hooks: "true"
+    helm.sdk.operator-framework.io/upgrade-disable-hooks: "true"
+    helm.sdk.operator-framework.io/uninstall-disable-hooks: "true"
 spec:
   replicaCount: 1
   image:

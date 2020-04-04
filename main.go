@@ -29,10 +29,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	zapl "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/operator-framework/helm-operator/pkg/manager"
-	"github.com/operator-framework/helm-operator/pkg/reconciler"
-	"github.com/operator-framework/helm-operator/pkg/watches"
-	// +kubebuilder:scaffold:imports
+	"github.com/joelanford/helm-operator/pkg/annotation"
+	"github.com/joelanford/helm-operator/pkg/manager"
+	"github.com/joelanford/helm-operator/pkg/reconciler"
+	"github.com/joelanford/helm-operator/pkg/watches"
 )
 
 var (
@@ -109,6 +109,10 @@ func main() {
 			reconciler.WithDependentWatchesEnabled(w.WatchDependentResources),
 			reconciler.WithMaxConcurrentReconciles(maxConcurrentReconciles),
 			reconciler.WithReconcilePeriod(reconcilePeriod),
+			reconciler.WithInstallAnnotation(&annotation.InstallDisableHooks{}),
+			reconciler.WithUpgradeAnnotation(&annotation.UpgradeDisableHooks{}),
+			reconciler.WithUpgradeAnnotation(&annotation.UpgradeForce{}),
+			reconciler.WithUninstallAnnotation(&annotation.UninstallDisableHooks{}),
 		)
 		if err != nil {
 			setupLog.Error(err, "unable to create helm reconciler", "controller", "Helm")

@@ -41,15 +41,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	helmclient "github.com/operator-framework/helm-operator/pkg/client"
-	"github.com/operator-framework/helm-operator/pkg/hook"
-	"github.com/operator-framework/helm-operator/pkg/reconciler/internal/conditions"
-	"github.com/operator-framework/helm-operator/pkg/reconciler/internal/controllerutil"
-	internalhook "github.com/operator-framework/helm-operator/pkg/reconciler/internal/hook"
-	"github.com/operator-framework/helm-operator/pkg/reconciler/internal/migrator"
-	"github.com/operator-framework/helm-operator/pkg/reconciler/internal/predicate"
-	"github.com/operator-framework/helm-operator/pkg/reconciler/internal/updater"
-	"github.com/operator-framework/helm-operator/pkg/reconciler/internal/values"
+	"github.com/joelanford/helm-operator/pkg/annotation"
+	helmclient "github.com/joelanford/helm-operator/pkg/client"
+	"github.com/joelanford/helm-operator/pkg/hook"
+	"github.com/joelanford/helm-operator/pkg/reconciler/internal/conditions"
+	"github.com/joelanford/helm-operator/pkg/reconciler/internal/controllerutil"
+	internalhook "github.com/joelanford/helm-operator/pkg/reconciler/internal/hook"
+	"github.com/joelanford/helm-operator/pkg/reconciler/internal/migrator"
+	"github.com/joelanford/helm-operator/pkg/reconciler/internal/updater"
+	"github.com/joelanford/helm-operator/pkg/reconciler/internal/values"
 )
 
 const uninstallFinalizer = "uninstall-helm-release"
@@ -70,6 +70,11 @@ type Reconciler struct {
 	watchDependents         *bool
 	maxConcurrentReconciles int
 	reconcilePeriod         time.Duration
+
+	annotations          map[string]struct{}
+	installAnnotations   map[string]annotation.Install
+	upgradeAnnotations   map[string]annotation.Upgrade
+	uninstallAnnotations map[string]annotation.Uninstall
 }
 
 // New creates a new Reconciler that reconciles custom resources that define a
@@ -84,7 +89,12 @@ type Reconciler struct {
 //
 // If an error occurs configuring or validating the Reconciler, it is returned.
 func New(opts ...Option) (*Reconciler, error) {
-	r := &Reconciler{}
+	r := &Reconciler{
+		annotations:          make(map[string]struct{}),
+		installAnnotations:   make(map[string]annotation.Install),
+		upgradeAnnotations:   make(map[string]annotation.Upgrade),
+		uninstallAnnotations: make(map[string]annotation.Uninstall),
+	}
 	for _, o := range opts {
 		if err := o(r); err != nil {
 			return nil, err
@@ -271,6 +281,57 @@ func WithReconcilePeriod(rp time.Duration) Option {
 			return errors.New("reconcile period must not be negative")
 		}
 		r.reconcilePeriod = rp
+		return nil
+	}
+}
+
+// WithInstallAnnotation is an Option that configures an Install annotation
+// to enable custom action.Install fields to be set based on the value of
+// annotations found in the custom resource watched by this reconciler.
+// Duplicate annotation names will result in an error.
+func WithInstallAnnotation(a annotation.Install) Option {
+	return func(r *Reconciler) error {
+		name := a.Name()
+		if _, ok := r.annotations[name]; ok {
+			return fmt.Errorf("annotation %q already exists", name)
+		}
+
+		r.annotations[name] = struct{}{}
+		r.installAnnotations[name] = a
+		return nil
+	}
+}
+
+// WithUpgradeAnnotation is an Option that configures an Upgrade annotation
+// to enable custom action.Upgrade fields to be set based on the value of
+// annotations found in the custom resource watched by this reconciler.
+// Duplicate annotation names will result in an error.
+func WithUpgradeAnnotation(a annotation.Upgrade) Option {
+	return func(r *Reconciler) error {
+		name := a.Name()
+		if _, ok := r.annotations[name]; ok {
+			return fmt.Errorf("annotation %q already exists", name)
+		}
+
+		r.annotations[name] = struct{}{}
+		r.upgradeAnnotations[name] = a
+		return nil
+	}
+}
+
+// WithUninstallAnnotation is an Option that configures an Uninstall annotation
+// to enable custom action.Uninstall fields to be set based on the value of
+// annotations found in the custom resource watched by this reconciler.
+// Duplicate annotation names will result in an error.
+func WithUninstallAnnotation(a annotation.Uninstall) Option {
+	return func(r *Reconciler) error {
+		name := a.Name()
+		if _, ok := r.annotations[name]; ok {
+			return fmt.Errorf("annotation %q already exists", name)
+		}
+
+		r.annotations[name] = struct{}{}
+		r.uninstallAnnotations[name] = a
 		return nil
 	}
 }
@@ -472,7 +533,13 @@ func (r *Reconciler) getReleaseState(client helmclient.ActionInterface, obj meta
 }
 
 func (r *Reconciler) doInstall(helmClient helmclient.ActionInterface, u *updater.Updater, obj *unstructured.Unstructured, vals map[string]interface{}, log logr.Logger) (*release.Release, error) {
-	rel, err := helmClient.Install(obj.GetName(), obj.GetNamespace(), r.chrt, vals)
+	var opts []helmclient.InstallOption
+	for name, annot := range r.installAnnotations {
+		if v, ok := obj.GetAnnotations()[name]; ok {
+			opts = append(opts, annot.InstallOption(v))
+		}
+	}
+	rel, err := helmClient.Install(obj.GetName(), obj.GetNamespace(), r.chrt, vals, opts...)
 	if err != nil {
 		u.UpdateStatus(updater.EnsureCondition(conditions.ReleaseFailed(conditions.ReasonInstallError, err)))
 		return nil, err
@@ -484,7 +551,14 @@ func (r *Reconciler) doInstall(helmClient helmclient.ActionInterface, u *updater
 }
 
 func (r *Reconciler) doUpgrade(helmClient helmclient.ActionInterface, u *updater.Updater, obj *unstructured.Unstructured, vals map[string]interface{}, log logr.Logger) (*release.Release, error) {
-	rel, err := helmClient.Upgrade(obj.GetName(), obj.GetNamespace(), r.chrt, vals)
+	var opts []helmclient.UpgradeOption
+	for name, annot := range r.upgradeAnnotations {
+		if v, ok := obj.GetAnnotations()[name]; ok {
+			opts = append(opts, annot.UpgradeOption(v))
+		}
+	}
+
+	rel, err := helmClient.Upgrade(obj.GetName(), obj.GetNamespace(), r.chrt, vals, opts...)
 	if err != nil {
 		u.UpdateStatus(updater.EnsureCondition(conditions.ReleaseFailed(conditions.ReasonUpgradeError, err)))
 		return nil, err
@@ -521,7 +595,14 @@ func (r *Reconciler) doReconcile(helmClient helmclient.ActionInterface, u *updat
 }
 
 func (r *Reconciler) doUninstall(helmClient helmclient.ActionInterface, u *updater.Updater, obj *unstructured.Unstructured, log logr.Logger) error {
-	resp, err := helmClient.Uninstall(obj.GetName())
+	var opts []helmclient.UninstallOption
+	for name, annot := range r.uninstallAnnotations {
+		if v, ok := obj.GetAnnotations()[name]; ok {
+			opts = append(opts, annot.UninstallOption(v))
+		}
+	}
+
+	resp, err := helmClient.Uninstall(obj.GetName(), opts...)
 	if errors.Is(err, driver.ErrReleaseNotFound) {
 		log.Info("Release not found, removing finalizer")
 	} else if err != nil {
@@ -595,7 +676,6 @@ func (r *Reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) err
 	if err := c.Watch(
 		&source.Kind{Type: obj},
 		&handler.EnqueueRequestForObject{},
-		predicate.GenerationChangedPredicate{},
 	); err != nil {
 		return err
 	}
