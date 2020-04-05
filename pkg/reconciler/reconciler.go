@@ -60,7 +60,8 @@ type Reconciler struct {
 	scheme             *runtime.Scheme
 	actionClientGetter helmclient.ActionClientGetter
 	eventRecorder      record.EventRecorder
-	hooks              []hook.Hook
+	preHooks           []hook.PreHook
+	postHooks          []hook.PostHook
 	migratorGetter     migrator.Getter
 
 	log                     logr.Logger
@@ -336,6 +337,25 @@ func WithUninstallAnnotation(a annotation.Uninstall) Option {
 	}
 }
 
+// WithPreHook is an Option that configures the reconciler to run the given
+// PreHook just before performing any actions (e.g. install, upgrade, uninstall,
+// or reconciliation).
+func WithPreHook(h hook.PreHook) Option {
+	return func(r *Reconciler) error {
+		r.preHooks = append(r.preHooks, h)
+		return nil
+	}
+}
+
+// WithPostHook is an Option that configures the reconciler to run the given
+// PostHook just after performing any non-uninstall release actions.
+func WithPostHook(h hook.PostHook) Option {
+	return func(r *Reconciler) error {
+		r.postHooks = append(r.postHooks, h)
+		return nil
+	}
+}
+
 // Reconcile reconciles a CR that defines a Helm v3 release.
 //
 // If a v2 release exists for the CR, it is automatically migrated to the v3
@@ -395,6 +415,12 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 	if err := releaseMigrator.Migrate(); err != nil {
 		u.UpdateStatus(updater.EnsureCondition(conditions.Irreconcilable(err)))
 		return ctrl.Result{}, err
+	}
+
+	for _, hook := range r.preHooks {
+		if err := hook.Exec(obj, vals, log); err != nil {
+			log.Error(err, "failed to execute pre-release hook")
+		}
 	}
 
 	rel, state, err := r.getReleaseState(helmClient, obj, vals.AsMap())
@@ -466,16 +492,16 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 		return ctrl.Result{}, fmt.Errorf("unexpected release state: %s", state)
 	}
 
-	for _, hook := range r.hooks {
-		if err := hook.Exec(rel); err != nil {
-			log.Error(err, "failed to execute release hook", "name", rel.Name, "version", rel.Version)
-		}
-	}
-
 	u.UpdateStatus(
 		updater.RemoveCondition(conditions.TypeReleaseFailed),
 		updater.EnsureDeployedRelease(rel),
 	)
+
+	for _, hook := range r.postHooks {
+		if err := hook.Exec(obj, rel, log); err != nil {
+			log.Error(err, "failed to execute post-release hook", "name", rel.Name, "version", rel.Version)
+		}
+	}
 
 	return ctrl.Result{RequeueAfter: r.reconcilePeriod}, nil
 }
@@ -698,7 +724,7 @@ func (r *Reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) err
 	}
 
 	if *r.watchDependents {
-		r.hooks = append([]hook.Hook{internalhook.NewDependentResourceWatcher(c, mgr.GetRESTMapper(), obj, r.log)}, r.hooks...)
+		r.postHooks = append([]hook.PostHook{internalhook.NewDependentResourceWatcher(c, mgr.GetRESTMapper(), obj)}, r.postHooks...)
 	}
 	return nil
 }

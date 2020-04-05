@@ -34,12 +34,11 @@ import (
 	"github.com/joelanford/helm-operator/pkg/reconciler/internal/predicate"
 )
 
-func NewDependentResourceWatcher(c controller.Controller, rm meta.RESTMapper, owner runtime.Object, log logr.Logger) hook.Hook {
+func NewDependentResourceWatcher(c controller.Controller, rm meta.RESTMapper, owner runtime.Object) hook.PostHook {
 	return &dependentResourceWatcher{
 		controller: c,
 		owner:      owner,
 		restMapper: rm,
-		log:        log,
 		m:          sync.Mutex{},
 		watches:    make(map[schema.GroupVersionKind]struct{}),
 	}
@@ -49,13 +48,12 @@ type dependentResourceWatcher struct {
 	controller controller.Controller
 	owner      runtime.Object
 	restMapper meta.RESTMapper
-	log        logr.Logger
 
 	m       sync.Mutex
 	watches map[schema.GroupVersionKind]struct{}
 }
 
-func (d *dependentResourceWatcher) Exec(rel *release.Release) error {
+func (d *dependentResourceWatcher) Exec(_ *unstructured.Unstructured, rel *release.Release, log logr.Logger) error {
 	// using predefined functions for filtering events
 	dependentPredicate := predicate.DependentPredicateFuncs()
 
@@ -81,7 +79,7 @@ func (d *dependentResourceWatcher) Exec(rel *release.Release) error {
 			return err
 		} else if !ok {
 			d.watches[depGVK] = struct{}{}
-			d.log.Info("Cannot watch cluster-scoped dependent resource for namespace-scoped owner. Changes to this dependent resource type will not be reconciled",
+			log.Info("Cannot watch cluster-scoped dependent resource for namespace-scoped owner. Changes to this dependent resource type will not be reconciled",
 				"dependentAPIVersion", depGVK.GroupVersion(), "dependentKind", depGVK.Kind)
 			continue
 		}
@@ -92,7 +90,7 @@ func (d *dependentResourceWatcher) Exec(rel *release.Release) error {
 		}
 
 		d.watches[depGVK] = struct{}{}
-		d.log.V(1).Info("Watching dependent resource", "dependentAPIVersion", depGVK.GroupVersion(), "dependentKind", depGVK.Kind)
+		log.V(1).Info("Watching dependent resource", "dependentAPIVersion", depGVK.GroupVersion(), "dependentKind", depGVK.Kind)
 	}
 }
 
