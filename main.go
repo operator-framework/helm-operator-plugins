@@ -111,7 +111,7 @@ func main() {
 			reconciler.WithChart(w.Chart),
 			reconciler.WithGroupVersionKind(w.GroupVersionKind),
 			reconciler.WithOverrideValues(w.OverrideValues),
-			reconciler.WithDependentWatchesEnabled(w.WatchDependentResources),
+			reconciler.WithDependentWatchesEnabled(*w.WatchDependentResources),
 			reconciler.WithMaxConcurrentReconciles(maxConcurrentReconciles),
 			reconciler.WithReconcilePeriod(reconcilePeriod),
 			reconciler.WithInstallAnnotation(&annotation.InstallDisableHooks{}),

@@ -30,23 +30,13 @@ import (
 type Watch struct {
 	GroupVersionKind schema.GroupVersionKind `yaml:",inline"`
 	ChartPath        string                  `yaml:"chart"`
-	Chart            *chart.Chart            `yaml:"-"`
 
-	WatchDependentResources bool              `yaml:"watchDependentResources"`
-	OverrideValues          map[string]string `yaml:"overrideValues"`
-	ReconcilePeriod         *time.Duration    `yaml:"reconcilePeriod"`
-	MaxConcurrentReconciles *int              `yaml:"maxConcurrentReconciles"`
-}
+	WatchDependentResources *bool             `yaml:"watchDependentResources,omitempty"`
+	OverrideValues          map[string]string `yaml:"overrideValues,omitempty"`
+	ReconcilePeriod         *time.Duration    `yaml:"reconcilePeriod,omitempty"`
+	MaxConcurrentReconciles *int              `yaml:"maxConcurrentReconciles,omitempty"`
 
-func (w *Watch) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	// by default, the operator will watch dependent resources
-	w.WatchDependentResources = true
-
-	// hide watch data in plain struct to prevent unmarshal from calling
-	// UnmarshalYAML again
-	type plain Watch
-
-	return unmarshal((*plain)(w))
+	Chart *chart.Chart `yaml:"-"`
 }
 
 // Load loads a slice of Watches from the watch file at `path`. For each entry
@@ -77,6 +67,10 @@ func Load(path string) ([]Watch, error) {
 		}
 		w.Chart = cl
 		w.OverrideValues = expandOverrideEnvs(w.OverrideValues)
+		if w.WatchDependentResources == nil {
+			trueVal := true
+			w.WatchDependentResources = &trueVal
+		}
 
 		if _, ok := watchesMap[w.GroupVersionKind]; ok {
 			return nil, fmt.Errorf("duplicate GVK: %s", w.GroupVersionKind)
@@ -89,6 +83,9 @@ func Load(path string) ([]Watch, error) {
 }
 
 func expandOverrideEnvs(in map[string]string) map[string]string {
+	if in == nil {
+		return nil
+	}
 	out := make(map[string]string)
 	for k, v := range in {
 		out[k] = os.ExpandEnv(v)
