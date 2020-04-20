@@ -21,12 +21,16 @@ import (
 	"fmt"
 
 	"github.com/ghodss/yaml"
+	"gomodules.xyz/jsonpatch/v2"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/kube"
+	helmkube "helm.sh/helm/v3/pkg/kube"
 	"helm.sh/helm/v3/pkg/postrender"
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/storage/driver"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,7 +39,6 @@ import (
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/kubectl/pkg/scheme"
 )
 
 type ActionClientGetter interface {
@@ -176,7 +179,7 @@ func (c *actionClient) Reconcile(rel *release.Release) error {
 	}
 	return infos.Visit(func(expected *resource.Info, err error) error {
 		if err != nil {
-			return err
+			return fmt.Errorf("visit error: %w", err)
 		}
 
 		helper := resource.NewHelper(expected.Client, expected.Mapping)
@@ -188,23 +191,21 @@ func (c *actionClient) Reconcile(rel *release.Release) error {
 			}
 			return nil
 		} else if err != nil {
-			return err
+			return fmt.Errorf("could not get object: %w", err)
 		}
 
-		expectedObj, err := asVersioned(expected)
+		patch, patchType, err := createPatch(existing, expected)
 		if err != nil {
-			return fmt.Errorf("could not get versioned object: %w", err)
-		}
-		patch, err := generateStrategicMergePatch(existing, expectedObj)
-		if err != nil {
-			return fmt.Errorf("failed to generate strategic merge patch: %w", err)
+			return fmt.Errorf("error creating patch: %w", err)
 		}
 
 		if patch == nil {
+			// nothing to do
 			return nil
 		}
 
-		_, err = helper.Patch(expected.Namespace, expected.Name, apitypes.StrategicMergePatchType, patch, &metav1.PatchOptions{})
+		_, err = helper.Patch(expected.Namespace, expected.Name, patchType, patch,
+			&metav1.PatchOptions{})
 		if err != nil {
 			return fmt.Errorf("patch error: %w", err)
 		}
@@ -212,29 +213,70 @@ func (c *actionClient) Reconcile(rel *release.Release) error {
 	})
 }
 
-func asVersioned(info *resource.Info) (runtime.Object, error) {
-	if info.Mapping == nil {
-		return nil, fmt.Errorf("failed to get GroupVersion mapping for resource: %s", info)
-	}
-	gv := info.Mapping.GroupVersionKind.GroupVersion()
-	return runtime.ObjectConvertor(scheme.Scheme).ConvertToVersion(info.Object, gv)
-}
-
-func generateStrategicMergePatch(existing, expected runtime.Object) ([]byte, error) {
+func createPatch(existing runtime.Object, expected *resource.Info) ([]byte, apitypes.PatchType, error) {
 	existingJSON, err := json.Marshal(existing)
 	if err != nil {
-		return nil, err
+		return nil, apitypes.StrategicMergePatchType, err
 	}
-	expectedJSON, err := json.Marshal(expected)
+	expectedJSON, err := json.Marshal(expected.Object)
+	if err != nil {
+		return nil, apitypes.StrategicMergePatchType, err
+	}
+
+	// Get a versioned object
+	versionedObject := helmkube.AsVersioned(expected)
+
+	// Unstructured objects, such as CRDs, may not have an not registered error
+	// returned from ConvertToVersion. Anything that's unstructured should
+	// use the jsonpatch.CreateMergePatch. Strategic Merge Patch is not supported
+	// on objects like CRDs.
+	_, isUnstructured := versionedObject.(runtime.Unstructured)
+
+	// On newer K8s versions, CRDs aren't unstructured but has this dedicated type
+	_, isCRDv1beta1 := versionedObject.(*apiextv1beta1.CustomResourceDefinition)
+	_, isCRDv1 := versionedObject.(*apiextv1.CustomResourceDefinition)
+
+	if isUnstructured || isCRDv1beta1 || isCRDv1 {
+		// fall back to generic JSON merge patch
+		patch, err := createJSONMergePatch(existingJSON, expectedJSON)
+		return patch, apitypes.JSONPatchType, err
+	}
+
+	patchMeta, err := strategicpatch.NewPatchMetaFromStruct(versionedObject)
+	if err != nil {
+		return nil, apitypes.StrategicMergePatchType, err
+	}
+
+	patch, err := strategicpatch.CreateThreeWayMergePatch(expectedJSON, expectedJSON, existingJSON, patchMeta, true)
+	return patch, apitypes.StrategicMergePatchType, err
+}
+
+func createJSONMergePatch(existingJSON, expectedJSON []byte) ([]byte, error) {
+	ops, err := jsonpatch.CreatePatch(existingJSON, expectedJSON)
 	if err != nil {
 		return nil, err
 	}
 
-	patchMeta, err := strategicpatch.NewPatchMetaFromStruct(expected)
-	if err != nil {
-		return nil, err
+	// We ignore the "remove" operations from the full patch because they are
+	// fields added by Kubernetes or by the user after the existing release
+	// resource has been applied. The goal for this patch is to make sure that
+	// the fields managed by the Helm chart are applied.
+	// All "add" operations without a value (null) can be ignored
+	patchOps := make([]jsonpatch.JsonPatchOperation, 0)
+	for _, op := range ops {
+		if op.Operation != "remove" && !(op.Operation == "add" && op.Value == nil) {
+			patchOps = append(patchOps, op)
+		}
 	}
-	return strategicpatch.CreateThreeWayMergePatch(expectedJSON, expectedJSON, existingJSON, patchMeta, true)
+
+	// If there are no patch operations, return nil. Callers are expected
+	// to check for a nil response and skip the patch operation to avoid
+	// unnecessary chatter with the API server.
+	if len(patchOps) == 0 {
+		return nil, nil
+	}
+
+	return json.Marshal(patchOps)
 }
 
 func createPostRenderer(kubeClient kube.Interface, obj Object) postrender.PostRenderer {
