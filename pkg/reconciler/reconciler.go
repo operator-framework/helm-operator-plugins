@@ -18,7 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/rand"
 	"strings"
 	"time"
 
@@ -387,7 +386,7 @@ func WithPostHook(h hook.PostHook) Option {
 //   - Irreconcilable - an error occurred during reconciliation
 func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 	ctx := context.Background()
-	log := r.log.WithValues(strings.ToLower(r.gvk.Kind), req.NamespacedName, "id", rand.Int())
+	log := r.log.WithValues(strings.ToLower(r.gvk.Kind), req.NamespacedName)
 
 	obj := &unstructured.Unstructured{}
 	obj.SetGroupVersionKind(*r.gvk)

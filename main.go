@@ -18,14 +18,10 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"os"
 	"time"
 
-	"github.com/go-logr/logr"
 	"go.uber.org/zap"
-	"helm.sh/helm/v3/pkg/chartutil"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -34,7 +30,6 @@ import (
 	zapl "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/joelanford/helm-operator/pkg/annotation"
-	"github.com/joelanford/helm-operator/pkg/hook"
 	"github.com/joelanford/helm-operator/pkg/manager"
 	"github.com/joelanford/helm-operator/pkg/reconciler"
 	"github.com/joelanford/helm-operator/pkg/watches"
@@ -118,10 +113,6 @@ func main() {
 			reconciler.WithUpgradeAnnotation(&annotation.UpgradeDisableHooks{}),
 			reconciler.WithUpgradeAnnotation(&annotation.UpgradeForce{}),
 			reconciler.WithUninstallAnnotation(&annotation.UninstallDisableHooks{}),
-			reconciler.WithPreHook(hook.PreHookFunc(func(obj *unstructured.Unstructured, vals *chartutil.Values, log logr.Logger) error {
-				log.Info(fmt.Sprintf("%s", vals.AsMap()))
-				return nil
-			})),
 		)
 		if err != nil {
 			setupLog.Error(err, "unable to create helm reconciler", "controller", "Helm")
