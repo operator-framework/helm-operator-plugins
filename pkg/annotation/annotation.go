@@ -29,11 +29,20 @@ type InstallDisableHooks struct {
 
 var _ Install = &InstallDisableHooks{}
 
+const (
+	DefaultDomain                    = "helm.sdk.operator-framework.io"
+	DefaultInstallDisableHooksName   = DefaultDomain + "/install-disable-hooks"
+	DefaultUpgradeDisableHooksName   = DefaultDomain + "/upgrade-disable-hooks"
+	DefaultUninstallDisableHooksName = DefaultDomain + "/uninstall-disable-hooks"
+
+	DefaultUpgradeForceName = DefaultDomain + "/upgrade-force"
+)
+
 func (i InstallDisableHooks) Name() string {
 	if i.CustomName != "" {
 		return i.CustomName
 	}
-	return "helm.sdk.operator-framework.io/install-disable-hooks"
+	return DefaultInstallDisableHooksName
 }
 
 func (i InstallDisableHooks) InstallOption(val string) helmclient.InstallOption {
@@ -57,7 +66,7 @@ func (u UpgradeDisableHooks) Name() string {
 	if u.CustomName != "" {
 		return u.CustomName
 	}
-	return "helm.sdk.operator-framework.io/upgrade-disable-hooks"
+	return DefaultUpgradeDisableHooksName
 }
 
 func (u UpgradeDisableHooks) UpgradeOption(val string) helmclient.UpgradeOption {
@@ -81,7 +90,7 @@ func (u UpgradeForce) Name() string {
 	if u.CustomName != "" {
 		return u.CustomName
 	}
-	return "helm.sdk.operator-framework.io/upgrade-force"
+	return DefaultUpgradeForceName
 }
 
 func (u UpgradeForce) UpgradeOption(val string) helmclient.UpgradeOption {
@@ -105,7 +114,7 @@ func (u UninstallDisableHooks) Name() string {
 	if u.CustomName != "" {
 		return u.CustomName
 	}
-	return "helm.sdk.operator-framework.io/uninstall-disable-hooks"
+	return DefaultUninstallDisableHooksName
 }
 
 func (u UninstallDisableHooks) UninstallOption(val string) helmclient.UninstallOption {

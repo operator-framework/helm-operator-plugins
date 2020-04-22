@@ -8,12 +8,14 @@ require (
 	github.com/go-logr/logr v0.1.0
 	github.com/helm/helm-2to3 v0.2.2
 	github.com/jmoiron/sqlx v1.2.0 // indirect
-	github.com/lib/pq v1.3.0 // indirect
-	github.com/rubenv/sql-migrate v0.0.0-20200119084958-8794cecc920c // indirect
+	github.com/lib/pq v1.4.0 // indirect
+	github.com/onsi/ginkgo v1.10.1
+	github.com/onsi/gomega v1.9.0
+	github.com/rubenv/sql-migrate v0.0.0-20200402132117-435005d389bc // indirect
 	github.com/stretchr/testify v1.4.0
-	go.uber.org/zap v1.10.0
+	go.uber.org/zap v1.13.0
 	gomodules.xyz/jsonpatch/v2 v2.0.1
-	gopkg.in/yaml.v2 v2.2.5
+	gopkg.in/yaml.v2 v2.2.8
 	helm.sh/helm/v3 v3.1.0
 	k8s.io/api v0.17.2
 	k8s.io/apiextensions-apiserver v0.17.2
