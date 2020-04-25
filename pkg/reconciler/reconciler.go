@@ -46,7 +46,6 @@ import (
 	"github.com/joelanford/helm-operator/pkg/reconciler/internal/conditions"
 	"github.com/joelanford/helm-operator/pkg/reconciler/internal/controllerutil"
 	internalhook "github.com/joelanford/helm-operator/pkg/reconciler/internal/hook"
-	"github.com/joelanford/helm-operator/pkg/reconciler/internal/migrator"
 	"github.com/joelanford/helm-operator/pkg/reconciler/internal/updater"
 	"github.com/joelanford/helm-operator/pkg/reconciler/internal/values"
 )
@@ -61,7 +60,6 @@ type Reconciler struct {
 	eventRecorder      record.EventRecorder
 	preHooks           []hook.PreHook
 	postHooks          []hook.PostHook
-	migratorGetter     migrator.Getter
 
 	log                     logr.Logger
 	gvk                     *schema.GroupVersionKind
@@ -357,9 +355,6 @@ func WithPostHook(h hook.PostHook) Option {
 
 // Reconcile reconciles a CR that defines a Helm v3 release.
 //
-// If a v2 release exists for the CR, it is automatically migrated to the v3
-// storage format, and the old v2 release is deleted if the migration succeeds.
-//
 //   - If a release does not exist for this CR, a new release is installed.
 //   - If a release exists and the CR spec has changed since the last,
 //     reconciliation, the release is upgraded.
@@ -410,14 +405,8 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 
 	u := updater.New(r.client, obj)
 
-	releaseMigrator := r.migratorGetter.MigratorFor(obj)
-	if err := releaseMigrator.Migrate(); err != nil {
-		u.UpdateStatus(updater.EnsureCondition(conditions.Irreconcilable(err)))
-		return ctrl.Result{}, err
-	}
-
-	for _, hook := range r.preHooks {
-		if err := hook.Exec(obj, vals, log); err != nil {
+	for _, h := range r.preHooks {
+		if err := h.Exec(obj, vals, log); err != nil {
 			log.Error(err, "failed to execute pre-release hook")
 		}
 	}
@@ -429,12 +418,11 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 	}
 	u.UpdateStatus(updater.RemoveCondition(conditions.TypeIrreconcilable))
 
-	if state == stateAlreadyUninstalled {
+	switch state {
+	case stateAlreadyUninstalled:
 		log.Info("Resource is terminated, skipping reconciliation")
 		return ctrl.Result{}, nil
-	}
-
-	if state == stateNeedsUninstall {
+	case stateNeedsUninstall:
 		if err := func() error {
 			defer func() {
 				applyErr := u.Apply(ctx, obj)
@@ -464,7 +452,6 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 			err = applyErr
 		}
 	}()
-	u.Update(updater.EnsureFinalizer(uninstallFinalizer))
 	u.UpdateStatus(
 		updater.EnsureCondition(conditions.Initialized()),
 		updater.EnsureDeployedRelease(rel),
@@ -491,13 +478,14 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 		return ctrl.Result{}, fmt.Errorf("unexpected release state: %s", state)
 	}
 
+	u.Update(updater.EnsureFinalizer(uninstallFinalizer))
 	u.UpdateStatus(
 		updater.RemoveCondition(conditions.TypeReleaseFailed),
 		updater.EnsureDeployedRelease(rel),
 	)
 
-	for _, hook := range r.postHooks {
-		if err := hook.Exec(obj, rel, log); err != nil {
+	for _, h := range r.postHooks {
+		if err := h.Exec(obj, rel, log); err != nil {
 			log.Error(err, "failed to execute post-release hook", "name", rel.Name, "version", rel.Version)
 		}
 	}
@@ -679,13 +667,6 @@ func (r *Reconciler) addDefaults(mgr ctrl.Manager, controllerName string) error 
 	}
 	if r.eventRecorder == nil {
 		r.eventRecorder = mgr.GetEventRecorderFor(controllerName)
-	}
-	if r.migratorGetter == nil {
-		migratorGetter, err := migrator.NewMigratorGetter(mgr.GetConfig())
-		if err != nil {
-			return err
-		}
-		r.migratorGetter = migratorGetter
 	}
 	return nil
 }

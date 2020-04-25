@@ -89,13 +89,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	watches, err := watches.Load(watchesFile)
+	ws, err := watches.Load(watchesFile)
 	if err != nil {
 		setupLog.Error(err, "unable to load watches.yaml", "path", watchesFile)
 		os.Exit(1)
 	}
 
-	for _, w := range watches {
+	for _, w := range ws {
 		if w.ReconcilePeriod != nil {
 			reconcilePeriod = *w.ReconcilePeriod
 		}

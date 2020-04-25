@@ -186,7 +186,7 @@ func (c *actionClient) Reconcile(rel *release.Release) error {
 
 		existing, err := helper.Get(expected.Namespace, expected.Name, expected.Export)
 		if apierrors.IsNotFound(err) {
-			if _, err := helper.Create(expected.Namespace, true, expected.Object, &metav1.CreateOptions{}); err != nil {
+			if _, err := helper.Create(expected.Namespace, true, expected.Object); err != nil {
 				return fmt.Errorf("create error: %w", err)
 			}
 			return nil

@@ -15,6 +15,7 @@
 package client
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/go-logr/logr"
@@ -115,12 +116,12 @@ type ownerRefSecretClient struct {
 	refs []metav1.OwnerReference
 }
 
-func (c *ownerRefSecretClient) Create(in *corev1.Secret) (*corev1.Secret, error) {
+func (c *ownerRefSecretClient) Create(ctx context.Context, in *corev1.Secret, opts metav1.CreateOptions) (*corev1.Secret, error) {
 	in.OwnerReferences = append(in.OwnerReferences, c.refs...)
-	return c.SecretInterface.Create(in)
+	return c.SecretInterface.Create(ctx, in, opts)
 }
 
-func (c *ownerRefSecretClient) Update(in *corev1.Secret) (*corev1.Secret, error) {
+func (c *ownerRefSecretClient) Update(ctx context.Context, in *corev1.Secret, opts metav1.UpdateOptions) (*corev1.Secret, error) {
 	in.OwnerReferences = append(in.OwnerReferences, c.refs...)
-	return c.SecretInterface.Update(in)
+	return c.SecretInterface.Update(ctx, in, opts)
 }
