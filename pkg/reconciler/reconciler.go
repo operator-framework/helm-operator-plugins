@@ -57,6 +57,7 @@ type Reconciler struct {
 	client             client.Client
 	scheme             *runtime.Scheme
 	actionClientGetter helmclient.ActionClientGetter
+	valueMapper        ValueMapper
 	eventRecorder      record.EventRecorder
 	preHooks           []hook.PreHook
 	postHooks          []hook.PostHook
@@ -353,6 +354,15 @@ func WithPostHook(h hook.PostHook) Option {
 	}
 }
 
+// WithValueMapper is an Option that configures a function that maps values
+// from a custom resource spec to the values passed to Helm
+func WithValueMapper(m ValueMapper) Option {
+	return func(r *Reconciler) error {
+		r.valueMapper = m
+		return nil
+	}
+}
+
 // Reconcile reconciles a CR that defines a Helm v3 release.
 //
 //   - If a release does not exist for this CR, a new release is installed.
@@ -406,7 +416,7 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 	u := updater.New(r.client, obj)
 
 	for _, h := range r.preHooks {
-		if err := h.Exec(obj, vals, log); err != nil {
+		if err := h.Exec(obj, &vals, log); err != nil {
 			log.Error(err, "failed to execute pre-release hook")
 		}
 	}
@@ -493,16 +503,23 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 	return ctrl.Result{RequeueAfter: r.reconcilePeriod}, nil
 }
 
-func (r *Reconciler) getValues(obj *unstructured.Unstructured) (*chartutil.Values, error) {
+func (r *Reconciler) getValues(obj *unstructured.Unstructured) (chartutil.Values, error) {
 	crVals, err := values.FromUnstructured(obj)
 	if err != nil {
-		return nil, err
+		return chartutil.Values{}, err
 	}
 	if err := crVals.ApplyOverrides(r.overrideValues); err != nil {
-		return nil, err
+		return chartutil.Values{}, err
 	}
-	vals, err := chartutil.CoalesceValues(r.chrt, crVals.Map())
-	return &vals, err
+	vals := crVals.Map()
+	if r.valueMapper != nil {
+		vals = r.valueMapper.MapValues(vals)
+	}
+	vals, err = chartutil.CoalesceValues(r.chrt, vals)
+	if err != nil {
+		return chartutil.Values{}, err
+	}
+	return vals, nil
 }
 
 type helmReleaseState string
@@ -707,4 +724,8 @@ func (r *Reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) err
 		r.postHooks = append([]hook.PostHook{internalhook.NewDependentResourceWatcher(c, mgr.GetRESTMapper(), obj)}, r.postHooks...)
 	}
 	return nil
+}
+
+type ValueMapper interface {
+	MapValues(chartutil.Values) chartutil.Values
 }
