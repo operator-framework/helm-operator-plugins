@@ -55,7 +55,6 @@ const uninstallFinalizer = "uninstall-helm-release"
 // Reconciler reconciles a Helm object
 type Reconciler struct {
 	client             client.Client
-	scheme             *runtime.Scheme
 	actionClientGetter helmclient.ActionClientGetter
 	valueMapper        ValueMapper
 	eventRecorder      record.EventRecorder
@@ -149,16 +148,6 @@ type Option func(r *Reconciler) error
 func WithClient(cl client.Client) Option {
 	return func(r *Reconciler) error {
 		r.client = cl
-		return nil
-	}
-}
-
-// WithScheme is an Option that configures a Reconciler's scheme.
-//
-// By default, manager.GetScheme() is used if this option is not configured.
-func WithScheme(scheme *runtime.Scheme) Option {
-	return func(r *Reconciler) error {
-		r.scheme = scheme
 		return nil
 	}
 }
@@ -403,7 +392,7 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 		return ctrl.Result{}, err
 	}
 
-	helmClient, err := r.actionClientGetter.ActionClientFor(obj)
+	actionClient, err := r.actionClientGetter.ActionClientFor(obj)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -421,7 +410,7 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 		}
 	}
 
-	rel, state, err := r.getReleaseState(helmClient, obj, vals.AsMap())
+	rel, state, err := r.getReleaseState(actionClient, obj, vals.AsMap())
 	if err != nil {
 		u.UpdateStatus(updater.EnsureCondition(conditions.Irreconcilable(err)))
 		return ctrl.Result{}, err
@@ -440,7 +429,7 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 					err = applyErr
 				}
 			}()
-			return r.doUninstall(helmClient, &u, obj, log)
+			return r.doUninstall(actionClient, &u, obj, log)
 		}(); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -469,19 +458,19 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 
 	switch state {
 	case stateNeedsInstall:
-		rel, err = r.doInstall(helmClient, &u, obj, vals.AsMap(), log)
+		rel, err = r.doInstall(actionClient, &u, obj, vals.AsMap(), log)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 
 	case stateNeedsUpgrade:
-		rel, err = r.doUpgrade(helmClient, &u, obj, vals.AsMap(), log)
+		rel, err = r.doUpgrade(actionClient, &u, obj, vals.AsMap(), log)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 
 	case stateUnchanged:
-		if err := r.doReconcile(helmClient, &u, rel, log); err != nil {
+		if err := r.doReconcile(actionClient, &u, rel, log); err != nil {
 			return ctrl.Result{}, err
 		}
 	default:
@@ -562,14 +551,14 @@ func (r *Reconciler) getReleaseState(client helmclient.ActionInterface, obj meta
 	return deployedRelease, stateUnchanged, nil
 }
 
-func (r *Reconciler) doInstall(helmClient helmclient.ActionInterface, u *updater.Updater, obj *unstructured.Unstructured, vals map[string]interface{}, log logr.Logger) (*release.Release, error) {
+func (r *Reconciler) doInstall(actionClient helmclient.ActionInterface, u *updater.Updater, obj *unstructured.Unstructured, vals map[string]interface{}, log logr.Logger) (*release.Release, error) {
 	var opts []helmclient.InstallOption
 	for name, annot := range r.installAnnotations {
 		if v, ok := obj.GetAnnotations()[name]; ok {
 			opts = append(opts, annot.InstallOption(v))
 		}
 	}
-	rel, err := helmClient.Install(obj.GetName(), obj.GetNamespace(), r.chrt, vals, opts...)
+	rel, err := actionClient.Install(obj.GetName(), obj.GetNamespace(), r.chrt, vals, opts...)
 	if err != nil {
 		u.UpdateStatus(updater.EnsureCondition(conditions.ReleaseFailed(conditions.ReasonInstallError, err)))
 		return nil, err
@@ -580,7 +569,7 @@ func (r *Reconciler) doInstall(helmClient helmclient.ActionInterface, u *updater
 	return rel, nil
 }
 
-func (r *Reconciler) doUpgrade(helmClient helmclient.ActionInterface, u *updater.Updater, obj *unstructured.Unstructured, vals map[string]interface{}, log logr.Logger) (*release.Release, error) {
+func (r *Reconciler) doUpgrade(actionClient helmclient.ActionInterface, u *updater.Updater, obj *unstructured.Unstructured, vals map[string]interface{}, log logr.Logger) (*release.Release, error) {
 	var opts []helmclient.UpgradeOption
 	for name, annot := range r.upgradeAnnotations {
 		if v, ok := obj.GetAnnotations()[name]; ok {
@@ -588,7 +577,7 @@ func (r *Reconciler) doUpgrade(helmClient helmclient.ActionInterface, u *updater
 		}
 	}
 
-	rel, err := helmClient.Upgrade(obj.GetName(), obj.GetNamespace(), r.chrt, vals, opts...)
+	rel, err := actionClient.Upgrade(obj.GetName(), obj.GetNamespace(), r.chrt, vals, opts...)
 	if err != nil {
 		u.UpdateStatus(updater.EnsureCondition(conditions.ReleaseFailed(conditions.ReasonUpgradeError, err)))
 		return nil, err
@@ -606,7 +595,7 @@ func (r *Reconciler) reportOverrideEvents(obj runtime.Object) {
 	}
 }
 
-func (r *Reconciler) doReconcile(helmClient helmclient.ActionInterface, u *updater.Updater, rel *release.Release, log logr.Logger) error {
+func (r *Reconciler) doReconcile(actionClient helmclient.ActionInterface, u *updater.Updater, rel *release.Release, log logr.Logger) error {
 	// If a change is made to the CR spec that causes a release failure, a
 	// ConditionReleaseFailed is added to the status conditions. If that change
 	// is then reverted to its previous state, the operator will stop
@@ -615,7 +604,7 @@ func (r *Reconciler) doReconcile(helmClient helmclient.ActionInterface, u *updat
 	// no longer being attempted.
 	u.UpdateStatus(updater.RemoveCondition(conditions.TypeReleaseFailed))
 
-	if err := helmClient.Reconcile(rel); err != nil {
+	if err := actionClient.Reconcile(rel); err != nil {
 		u.UpdateStatus(updater.EnsureCondition(conditions.Irreconcilable(err)))
 		return err
 	}
@@ -624,7 +613,7 @@ func (r *Reconciler) doReconcile(helmClient helmclient.ActionInterface, u *updat
 	return nil
 }
 
-func (r *Reconciler) doUninstall(helmClient helmclient.ActionInterface, u *updater.Updater, obj *unstructured.Unstructured, log logr.Logger) error {
+func (r *Reconciler) doUninstall(actionClient helmclient.ActionInterface, u *updater.Updater, obj *unstructured.Unstructured, log logr.Logger) error {
 	var opts []helmclient.UninstallOption
 	for name, annot := range r.uninstallAnnotations {
 		if v, ok := obj.GetAnnotations()[name]; ok {
@@ -632,7 +621,7 @@ func (r *Reconciler) doUninstall(helmClient helmclient.ActionInterface, u *updat
 		}
 	}
 
-	resp, err := helmClient.Uninstall(obj.GetName(), opts...)
+	resp, err := actionClient.Uninstall(obj.GetName(), opts...)
 	if errors.Is(err, driver.ErrReleaseNotFound) {
 		log.Info("Release not found, removing finalizer")
 	} else if err != nil {
@@ -678,9 +667,6 @@ func (r *Reconciler) addDefaults(mgr ctrl.Manager, controllerName string) error 
 			return err
 		}
 		r.actionClientGetter = helmclient.NewActionClientGetter(actionConfigGetter)
-	}
-	if r.scheme == nil {
-		r.scheme = mgr.GetScheme()
 	}
 	if r.eventRecorder == nil {
 		r.eventRecorder = mgr.GetEventRecorderFor(controllerName)
