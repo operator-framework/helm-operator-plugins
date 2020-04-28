@@ -522,6 +522,7 @@ const (
 	stateError              helmReleaseState = "error"
 )
 
+// TODO(joelanford): Make an interface abstraction and make it customizable. This will simplify unit tests.
 func (r *Reconciler) getReleaseState(client helmclient.ActionInterface, obj metav1.Object, vals map[string]interface{}) (*release.Release, helmReleaseState, error) {
 	deployedRelease, err := client.Get(obj.GetName())
 	if err != nil && !errors.Is(err, driver.ErrReleaseNotFound) {
