@@ -27,7 +27,7 @@ import (
 	"github.com/joelanford/helm-operator/pkg/internal/sdk/status"
 )
 
-func New(client client.Client, obj *unstructured.Unstructured) Updater {
+func New(client client.Client) Updater {
 	return Updater{
 		client: client,
 	}
@@ -57,13 +57,13 @@ func (u *Updater) Apply(ctx context.Context, obj *unstructured.Unstructured) err
 	// we remove the finalizer, updating the status will fail
 	// because the object and its status will be garbage-collected
 	if err := retry.RetryOnConflict(backoff, func() error {
-		status := statusFor(obj)
+		st := statusFor(obj)
 		needsStatusUpdate := false
 		for _, f := range u.updateStatusFuncs {
-			needsStatusUpdate = f(status) || needsStatusUpdate
+			needsStatusUpdate = f(st) || needsStatusUpdate
 		}
 		if needsStatusUpdate {
-			obj.Object["status"] = status
+			obj.Object["status"] = st
 			return u.client.Status().Update(ctx, obj)
 		}
 		return nil

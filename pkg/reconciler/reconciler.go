@@ -402,7 +402,7 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 		return ctrl.Result{}, err
 	}
 
-	u := updater.New(r.client, obj)
+	u := updater.New(r.client)
 
 	for _, h := range r.preHooks {
 		if err := h.Exec(obj, &vals, log); err != nil {
