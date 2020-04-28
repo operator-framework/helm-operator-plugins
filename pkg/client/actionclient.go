@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ghodss/yaml"
 	"gomodules.xyz/jsonpatch/v2"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
@@ -39,6 +38,10 @@ import (
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/cli-runtime/pkg/resource"
+	"sigs.k8s.io/yaml"
+
+	"github.com/joelanford/helm-operator/pkg/internal/sdk/controllerutil"
+	"github.com/joelanford/helm-operator/pkg/internal/sdk/handler"
 )
 
 type ActionClientGetter interface {
@@ -73,7 +76,11 @@ func (hcg *actionClientGetter) ActionClientFor(obj Object) (ActionInterface, err
 	if err != nil {
 		return nil, err
 	}
-	postRenderer := createPostRenderer(actionConfig.KubeClient, obj)
+	rm, err := actionConfig.RESTClientGetter.ToRESTMapper()
+	if err != nil {
+		return nil, err
+	}
+	postRenderer := createPostRenderer(rm, actionConfig.KubeClient, obj)
 	return &actionClient{actionConfig, postRenderer}, nil
 }
 
@@ -279,17 +286,17 @@ func createJSONMergePatch(existingJSON, expectedJSON []byte) ([]byte, error) {
 	return json.Marshal(patchOps)
 }
 
-func createPostRenderer(kubeClient kube.Interface, obj Object) postrender.PostRenderer {
-	ownerRef := metav1.NewControllerRef(obj, obj.GetObjectKind().GroupVersionKind())
-	return &ownerRefPostRenderer{kubeClient, ownerRef}
+func createPostRenderer(rm meta.RESTMapper, kubeClient kube.Interface, owner Object) postrender.PostRenderer {
+	return &ownerPostRenderer{rm, kubeClient, owner}
 }
 
-type ownerRefPostRenderer struct {
+type ownerPostRenderer struct {
+	rm         meta.RESTMapper
 	kubeClient kube.Interface
-	ownerRef   *metav1.OwnerReference
+	owner      Object
 }
 
-func (pr *ownerRefPostRenderer) Run(in *bytes.Buffer) (*bytes.Buffer, error) {
+func (pr *ownerPostRenderer) Run(in *bytes.Buffer) (*bytes.Buffer, error) {
 	resourceList, err := pr.kubeClient.Build(in, false)
 	if err != nil {
 		return nil, err
@@ -305,15 +312,28 @@ func (pr *ownerRefPostRenderer) Run(in *bytes.Buffer) (*bytes.Buffer, error) {
 			return err
 		}
 		u := &unstructured.Unstructured{Object: objMap}
-		if r.ResourceMapping().Scope == meta.RESTScopeNamespace {
-			ownerRefs := append(u.GetOwnerReferences(), *pr.ownerRef)
+		useOwnerRef, err := controllerutil.SupportsOwnerReference(pr.rm, pr.owner, u)
+		if err != nil {
+			return err
+		}
+		if useOwnerRef {
+			ownerRef := metav1.NewControllerRef(pr.owner, pr.owner.GetObjectKind().GroupVersionKind())
+			ownerRefs := append(u.GetOwnerReferences(), *ownerRef)
 			u.SetOwnerReferences(ownerRefs)
+		} else {
+			a := u.GetAnnotations()
+			if a == nil {
+				a = map[string]string{}
+			}
+			a[handler.NamespacedNameAnnotation] = fmt.Sprintf("%s/%s", pr.owner.GetNamespace(), pr.owner.GetName())
+			a[handler.TypeAnnotation] = pr.owner.GetObjectKind().GroupVersionKind().GroupKind().String()
+			u.SetAnnotations(a)
 		}
 		outData, err := yaml.Marshal(u.Object)
 		if err != nil {
 			return err
 		}
-		if _, err := out.Write(outData); err != nil {
+		if _, err := out.WriteString("---\n" + string(outData)); err != nil {
 			return err
 		}
 		return nil

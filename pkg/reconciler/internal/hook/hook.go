@@ -15,13 +15,11 @@
 package hook
 
 import (
-	"bytes"
-	"io"
 	"sync"
 
 	"github.com/go-logr/logr"
-	"gopkg.in/yaml.v2"
 	"helm.sh/helm/v3/pkg/release"
+	"helm.sh/helm/v3/pkg/releaseutil"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,9 +27,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"sigs.k8s.io/yaml"
 
 	"github.com/joelanford/helm-operator/pkg/hook"
-	"github.com/joelanford/helm-operator/pkg/reconciler/internal/predicate"
+	"github.com/joelanford/helm-operator/pkg/internal/sdk/controllerutil"
+	sdkhandler "github.com/joelanford/helm-operator/pkg/internal/sdk/handler"
+	"github.com/joelanford/helm-operator/pkg/internal/sdk/predicate"
 )
 
 func NewDependentResourceWatcher(c controller.Controller, rm meta.RESTMapper, owner runtime.Object) hook.PostHook {
@@ -57,15 +58,12 @@ func (d *dependentResourceWatcher) Exec(_ *unstructured.Unstructured, rel *relea
 	// using predefined functions for filtering events
 	dependentPredicate := predicate.DependentPredicateFuncs()
 
-	dec := yaml.NewDecoder(bytes.NewBufferString(rel.Manifest))
+	resources := releaseutil.SplitManifests(rel.Manifest)
 	d.m.Lock()
 	defer d.m.Unlock()
-	for {
+	for _, r := range resources {
 		var obj unstructured.Unstructured
-		err := dec.Decode(&obj.Object)
-		if err == io.EOF {
-			return nil
-		}
+		err := yaml.Unmarshal([]byte(r), &obj)
 		if err != nil {
 			return err
 		}
@@ -75,41 +73,23 @@ func (d *dependentResourceWatcher) Exec(_ *unstructured.Unstructured, rel *relea
 			continue
 		}
 
-		if ok, err := isValidRelationship(d.restMapper, d.owner.GetObjectKind().GroupVersionKind(), depGVK); err != nil {
-			return err
-		} else if !ok {
-			d.watches[depGVK] = struct{}{}
-			log.Info("Cannot watch cluster-scoped dependent resource for namespace-scoped owner. Changes to this dependent resource type will not be reconciled",
-				"dependentAPIVersion", depGVK.GroupVersion(), "dependentKind", depGVK.Kind)
-			continue
-		}
-
-		err = d.controller.Watch(&source.Kind{Type: &obj}, &handler.EnqueueRequestForOwner{OwnerType: d.owner}, dependentPredicate)
+		useOwnerRef, err := controllerutil.SupportsOwnerReference(d.restMapper, d.owner, &obj)
 		if err != nil {
 			return err
+		}
+
+		if useOwnerRef {
+			if err := d.controller.Watch(&source.Kind{Type: &obj}, &handler.EnqueueRequestForOwner{OwnerType: d.owner}, dependentPredicate); err != nil {
+				return err
+			}
+		} else {
+			if err := d.controller.Watch(&source.Kind{Type: &obj}, &sdkhandler.EnqueueRequestForAnnotation{Type: d.owner.GetObjectKind().GroupVersionKind().GroupKind().String()}, dependentPredicate); err != nil {
+				return err
+			}
 		}
 
 		d.watches[depGVK] = struct{}{}
 		log.V(1).Info("Watching dependent resource", "dependentAPIVersion", depGVK.GroupVersion(), "dependentKind", depGVK.Kind)
 	}
-}
-
-func isValidRelationship(restMapper meta.RESTMapper, owner, dependent schema.GroupVersionKind) (bool, error) {
-	ownerMapping, err := restMapper.RESTMapping(owner.GroupKind(), owner.Version)
-	if err != nil {
-		return false, err
-	}
-
-	depMapping, err := restMapper.RESTMapping(dependent.GroupKind(), dependent.Version)
-	if err != nil {
-		return false, err
-	}
-
-	ownerClusterScoped := ownerMapping.Scope.Name() == meta.RESTScopeNameRoot
-	depClusterScoped := depMapping.Scope.Name() == meta.RESTScopeNameRoot
-
-	if !ownerClusterScoped && depClusterScoped {
-		return false, nil
-	}
-	return true, nil
+	return nil
 }

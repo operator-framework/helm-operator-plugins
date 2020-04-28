@@ -19,6 +19,7 @@ import (
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -39,7 +40,7 @@ var (
 	}
 )
 
-func WaitForDeletion(ctx context.Context, cl client.Client, o runtime.Object) error {
+func WaitForDeletion(ctx context.Context, cl client.Reader, o runtime.Object) error {
 	key, err := client.ObjectKeyFromObject(o)
 	if err != nil {
 		return err
@@ -55,4 +56,45 @@ func WaitForDeletion(ctx context.Context, cl client.Client, o runtime.Object) er
 		}
 		return false, nil
 	}, ctx.Done())
+}
+
+func SupportsOwnerReference(restMapper meta.RESTMapper, owner, dependent runtime.Object) (bool, error) {
+	ownerGVK := owner.GetObjectKind().GroupVersionKind()
+	ownerMapping, err := restMapper.RESTMapping(ownerGVK.GroupKind(), ownerGVK.Version)
+	if err != nil {
+		return false, err
+	}
+	mOwner, err := meta.Accessor(owner)
+	if err != nil {
+		return false, err
+	}
+
+	depGVK := dependent.GetObjectKind().GroupVersionKind()
+	depMapping, err := restMapper.RESTMapping(depGVK.GroupKind(), depGVK.Version)
+	if err != nil {
+		return false, err
+	}
+	mDep, err := meta.Accessor(dependent)
+	if err != nil {
+		return false, err
+	}
+
+	ownerClusterScoped := ownerMapping.Scope.Name() == meta.RESTScopeNameRoot
+	ownerNamespace := mOwner.GetNamespace()
+	depClusterScoped := depMapping.Scope.Name() == meta.RESTScopeNameRoot
+	depNamespace := mDep.GetNamespace()
+
+	if ownerClusterScoped {
+		return true, nil
+	}
+
+	if depClusterScoped {
+		return false, nil
+	}
+
+	if ownerNamespace != depNamespace {
+		return false, nil
+	}
+
+	return true, nil
 }
