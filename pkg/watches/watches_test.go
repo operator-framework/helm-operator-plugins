@@ -30,6 +30,7 @@ type testCase struct {
 	expectOverrides []map[string]string
 }
 
+// TODO(joelanford): convert to ginkgo/gomega
 func TestLoadWatches(t *testing.T) {
 	testCases := []testCase{
 		{
