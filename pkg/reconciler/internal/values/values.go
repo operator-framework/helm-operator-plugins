@@ -27,6 +27,9 @@ type Values struct {
 }
 
 func FromUnstructured(obj *unstructured.Unstructured) (*Values, error) {
+	if obj == nil || obj.Object == nil {
+		return nil, fmt.Errorf("nil object")
+	}
 	spec, ok := obj.Object["spec"]
 	if !ok {
 		return nil, fmt.Errorf("spec not found")
