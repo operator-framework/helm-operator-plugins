@@ -422,6 +422,12 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 		log.Info("Resource is terminated, skipping reconciliation")
 		return ctrl.Result{}, nil
 	case stateNeedsUninstall:
+		// Use defer in a closure so that it executes before we wait for
+		// the deletion of the CR. This might seem unnecessary since we're
+		// applying changes to the CR after is has a deletion timestamp.
+		// However, if uninstall fails, the finalizer will not be removed
+		// and we need to be able to update the conditions on the CR to
+		// indicate that the uninstall failed.
 		if err := func() error {
 			defer func() {
 				applyErr := u.Apply(ctx, obj)
