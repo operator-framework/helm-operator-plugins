@@ -25,8 +25,6 @@ type PreHook interface {
 	Exec(*unstructured.Unstructured, *chartutil.Values, logr.Logger) error
 }
 
-var _ PreHook = PreHookFunc(func(*unstructured.Unstructured, *chartutil.Values, logr.Logger) error { return nil })
-
 type PreHookFunc func(*unstructured.Unstructured, *chartutil.Values, logr.Logger) error
 
 func (f PreHookFunc) Exec(obj *unstructured.Unstructured, vals *chartutil.Values, log logr.Logger) error {
@@ -36,8 +34,6 @@ func (f PreHookFunc) Exec(obj *unstructured.Unstructured, vals *chartutil.Values
 type PostHook interface {
 	Exec(*unstructured.Unstructured, *release.Release, logr.Logger) error
 }
-
-var _ PostHook = PostHookFunc(func(*unstructured.Unstructured, *release.Release, logr.Logger) error { return nil })
 
 type PostHookFunc func(*unstructured.Unstructured, *release.Release, logr.Logger) error
 
