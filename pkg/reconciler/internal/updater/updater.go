@@ -63,7 +63,11 @@ func (u *Updater) Apply(ctx context.Context, obj *unstructured.Unstructured) err
 			needsStatusUpdate = f(st) || needsStatusUpdate
 		}
 		if needsStatusUpdate {
-			obj.Object["status"] = st
+			uSt, err := runtime.DefaultUnstructuredConverter.ToUnstructured(st)
+			if err != nil {
+				return err
+			}
+			obj.Object["status"] = uSt
 			return u.client.Status().Update(ctx, obj)
 		}
 		return nil
