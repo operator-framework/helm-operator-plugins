@@ -45,7 +45,7 @@ var _ = Describe("Updater", func() {
 			resourceVersion := obj.GetResourceVersion()
 
 			Expect(u.Apply(context.TODO(), obj)).To(Succeed())
-			Expect(client.Get(context.TODO(), types.NamespacedName{"testNamespace", "testDeployment"}, obj)).To(Succeed())
+			Expect(client.Get(context.TODO(), types.NamespacedName{Namespace: "testNamespace", Name: "testDeployment"}, obj)).To(Succeed())
 			Expect(obj.GetFinalizers()).To(Equal([]string{testFinalizer}))
 			Expect(obj.GetResourceVersion()).NotTo(Equal(resourceVersion))
 		})
@@ -55,7 +55,7 @@ var _ = Describe("Updater", func() {
 			resourceVersion := obj.GetResourceVersion()
 
 			Expect(u.Apply(context.TODO(), obj)).To(Succeed())
-			Expect(client.Get(context.TODO(), types.NamespacedName{"testNamespace", "testDeployment"}, obj)).To(Succeed())
+			Expect(client.Get(context.TODO(), types.NamespacedName{Namespace: "testNamespace", Name: "testDeployment"}, obj)).To(Succeed())
 			Expect((obj.Object["status"].(map[string]interface{}))["conditions"]).To(HaveLen(1))
 			Expect(obj.GetResourceVersion()).NotTo(Equal(resourceVersion))
 		})

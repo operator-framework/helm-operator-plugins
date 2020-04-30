@@ -54,14 +54,14 @@ var _ = Describe("Hook", func() {
 			})
 			It("should fail with unknown owner kind", func() {
 				Expect(drw.Exec(nil, rel, log)).To(MatchError(&meta.NoKindMatchError{
-					GroupKind:        schema.GroupKind{"apps", "Deployment"},
+					GroupKind:        schema.GroupKind{Group: "apps", Kind: "Deployment"},
 					SearchedVersions: []string{"v1"},
 				}))
 			})
 			It("should fail with unknown dependent kind", func() {
 				rm.Add(schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}, meta.RESTScopeNamespace)
 				Expect(drw.Exec(nil, rel, log)).To(MatchError(&meta.NoKindMatchError{
-					GroupKind:        schema.GroupKind{"apps", "ReplicaSet"},
+					GroupKind:        schema.GroupKind{Group: "apps", Kind: "ReplicaSet"},
 					SearchedVersions: []string{"v1"},
 				}))
 			})
