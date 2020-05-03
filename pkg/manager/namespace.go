@@ -11,8 +11,7 @@ import (
 )
 
 const (
-	WatchNamespacesEnvVar = "WATCH_NAMESPACES"
-	WatchNamespaceEnvVar  = "WATCH_NAMESPACE"
+	WatchNamespaceEnvVar = "WATCH_NAMESPACE"
 )
 
 func ConfigureWatchNamespaces(options *manager.Options, log logr.Logger) {
@@ -31,9 +30,7 @@ func ConfigureWatchNamespaces(options *manager.Options, log logr.Logger) {
 }
 
 func lookupEnv() ([]string, bool) {
-	if watchNamespaces, found := os.LookupEnv(WatchNamespacesEnvVar); found {
-		return splitNamespaces(watchNamespaces), true
-	} else if watchNamespace, found := os.LookupEnv(WatchNamespaceEnvVar); found {
+	if watchNamespace, found := os.LookupEnv(WatchNamespaceEnvVar); found {
 		return splitNamespaces(watchNamespace), true
 	}
 	return nil, false
