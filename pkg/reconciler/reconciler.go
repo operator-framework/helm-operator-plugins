@@ -65,7 +65,7 @@ type Reconciler struct {
 	gvk                     *schema.GroupVersionKind
 	chrt                    *chart.Chart
 	overrideValues          map[string]string
-	watchDependents         *bool
+	skipDependentWatches    bool
 	maxConcurrentReconciles int
 	reconcilePeriod         time.Duration
 
@@ -198,9 +198,9 @@ func WithGroupVersionKind(gvk schema.GroupVersionKind) Option {
 // WithChart is an Option that configures a Reconciler's helm chart.
 //
 // This option is required.
-func WithChart(chrt *chart.Chart) Option {
+func WithChart(chrt chart.Chart) Option {
 	return func(r *Reconciler) error {
-		r.chrt = chrt
+		r.chrt = &chrt
 		return nil
 	}
 }
@@ -238,9 +238,9 @@ func WithOverrideValues(overrides map[string]string) Option {
 // trigger reconciliations when they change.
 //
 // By default, dependent watches are enabled.
-func WithDependentWatchesEnabled(enable bool) Option {
+func SkipDependentWatches(skip bool) Option {
 	return func(r *Reconciler) error {
-		r.watchDependents = &enable
+		r.skipDependentWatches = skip
 		return nil
 	}
 }
@@ -658,10 +658,6 @@ func (r *Reconciler) validate() error {
 }
 
 func (r *Reconciler) addDefaults(mgr ctrl.Manager, controllerName string) error {
-	trueVal := true
-	if r.watchDependents == nil {
-		r.watchDependents = &trueVal
-	}
 	if r.client == nil {
 		r.client = mgr.GetClient()
 	}
@@ -713,7 +709,7 @@ func (r *Reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) err
 		return err
 	}
 
-	if *r.watchDependents {
+	if !r.skipDependentWatches {
 		r.postHooks = append([]hook.PostHook{internalhook.NewDependentResourceWatcher(c, mgr.GetRESTMapper(), obj)}, r.postHooks...)
 	}
 	return nil

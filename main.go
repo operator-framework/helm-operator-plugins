@@ -102,11 +102,12 @@ func main() {
 		if w.MaxConcurrentReconciles != nil {
 			maxConcurrentReconciles = *w.MaxConcurrentReconciles
 		}
+
 		r, err := reconciler.New(
-			reconciler.WithChart(w.Chart),
+			reconciler.WithChart(*w.Chart),
 			reconciler.WithGroupVersionKind(w.GroupVersionKind),
 			reconciler.WithOverrideValues(w.OverrideValues),
-			reconciler.WithDependentWatchesEnabled(*w.WatchDependentResources),
+			reconciler.SkipDependentWatches(w.WatchDependentResources != nil && !*w.WatchDependentResources),
 			reconciler.WithMaxConcurrentReconciles(maxConcurrentReconciles),
 			reconciler.WithReconcilePeriod(reconcilePeriod),
 			reconciler.WithInstallAnnotation(&annotation.InstallDisableHooks{}),
