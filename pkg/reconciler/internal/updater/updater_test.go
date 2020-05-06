@@ -119,25 +119,6 @@ var _ = Describe("EnsureCondition", func() {
 	})
 })
 
-var _ = Describe("RemoveCondition", func() {
-	var obj *helmAppStatus
-
-	BeforeEach(func() {
-		obj = &helmAppStatus{}
-	})
-
-	It("should remove condition if present", func() {
-		obj.Conditions.SetCondition(conditions.Initialized())
-		Expect(RemoveCondition(conditions.TypeInitialized)(obj)).To(BeTrue())
-		Expect(obj.Conditions.GetCondition(conditions.TypeInitialized)).To(BeNil())
-	})
-
-	It("should return false if condition is not present", func() {
-		Expect(RemoveCondition(conditions.TypeInitialized)(obj)).To(BeFalse())
-		Expect(obj.Conditions.GetCondition(conditions.TypeInitialized)).To(BeNil())
-	})
-})
-
 var _ = Describe("EnsureDeployedRelease", func() {
 	var obj *helmAppStatus
 	var rel *release.Release

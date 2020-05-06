@@ -45,6 +45,7 @@ import (
 	helmclient "github.com/joelanford/helm-operator/pkg/client"
 	"github.com/joelanford/helm-operator/pkg/hook"
 	"github.com/joelanford/helm-operator/pkg/internal/sdk/controllerutil"
+	"github.com/joelanford/helm-operator/pkg/internal/sdk/status"
 	"github.com/joelanford/helm-operator/pkg/reconciler/internal/conditions"
 	internalhook "github.com/joelanford/helm-operator/pkg/reconciler/internal/hook"
 	"github.com/joelanford/helm-operator/pkg/reconciler/internal/updater"
@@ -406,7 +407,7 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 	u := updater.New(r.client)
 	defer func() {
 		applyErr := u.Apply(ctx, obj)
-		if err == nil {
+		if err == nil && !apierrors.IsNotFound(applyErr) {
 			err = applyErr
 		}
 	}()
@@ -434,7 +435,7 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 		u.UpdateStatus(updater.EnsureCondition(conditions.Irreconcilable(err)))
 		return ctrl.Result{}, err
 	}
-	u.UpdateStatus(updater.RemoveCondition(conditions.TypeIrreconcilable))
+	u.UpdateStatus(updater.EnsureCondition(status.Condition{Type: conditions.TypeIrreconcilable, Status: corev1.ConditionFalse, Reason: "", Message: ""}))
 
 	switch state {
 	case stateAlreadyUninstalled:
@@ -471,10 +472,10 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 		return ctrl.Result{}, nil
 	}
 
-	u.UpdateStatus(
-		updater.EnsureCondition(conditions.Initialized()),
-		updater.EnsureDeployedRelease(rel),
-	)
+	u.UpdateStatus(updater.EnsureCondition(conditions.Initialized()))
+	if rel != nil {
+		ensureDeployedRelease(&u, rel)
+	}
 
 	switch state {
 	case stateNeedsInstall:
@@ -497,22 +498,12 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 		return ctrl.Result{}, fmt.Errorf("unexpected release state: %s", state)
 	}
 
-	reason := conditions.ReasonInstallSuccessful
-	message := "release was successfully installed"
-	if rel.Version > 1 {
-		reason = conditions.ReasonUpgradeSuccessful
-		message = "release was successfully upgraded"
-	}
-	if rel.Info != nil && len(rel.Info.Notes) > 0 {
-		message = rel.Info.Notes
-	}
+	ensureDeployedRelease(&u, rel)
 
 	u.Update(updater.EnsureFinalizer(uninstallFinalizer))
 	u.UpdateStatus(
-		updater.RemoveCondition(conditions.TypeReleaseFailed),
-		updater.RemoveCondition(conditions.TypeIrreconcilable),
-		updater.EnsureCondition(conditions.Deployed(corev1.ConditionTrue, reason, message)),
-		updater.EnsureDeployedRelease(rel),
+		updater.EnsureCondition(status.Condition{Type: conditions.TypeReleaseFailed, Status: corev1.ConditionFalse, Reason: "", Message: ""}),
+		updater.EnsureCondition(status.Condition{Type: conditions.TypeIrreconcilable, Status: corev1.ConditionFalse, Reason: "", Message: ""}),
 	)
 
 	for _, h := range r.postHooks {
@@ -551,7 +542,6 @@ const (
 	stateError              helmReleaseState = "error"
 )
 
-// TODO(joelanford): Make an interface abstraction and make it customizable. This will simplify unit tests.
 func (r *Reconciler) getReleaseState(client helmclient.ActionInterface, obj metav1.Object, vals map[string]interface{}) (*release.Release, helmReleaseState, error) {
 	deployedRelease, err := client.Get(obj.GetName())
 	if err != nil && !errors.Is(err, driver.ErrReleaseNotFound) {
@@ -590,7 +580,10 @@ func (r *Reconciler) doInstall(actionClient helmclient.ActionInterface, u *updat
 	}
 	rel, err := actionClient.Install(obj.GetName(), obj.GetNamespace(), r.chrt, vals, opts...)
 	if err != nil {
-		u.UpdateStatus(updater.EnsureCondition(conditions.ReleaseFailed(conditions.ReasonInstallError, err)))
+		u.UpdateStatus(
+			updater.EnsureCondition(conditions.Irreconcilable(err)),
+			updater.EnsureCondition(conditions.ReleaseFailed(conditions.ReasonInstallError, err)),
+		)
 		return nil, err
 	}
 	r.reportOverrideEvents(obj)
@@ -609,7 +602,10 @@ func (r *Reconciler) doUpgrade(actionClient helmclient.ActionInterface, u *updat
 
 	rel, err := actionClient.Upgrade(obj.GetName(), obj.GetNamespace(), r.chrt, vals, opts...)
 	if err != nil {
-		u.UpdateStatus(updater.EnsureCondition(conditions.ReleaseFailed(conditions.ReasonUpgradeError, err)))
+		u.UpdateStatus(
+			updater.EnsureCondition(conditions.Irreconcilable(err)),
+			updater.EnsureCondition(conditions.ReleaseFailed(conditions.ReasonUpgradeError, err)),
+		)
 		return nil, err
 	}
 	r.reportOverrideEvents(obj)
@@ -630,9 +626,11 @@ func (r *Reconciler) doReconcile(actionClient helmclient.ActionInterface, u *upd
 	// ConditionReleaseFailed is added to the status conditions. If that change
 	// is then reverted to its previous state, the operator will stop
 	// attempting the release and will resume reconciling. In this case, we
-	// need to remove the ConditionReleaseFailed because the failing release is
-	// no longer being attempted.
-	u.UpdateStatus(updater.RemoveCondition(conditions.TypeReleaseFailed))
+	// need to set the ConditionReleaseFailed to false because the failing
+	// release is no longer being attempted.
+	u.UpdateStatus(
+		updater.EnsureCondition(status.Condition{Type: conditions.TypeReleaseFailed, Status: corev1.ConditionFalse, Reason: "", Message: ""}),
+	)
 
 	if err := actionClient.Reconcile(rel); err != nil {
 		u.UpdateStatus(updater.EnsureCondition(conditions.Irreconcilable(err)))
@@ -663,7 +661,7 @@ func (r *Reconciler) doUninstall(actionClient helmclient.ActionInterface, u *upd
 	}
 	u.Update(updater.RemoveFinalizer(uninstallFinalizer))
 	u.UpdateStatus(
-		updater.RemoveCondition(conditions.TypeReleaseFailed),
+		updater.EnsureCondition(status.Condition{Type: conditions.TypeReleaseFailed, Status: corev1.ConditionFalse, Reason: "", Message: ""}),
 		updater.EnsureCondition(conditions.Deployed(corev1.ConditionFalse, conditions.ReasonUninstallSuccessful, "")),
 		updater.RemoveDeployedRelease(),
 	)
@@ -739,4 +737,20 @@ func (r *Reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) err
 		r.postHooks = append([]hook.PostHook{internalhook.NewDependentResourceWatcher(c, mgr.GetRESTMapper(), obj)}, r.postHooks...)
 	}
 	return nil
+}
+
+func ensureDeployedRelease(u *updater.Updater, rel *release.Release) {
+	reason := conditions.ReasonInstallSuccessful
+	message := "release was successfully installed"
+	if rel.Version > 1 {
+		reason = conditions.ReasonUpgradeSuccessful
+		message = "release was successfully upgraded"
+	}
+	if rel.Info != nil && len(rel.Info.Notes) > 0 {
+		message = rel.Info.Notes
+	}
+	u.UpdateStatus(
+		updater.EnsureCondition(status.Condition{Type: conditions.TypeDeployed, Status: corev1.ConditionTrue, Reason: reason, Message: message}),
+		updater.EnsureDeployedRelease(rel),
+	)
 }
