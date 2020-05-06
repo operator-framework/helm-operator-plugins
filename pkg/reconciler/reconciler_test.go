@@ -37,6 +37,8 @@ import (
 	helmfake "github.com/joelanford/helm-operator/pkg/client/fake"
 	"github.com/joelanford/helm-operator/pkg/hook"
 	"github.com/joelanford/helm-operator/pkg/internal/sdk/controllerutil"
+	"github.com/joelanford/helm-operator/pkg/internal/sdk/status"
+	"github.com/joelanford/helm-operator/pkg/reconciler/internal/conditions"
 	"github.com/joelanford/helm-operator/pkg/reconciler/internal/values"
 )
 
@@ -366,6 +368,8 @@ var _ = Describe("Reconciler", func() {
 			chrt            chart.Chart
 			actionClient    helmfake.ActionClient
 			reconcilePeriod time.Duration
+			preHookCalled   bool
+			postHookCalled  bool
 			done            chan struct{}
 		)
 
@@ -383,6 +387,8 @@ var _ = Describe("Reconciler", func() {
 			})
 
 			actionClient = helmfake.NewActionClient()
+			preHookCalled = false
+			postHookCalled = false
 
 			var err error
 			r, err = New(
@@ -391,6 +397,14 @@ var _ = Describe("Reconciler", func() {
 				WithValueMapper(valueMapper),
 				WithActionClientGetter(helmfake.NewActionClientGetter(&actionClient, nil)),
 				WithReconcilePeriod(reconcilePeriod),
+				WithPreHook(hook.PreHookFunc(func(*unstructured.Unstructured, *chartutil.Values, logr.Logger) error {
+					preHookCalled = true
+					return nil
+				})),
+				WithPostHook(hook.PostHookFunc(func(*unstructured.Unstructured, *release.Release, logr.Logger) error {
+					postHookCalled = true
+					return nil
+				})),
 			)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(r.SetupWithManager(mgr)).NotTo(HaveOccurred())
@@ -440,82 +454,266 @@ var _ = Describe("Reconciler", func() {
 				Expect(err).NotTo(HaveOccurred())
 			})
 
+			When("actionClientGetter returns an error", func() {
+				var acgErr = errors.New("failed to get action client")
+				BeforeEach(func() {
+					r.actionClientGetter = helmfake.NewActionClientGetter(nil, acgErr)
+				})
+				It("should fail reconciliation", func() {
+					By("returning an error", func() {
+						res, err := r.Reconcile(req)
+						Expect(res).To(Equal(reconcile.Result{}))
+						Expect(err).To(HaveOccurred())
+					})
+
+					Expect(mgr.GetClient().Get(context.TODO(), objKey, obj)).To(Succeed())
+
+					By("ensuring the correct conditions are set on the CR", func() {
+						objStat := &objStatus{}
+						Expect(runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, objStat)).To(Succeed())
+						Expect(objStat.Status.Conditions.IsTrueFor(conditions.TypeIrreconcilable)).To(BeTrue())
+						Expect(objStat.Status.Conditions.IsUnknownFor(conditions.TypeInitialized)).To(BeTrue())
+						Expect(objStat.Status.Conditions.IsUnknownFor(conditions.TypeDeployed)).To(BeTrue())
+						Expect(objStat.Status.Conditions.IsUnknownFor(conditions.TypeReleaseFailed)).To(BeTrue())
+					})
+
+					By("ensuring the uninstall finalizer is not preset on the CR", func() {
+						Expect(controllerutil.ContainsFinalizer(obj, "uninstall-helm-release")).To(BeFalse())
+					})
+				})
+			})
+
+			When("there is an error getting values", func() {
+				BeforeEach(func() {
+					r.overrideValues = map[string]string{"r[": "foobar"}
+				})
+				It("should fail reconciliation", func() {
+					By("returning an error", func() {
+						res, err := r.Reconcile(req)
+						Expect(res).To(Equal(reconcile.Result{}))
+						Expect(err).To(HaveOccurred())
+					})
+
+					Expect(mgr.GetClient().Get(context.TODO(), objKey, obj)).To(Succeed())
+
+					By("ensuring the correct conditions are set on the CR", func() {
+						objStat := &objStatus{}
+						Expect(runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, objStat)).To(Succeed())
+						Expect(objStat.Status.Conditions.IsTrueFor(conditions.TypeIrreconcilable)).To(BeTrue())
+						Expect(objStat.Status.Conditions.IsUnknownFor(conditions.TypeInitialized)).To(BeTrue())
+						Expect(objStat.Status.Conditions.IsUnknownFor(conditions.TypeDeployed)).To(BeTrue())
+						Expect(objStat.Status.Conditions.IsUnknownFor(conditions.TypeReleaseFailed)).To(BeTrue())
+					})
+
+					By("ensuring the uninstall finalizer is not preset on the CR", func() {
+						Expect(controllerutil.ContainsFinalizer(obj, "uninstall-helm-release")).To(BeFalse())
+					})
+				})
+			})
+
+			When("there is an error getting release state", func() {
+				BeforeEach(func() {
+					actionClient.HandleGet = func() (*release.Release, error) {
+						return nil, errors.New("unexpected error")
+					}
+				})
+				It("should fail reconciliation", func() {
+					By("returning an error", func() {
+						res, err := r.Reconcile(req)
+						Expect(res).To(Equal(reconcile.Result{}))
+						Expect(err).To(HaveOccurred())
+					})
+
+					Expect(mgr.GetClient().Get(context.TODO(), objKey, obj)).To(Succeed())
+
+					By("ensuring the correct conditions are set on the CR", func() {
+						objStat := &objStatus{}
+						Expect(runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, objStat)).To(Succeed())
+						Expect(objStat.Status.Conditions.IsTrueFor(conditions.TypeIrreconcilable)).To(BeTrue())
+						Expect(objStat.Status.Conditions.IsUnknownFor(conditions.TypeInitialized)).To(BeTrue())
+						Expect(objStat.Status.Conditions.IsUnknownFor(conditions.TypeDeployed)).To(BeTrue())
+						Expect(objStat.Status.Conditions.IsUnknownFor(conditions.TypeReleaseFailed)).To(BeTrue())
+					})
+
+					By("ensuring the uninstall finalizer is not preset on the CR", func() {
+						Expect(controllerutil.ContainsFinalizer(obj, "uninstall-helm-release")).To(BeFalse())
+					})
+				})
+			})
+
 			When("requested CR release is not installed", func() {
 				BeforeEach(func() {
 					actionClient.HandleGet = func() (*release.Release, error) {
 						return nil, driver.ErrReleaseNotFound
 					}
 				})
-				It("installs a release", func() {
-					actionClient.HandleInstall = func() (*release.Release, error) {
-						return &release.Release{Name: obj.GetName()}, nil
-					}
-
-					By("successfully reconciling a request", func() {
-						res, err := r.Reconcile(req)
-						Expect(res).To(Equal(reconcile.Result{}))
-						Expect(err).NotTo(HaveOccurred())
-						Expect(actionClient.Installs).To(HaveLen(1))
+				When("release installation fails", func() {
+					BeforeEach(func() {
+						actionClient.HandleInstall = func() (*release.Release, error) {
+							return nil, errors.New("install failed")
+						}
 					})
+					It("should fail reconciliation", func() {
+						By("returning an error", func() {
+							res, err := r.Reconcile(req)
+							Expect(res).To(Equal(reconcile.Result{}))
+							Expect(err).To(HaveOccurred())
+						})
 
-					By("doing an installation", func() {
-						Expect(actionClient.Installs[0].Name).To(Equal(obj.GetName()))
-						Expect(actionClient.Installs[0].Namespace).To(Equal(obj.GetNamespace()))
-						Expect(actionClient.Installs[0].Chart).To(Equal(&chrt))
-						Expect(actionClient.Installs[0].Values).To(HaveKey("replicaCount"))
-						Expect(actionClient.Installs[0].Opts).To(HaveLen(0))
-					})
+						Expect(mgr.GetClient().Get(context.TODO(), objKey, obj)).To(Succeed())
 
-					By("ensuring the uninstall finalizer is present", func() {
-						err := mgr.GetClient().Get(context.TODO(), objKey, obj)
-						Expect(err).NotTo(HaveOccurred())
-						Expect(obj.GetFinalizers()).To(ContainElement("uninstall-helm-release"))
+						By("ensuring the correct conditions are set on the CR", func() {
+							objStat := &objStatus{}
+							Expect(runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, objStat)).To(Succeed())
+							Expect(objStat.Status.Conditions.IsUnknownFor(conditions.TypeIrreconcilable)).To(BeTrue())
+							Expect(objStat.Status.Conditions.IsTrueFor(conditions.TypeInitialized)).To(BeTrue())
+							Expect(objStat.Status.Conditions.IsUnknownFor(conditions.TypeDeployed)).To(BeTrue())
+							Expect(objStat.Status.Conditions.IsTrueFor(conditions.TypeReleaseFailed)).To(BeTrue())
+						})
+
+						By("ensuring the uninstall finalizer is not preset on the CR", func() {
+							Expect(controllerutil.ContainsFinalizer(obj, "uninstall-helm-release")).To(BeFalse())
+						})
 					})
 				})
+				When("release installation succeeds", func() {
+					BeforeEach(func() {
+						actionClient.HandleInstall = func() (*release.Release, error) {
+							return getRelease(obj.GetName(), 1), nil
+						}
+					})
+					It("should install the release", func() {
+						By("successfully reconciling a request", func() {
+							res, err := r.Reconcile(req)
+							Expect(res).To(Equal(reconcile.Result{}))
+							Expect(err).NotTo(HaveOccurred())
+							Expect(actionClient.Installs).To(HaveLen(1))
+						})
+
+						By("running pre-hooks", func() {
+							Expect(preHookCalled).To(BeTrue())
+						})
+
+						By("doing an installation", func() {
+							Expect(actionClient.Installs[0].Name).To(Equal(obj.GetName()))
+							Expect(actionClient.Installs[0].Namespace).To(Equal(obj.GetNamespace()))
+							Expect(actionClient.Installs[0].Chart).To(Equal(&chrt))
+							Expect(actionClient.Installs[0].Values).To(HaveKey("replicaCount"))
+							Expect(actionClient.Installs[0].Opts).To(HaveLen(0))
+						})
+
+						By("running post-hooks", func() {
+							Expect(postHookCalled).To(BeTrue())
+						})
+
+						Expect(mgr.GetClient().Get(context.TODO(), objKey, obj)).To(Succeed())
+
+						By("ensuring the uninstall finalizer is present", func() {
+							Expect(obj.GetFinalizers()).To(ContainElement("uninstall-helm-release"))
+						})
+
+						By("ensuring the correct conditions are set on the CR", func() {
+							objStat := &objStatus{}
+							Expect(runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, objStat)).To(Succeed())
+							Expect(objStat.Status.Conditions.IsUnknownFor(conditions.TypeIrreconcilable)).To(BeTrue())
+							Expect(objStat.Status.Conditions.IsTrueFor(conditions.TypeInitialized)).To(BeTrue())
+							Expect(objStat.Status.Conditions.IsTrueFor(conditions.TypeDeployed)).To(BeTrue())
+							Expect(objStat.Status.Conditions.IsUnknownFor(conditions.TypeReleaseFailed)).To(BeTrue())
+						})
+					})
+				})
+
 			})
 
 			When("requested CR release is not upgraded", func() {
 				BeforeEach(func() {
 					actionClient.HandleGet = func() (*release.Release, error) {
-						return &release.Release{Name: obj.GetName(), Manifest: "old"}, nil
+						return getRelease(obj.GetName(), 1), nil
 					}
 				})
-				It("should upgrade the release", func() {
-					actionClient.HandleUpgrade = func() (*release.Release, error) {
-						return &release.Release{Name: obj.GetName(), Manifest: "new"}, nil
-					}
-
-					By("successfully reconciling a request", func() {
-						res, err := r.Reconcile(req)
-						Expect(res).To(Equal(reconcile.Result{}))
-						Expect(err).NotTo(HaveOccurred())
-						Expect(actionClient.Upgrades).To(HaveLen(2))
+				When("release upgrade fails", func() {
+					BeforeEach(func() {
+						fail := false
+						actionClient.HandleUpgrade = func() (*release.Release, error) {
+							if fail {
+								return nil, errors.New("upgrade failed")
+							}
+							fail = true
+							return getRelease(obj.GetName(), 2), nil
+						}
 					})
+					It("should fail reconciliation", func() {
+						By("returning an error", func() {
+							res, err := r.Reconcile(req)
+							Expect(res).To(Equal(reconcile.Result{}))
+							Expect(err).To(HaveOccurred())
+						})
 
-					By("doing a dry run upgrade", func() {
-						Expect(actionClient.Upgrades[0].Name).To(Equal(obj.GetName()))
-						Expect(actionClient.Upgrades[0].Namespace).To(Equal(obj.GetNamespace()))
-						Expect(actionClient.Upgrades[0].Chart).To(Equal(&chrt))
-						Expect(actionClient.Upgrades[0].Values).To(HaveKey("replicaCount"))
-						Expect(actionClient.Upgrades[0].Opts).To(HaveLen(1))
+						Expect(mgr.GetClient().Get(context.TODO(), objKey, obj)).To(Succeed())
 
-						u := action.Upgrade{}
-						Expect(actionClient.Upgrades[0].Opts[0](&u)).To(Succeed())
-						Expect(u.DryRun).To(BeTrue())
+						By("ensuring the correct conditions are set on the CR", func() {
+							objStat := &objStatus{}
+							Expect(runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, objStat)).To(Succeed())
+							Expect(objStat.Status.Conditions.IsUnknownFor(conditions.TypeIrreconcilable)).To(BeTrue())
+							Expect(objStat.Status.Conditions.IsTrueFor(conditions.TypeInitialized)).To(BeTrue())
+							Expect(objStat.Status.Conditions.IsUnknownFor(conditions.TypeDeployed)).To(BeTrue())
+							Expect(objStat.Status.Conditions.IsTrueFor(conditions.TypeReleaseFailed)).To(BeTrue())
+						})
+
+						By("ensuring the uninstall finalizer is not preset on the CR", func() {
+							Expect(controllerutil.ContainsFinalizer(obj, "uninstall-helm-release")).To(BeFalse())
+						})
 					})
+				})
 
-					By("doing an actual upgrade", func() {
-						Expect(actionClient.Upgrades[1].Name).To(Equal(obj.GetName()))
-						Expect(actionClient.Upgrades[1].Namespace).To(Equal(obj.GetNamespace()))
-						Expect(actionClient.Upgrades[1].Chart).To(Equal(&chrt))
-						Expect(actionClient.Upgrades[1].Values).To(HaveKey("replicaCount"))
-						Expect(actionClient.Upgrades[1].Opts).To(HaveLen(0))
+				When("release upgrade succeeds", func() {
+					BeforeEach(func() {
+						actionClient.HandleUpgrade = func() (*release.Release, error) {
+							return getRelease(obj.GetName(), 2), nil
+						}
 					})
+					It("should upgrade the release", func() {
+						By("successfully reconciling a request", func() {
+							res, err := r.Reconcile(req)
+							Expect(res).To(Equal(reconcile.Result{}))
+							Expect(err).NotTo(HaveOccurred())
+							Expect(actionClient.Upgrades).To(HaveLen(2))
+						})
 
-					By("ensuring the uninstall finalizer is present", func() {
-						err := mgr.GetClient().Get(context.TODO(), objKey, obj)
-						Expect(err).NotTo(HaveOccurred())
-						Expect(obj.GetFinalizers()).To(ContainElement("uninstall-helm-release"))
+						By("doing a dry run upgrade", func() {
+							Expect(actionClient.Upgrades[0].Name).To(Equal(obj.GetName()))
+							Expect(actionClient.Upgrades[0].Namespace).To(Equal(obj.GetNamespace()))
+							Expect(actionClient.Upgrades[0].Chart).To(Equal(&chrt))
+							Expect(actionClient.Upgrades[0].Values).To(HaveKey("replicaCount"))
+							Expect(actionClient.Upgrades[0].Opts).To(HaveLen(1))
+
+							u := action.Upgrade{}
+							Expect(actionClient.Upgrades[0].Opts[0](&u)).To(Succeed())
+							Expect(u.DryRun).To(BeTrue())
+						})
+
+						By("doing an actual upgrade", func() {
+							Expect(actionClient.Upgrades[1].Name).To(Equal(obj.GetName()))
+							Expect(actionClient.Upgrades[1].Namespace).To(Equal(obj.GetNamespace()))
+							Expect(actionClient.Upgrades[1].Chart).To(Equal(&chrt))
+							Expect(actionClient.Upgrades[1].Values).To(HaveKey("replicaCount"))
+							Expect(actionClient.Upgrades[1].Opts).To(HaveLen(0))
+						})
+
+						Expect(mgr.GetClient().Get(context.TODO(), objKey, obj)).To(Succeed())
+
+						By("ensuring the uninstall finalizer is present", func() {
+							Expect(obj.GetFinalizers()).To(ContainElement("uninstall-helm-release"))
+						})
+
+						By("ensuring the correct conditions are set on the CR", func() {
+							objStat := &objStatus{}
+							Expect(runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, objStat)).To(Succeed())
+							Expect(objStat.Status.Conditions.IsUnknownFor(conditions.TypeIrreconcilable)).To(BeTrue())
+							Expect(objStat.Status.Conditions.IsTrueFor(conditions.TypeInitialized)).To(BeTrue())
+							Expect(objStat.Status.Conditions.IsTrueFor(conditions.TypeDeployed)).To(BeTrue())
+							Expect(objStat.Status.Conditions.IsUnknownFor(conditions.TypeReleaseFailed)).To(BeTrue())
+						})
 					})
 				})
 			})
@@ -524,7 +722,7 @@ var _ = Describe("Reconciler", func() {
 				var currentRelease *release.Release
 
 				BeforeEach(func() {
-					currentRelease = &release.Release{Name: obj.GetName(), Manifest: "current"}
+					currentRelease = getRelease(obj.GetName(), 1)
 					actionClient.HandleGet = func() (*release.Release, error) {
 						return currentRelease, nil
 					}
@@ -532,39 +730,81 @@ var _ = Describe("Reconciler", func() {
 						return currentRelease, nil
 					}
 				})
-				It("should reconcile the release", func() {
-					actionClient.HandleReconcile = func() error {
-						return nil
-					}
-
-					By("successfully reconciling a request", func() {
-						res, err := r.Reconcile(req)
-						Expect(res).To(Equal(reconcile.Result{}))
-						Expect(err).NotTo(HaveOccurred())
+				When("reconciling the release fails", func() {
+					BeforeEach(func() {
+						actionClient.HandleReconcile = func() error {
+							return errors.New("reconcile failed")
+						}
 					})
+					It("should fail reconciliation", func() {
+						By("returning an error", func() {
+							res, err := r.Reconcile(req)
+							Expect(res).To(Equal(reconcile.Result{}))
+							Expect(err).To(HaveOccurred())
+						})
 
-					By("doing a dry run upgrade", func() {
-						Expect(actionClient.Upgrades).To(HaveLen(1))
-						Expect(actionClient.Upgrades[0].Name).To(Equal(obj.GetName()))
-						Expect(actionClient.Upgrades[0].Namespace).To(Equal(obj.GetNamespace()))
-						Expect(actionClient.Upgrades[0].Chart).To(Equal(&chrt))
-						Expect(actionClient.Upgrades[0].Values).To(HaveKey("replicaCount"))
-						Expect(actionClient.Upgrades[0].Opts).To(HaveLen(1))
+						Expect(mgr.GetClient().Get(context.TODO(), objKey, obj)).To(Succeed())
 
-						u := action.Upgrade{}
-						Expect(actionClient.Upgrades[0].Opts[0](&u)).To(Succeed())
-						Expect(u.DryRun).To(BeTrue())
+						By("ensuring the correct conditions are set on the CR", func() {
+							objStat := &objStatus{}
+							Expect(runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, objStat)).To(Succeed())
+							Expect(objStat.Status.Conditions.IsTrueFor(conditions.TypeIrreconcilable)).To(BeTrue())
+							Expect(objStat.Status.Conditions.IsTrueFor(conditions.TypeInitialized)).To(BeTrue())
+							Expect(objStat.Status.Conditions.IsUnknownFor(conditions.TypeDeployed)).To(BeTrue())
+							Expect(objStat.Status.Conditions.IsUnknownFor(conditions.TypeReleaseFailed)).To(BeTrue())
+						})
+
+						By("ensuring the uninstall finalizer is not preset on the CR", func() {
+							Expect(controllerutil.ContainsFinalizer(obj, "uninstall-helm-release")).To(BeFalse())
+						})
 					})
-
-					By("doing a reconciliation", func() {
-						Expect(actionClient.Reconciles).To(HaveLen(1))
-						Expect(actionClient.Reconciles[0].Release).To(Equal(currentRelease))
+				})
+				When("reconciling the release succeeds", func() {
+					BeforeEach(func() {
+						actionClient.HandleReconcile = func() error {
+							return nil
+						}
 					})
+					It("should reconcile the release", func() {
 
-					By("ensuring the uninstall finalizer is present", func() {
-						err := mgr.GetClient().Get(context.TODO(), objKey, obj)
-						Expect(err).NotTo(HaveOccurred())
-						Expect(obj.GetFinalizers()).To(ContainElement("uninstall-helm-release"))
+						By("successfully reconciling a request", func() {
+							res, err := r.Reconcile(req)
+							Expect(res).To(Equal(reconcile.Result{}))
+							Expect(err).NotTo(HaveOccurred())
+						})
+
+						By("doing a dry run upgrade", func() {
+							Expect(actionClient.Upgrades).To(HaveLen(1))
+							Expect(actionClient.Upgrades[0].Name).To(Equal(obj.GetName()))
+							Expect(actionClient.Upgrades[0].Namespace).To(Equal(obj.GetNamespace()))
+							Expect(actionClient.Upgrades[0].Chart).To(Equal(&chrt))
+							Expect(actionClient.Upgrades[0].Values).To(HaveKey("replicaCount"))
+							Expect(actionClient.Upgrades[0].Opts).To(HaveLen(1))
+
+							u := action.Upgrade{}
+							Expect(actionClient.Upgrades[0].Opts[0](&u)).To(Succeed())
+							Expect(u.DryRun).To(BeTrue())
+						})
+
+						By("doing a reconciliation", func() {
+							Expect(actionClient.Reconciles).To(HaveLen(1))
+							Expect(actionClient.Reconciles[0].Release).To(Equal(currentRelease))
+						})
+
+						Expect(mgr.GetClient().Get(context.TODO(), objKey, obj)).To(Succeed())
+
+						By("ensuring the uninstall finalizer is present", func() {
+							Expect(obj.GetFinalizers()).To(ContainElement("uninstall-helm-release"))
+						})
+
+						By("ensuring the correct conditions are set on the CR", func() {
+							objStat := &objStatus{}
+							Expect(runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, objStat)).To(Succeed())
+							Expect(objStat.Status.Conditions.IsUnknownFor(conditions.TypeIrreconcilable)).To(BeTrue())
+							Expect(objStat.Status.Conditions.IsTrueFor(conditions.TypeInitialized)).To(BeTrue())
+							Expect(objStat.Status.Conditions.IsTrueFor(conditions.TypeDeployed)).To(BeTrue())
+							Expect(objStat.Status.Conditions.IsUnknownFor(conditions.TypeReleaseFailed)).To(BeTrue())
+						})
 					})
 				})
 			})
@@ -582,7 +822,7 @@ var _ = Describe("Reconciler", func() {
 						}
 						return obj.GetDeletionTimestamp() != nil, nil
 					})).To(Succeed())
-					currentRelease = &release.Release{Name: obj.GetName(), Manifest: "current"}
+					currentRelease = getRelease(obj.GetName(), 1)
 					actionClient.HandleGet = func() (*release.Release, error) {
 						return currentRelease, nil
 					}
@@ -678,4 +918,21 @@ func getTestCR(gvk schema.GroupVersionKind) *unstructured.Unstructured {
 	obj.SetNamespace("default")
 	obj.SetGroupVersionKind(gvk)
 	return obj
+}
+
+func getRelease(name string, version int) *release.Release {
+	return &release.Release{
+		Name:     "name",
+		Version:  version,
+		Manifest: fmt.Sprintf("v%d manifest", version),
+		Info: &release.Info{
+			Notes: fmt.Sprintf("v%d notes", version),
+		},
+	}
+}
+
+type objStatus struct {
+	Status struct {
+		Conditions status.Conditions `json:"conditions"`
+	} `json:"status"`
 }

@@ -403,17 +403,25 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 		return ctrl.Result{}, err
 	}
 
+	u := updater.New(r.client)
+	defer func() {
+		applyErr := u.Apply(ctx, obj)
+		if err == nil {
+			err = applyErr
+		}
+	}()
+
 	actionClient, err := r.actionClientGetter.ActionClientFor(obj)
 	if err != nil {
+		u.UpdateStatus(updater.EnsureCondition(conditions.Irreconcilable(err)))
 		return ctrl.Result{}, err
 	}
 
 	vals, err := r.getValues(obj)
 	if err != nil {
+		u.UpdateStatus(updater.EnsureCondition(conditions.Irreconcilable(err)))
 		return ctrl.Result{}, err
 	}
-
-	u := updater.New(r.client)
 
 	for _, h := range r.preHooks {
 		if err := h.Exec(obj, &vals, log); err != nil {
@@ -440,13 +448,14 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 		// and we need to be able to update the conditions on the CR to
 		// indicate that the uninstall failed.
 		if err := func() error {
+			uninstallUpdater := updater.New(r.client)
 			defer func() {
-				applyErr := u.Apply(ctx, obj)
+				applyErr := uninstallUpdater.Apply(ctx, obj)
 				if err == nil {
 					err = applyErr
 				}
 			}()
-			return r.doUninstall(actionClient, &u, obj, log)
+			return r.doUninstall(actionClient, &uninstallUpdater, obj, log)
 		}(); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -462,12 +471,6 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 		return ctrl.Result{}, nil
 	}
 
-	defer func() {
-		applyErr := u.Apply(ctx, obj)
-		if err == nil {
-			err = applyErr
-		}
-	}()
 	u.UpdateStatus(
 		updater.EnsureCondition(conditions.Initialized()),
 		updater.EnsureDeployedRelease(rel),
@@ -494,9 +497,21 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 		return ctrl.Result{}, fmt.Errorf("unexpected release state: %s", state)
 	}
 
+	reason := conditions.ReasonInstallSuccessful
+	message := "release was successfully installed"
+	if rel.Version > 1 {
+		reason = conditions.ReasonUpgradeSuccessful
+		message = "release was successfully upgraded"
+	}
+	if rel.Info != nil && len(rel.Info.Notes) > 0 {
+		message = rel.Info.Notes
+	}
+
 	u.Update(updater.EnsureFinalizer(uninstallFinalizer))
 	u.UpdateStatus(
 		updater.RemoveCondition(conditions.TypeReleaseFailed),
+		updater.RemoveCondition(conditions.TypeIrreconcilable),
+		updater.EnsureCondition(conditions.Deployed(corev1.ConditionTrue, reason, message)),
 		updater.EnsureDeployedRelease(rel),
 	)
 
@@ -580,12 +595,6 @@ func (r *Reconciler) doInstall(actionClient helmclient.ActionInterface, u *updat
 	}
 	r.reportOverrideEvents(obj)
 
-	message := "release was successfully installed"
-	if rel.Info != nil && len(rel.Info.Notes) > 0 {
-		message = rel.Info.Notes
-	}
-	u.UpdateStatus(updater.EnsureCondition(conditions.Deployed(corev1.ConditionTrue, conditions.ReasonInstallSuccessful, message)))
-
 	log.Info("Release installed", "name", rel.Name, "version", rel.Version)
 	return rel, nil
 }
@@ -604,12 +613,6 @@ func (r *Reconciler) doUpgrade(actionClient helmclient.ActionInterface, u *updat
 		return nil, err
 	}
 	r.reportOverrideEvents(obj)
-
-	message := "release was successfully upgraded"
-	if rel.Info != nil && len(rel.Info.Notes) > 0 {
-		message = rel.Info.Notes
-	}
-	u.UpdateStatus(updater.EnsureCondition(conditions.Deployed(corev1.ConditionTrue, conditions.ReasonUpgradeSuccessful, message)))
 
 	log.Info("Release upgraded", "name", rel.Name, "version", rel.Version)
 	return rel, nil
@@ -635,7 +638,7 @@ func (r *Reconciler) doReconcile(actionClient helmclient.ActionInterface, u *upd
 		u.UpdateStatus(updater.EnsureCondition(conditions.Irreconcilable(err)))
 		return err
 	}
-	u.UpdateStatus(updater.RemoveCondition(conditions.TypeIrreconcilable))
+
 	log.Info("Release reconciled", "name", rel.Name, "version", rel.Version)
 	return nil
 }
