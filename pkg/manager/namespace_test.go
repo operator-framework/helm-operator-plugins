@@ -95,7 +95,7 @@ var _ = Describe("ConfigureWatchNamespaces", func() {
 			key, err := client.ObjectKeyFromObject(&p)
 			Expect(err).To(BeNil())
 
-			Expect(c.Get(context.TODO(), key, &p)).To(Succeed())
+			Expect(c.Get(context.TODO(), key, &p)).NotTo(Succeed())
 		}
 		close(done)
 		wg.Wait()
