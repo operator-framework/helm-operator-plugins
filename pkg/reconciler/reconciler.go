@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -56,7 +57,7 @@ const uninstallFinalizer = "uninstall-helm-release"
 type Reconciler struct {
 	client             client.Client
 	actionClientGetter helmclient.ActionClientGetter
-	valueMapper        ValueMapper
+	valueMapper        values.Mapper
 	eventRecorder      record.EventRecorder
 	preHooks           []hook.PreHook
 	postHooks          []hook.PostHook
@@ -69,6 +70,7 @@ type Reconciler struct {
 	maxConcurrentReconciles int
 	reconcilePeriod         time.Duration
 
+	annotSetupOnce       sync.Once
 	annotations          map[string]struct{}
 	installAnnotations   map[string]annotation.Install
 	upgradeAnnotations   map[string]annotation.Upgrade
@@ -87,12 +89,8 @@ type Reconciler struct {
 //
 // If an error occurs configuring or validating the Reconciler, it is returned.
 func New(opts ...Option) (*Reconciler, error) {
-	r := &Reconciler{
-		annotations:          make(map[string]struct{}),
-		installAnnotations:   make(map[string]annotation.Install),
-		upgradeAnnotations:   make(map[string]annotation.Upgrade),
-		uninstallAnnotations: make(map[string]annotation.Uninstall),
-	}
+	r := &Reconciler{}
+	r.annotSetupOnce.Do(r.setupAnnotationMaps)
 	for _, o := range opts {
 		if err := o(r); err != nil {
 			return nil, err
@@ -103,6 +101,13 @@ func New(opts ...Option) (*Reconciler, error) {
 		return nil, err
 	}
 	return r, nil
+}
+
+func (r *Reconciler) setupAnnotationMaps() {
+	r.annotations = make(map[string]struct{})
+	r.installAnnotations = make(map[string]annotation.Install)
+	r.upgradeAnnotations = make(map[string]annotation.Upgrade)
+	r.uninstallAnnotations = make(map[string]annotation.Uninstall)
 }
 
 // SetupWithManager configures a controller for the Reconciler and registers
@@ -279,6 +284,8 @@ func WithReconcilePeriod(rp time.Duration) Option {
 // Duplicate annotation names will result in an error.
 func WithInstallAnnotation(a annotation.Install) Option {
 	return func(r *Reconciler) error {
+		r.annotSetupOnce.Do(r.setupAnnotationMaps)
+
 		name := a.Name()
 		if _, ok := r.annotations[name]; ok {
 			return fmt.Errorf("annotation %q already exists", name)
@@ -296,6 +303,8 @@ func WithInstallAnnotation(a annotation.Install) Option {
 // Duplicate annotation names will result in an error.
 func WithUpgradeAnnotation(a annotation.Upgrade) Option {
 	return func(r *Reconciler) error {
+		r.annotSetupOnce.Do(r.setupAnnotationMaps)
+
 		name := a.Name()
 		if _, ok := r.annotations[name]; ok {
 			return fmt.Errorf("annotation %q already exists", name)
@@ -313,6 +322,8 @@ func WithUpgradeAnnotation(a annotation.Upgrade) Option {
 // Duplicate annotation names will result in an error.
 func WithUninstallAnnotation(a annotation.Uninstall) Option {
 	return func(r *Reconciler) error {
+		r.annotSetupOnce.Do(r.setupAnnotationMaps)
+
 		name := a.Name()
 		if _, ok := r.annotations[name]; ok {
 			return fmt.Errorf("annotation %q already exists", name)
@@ -345,7 +356,7 @@ func WithPostHook(h hook.PostHook) Option {
 
 // WithValueMapper is an Option that configures a function that maps values
 // from a custom resource spec to the values passed to Helm
-func WithValueMapper(m ValueMapper) Option {
+func WithValueMapper(m values.Mapper) Option {
 	return func(r *Reconciler) error {
 		r.valueMapper = m
 		return nil
@@ -506,10 +517,7 @@ func (r *Reconciler) getValues(obj *unstructured.Unstructured) (chartutil.Values
 	if err := crVals.ApplyOverrides(r.overrideValues); err != nil {
 		return chartutil.Values{}, err
 	}
-	vals := crVals.Map()
-	if r.valueMapper != nil {
-		vals = r.valueMapper.MapValues(vals)
-	}
+	vals := r.valueMapper.Map(crVals.Map())
 	vals, err = chartutil.CoalesceValues(r.chrt, vals)
 	if err != nil {
 		return chartutil.Values{}, err
@@ -571,7 +579,13 @@ func (r *Reconciler) doInstall(actionClient helmclient.ActionInterface, u *updat
 		return nil, err
 	}
 	r.reportOverrideEvents(obj)
-	u.UpdateStatus(updater.EnsureCondition(conditions.Deployed(corev1.ConditionTrue, conditions.ReasonInstallSuccessful, rel.Info.Notes)))
+
+	message := "release was successfully installed"
+	if rel.Info != nil && len(rel.Info.Notes) > 0 {
+		message = rel.Info.Notes
+	}
+	u.UpdateStatus(updater.EnsureCondition(conditions.Deployed(corev1.ConditionTrue, conditions.ReasonInstallSuccessful, message)))
+
 	log.Info("Release installed", "name", rel.Name, "version", rel.Version)
 	return rel, nil
 }
@@ -590,7 +604,13 @@ func (r *Reconciler) doUpgrade(actionClient helmclient.ActionInterface, u *updat
 		return nil, err
 	}
 	r.reportOverrideEvents(obj)
-	u.UpdateStatus(updater.EnsureCondition(conditions.Deployed(corev1.ConditionTrue, conditions.ReasonUpgradeSuccessful, rel.Info.Notes)))
+
+	message := "release was successfully upgraded"
+	if rel.Info != nil && len(rel.Info.Notes) > 0 {
+		message = rel.Info.Notes
+	}
+	u.UpdateStatus(updater.EnsureCondition(conditions.Deployed(corev1.ConditionTrue, conditions.ReasonUpgradeSuccessful, message)))
+
 	log.Info("Release upgraded", "name", rel.Name, "version", rel.Version)
 	return rel, nil
 }
@@ -674,6 +694,9 @@ func (r *Reconciler) addDefaults(mgr ctrl.Manager, controllerName string) error 
 	if r.eventRecorder == nil {
 		r.eventRecorder = mgr.GetEventRecorderFor(controllerName)
 	}
+	if r.valueMapper == nil {
+		r.valueMapper = values.DefaultMapper
+	}
 	return nil
 }
 
@@ -713,8 +736,4 @@ func (r *Reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) err
 		r.postHooks = append([]hook.PostHook{internalhook.NewDependentResourceWatcher(c, mgr.GetRESTMapper(), obj)}, r.postHooks...)
 	}
 	return nil
-}
-
-type ValueMapper interface {
-	MapValues(chartutil.Values) chartutil.Values
 }
