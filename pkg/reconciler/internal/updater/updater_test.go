@@ -6,6 +6,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"helm.sh/helm/v3/pkg/release"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubectl/pkg/scheme"
@@ -51,7 +52,7 @@ var _ = Describe("Updater", func() {
 		})
 
 		It("should apply an update status function", func() {
-			u.UpdateStatus(EnsureCondition(conditions.Initialized()))
+			u.UpdateStatus(EnsureCondition(conditions.Initialized(corev1.ConditionTrue, "", "")))
 			resourceVersion := obj.GetResourceVersion()
 
 			Expect(u.Apply(context.TODO(), obj)).To(Succeed())
@@ -108,13 +109,13 @@ var _ = Describe("EnsureCondition", func() {
 	})
 
 	It("should add condition if not present", func() {
-		Expect(EnsureCondition(conditions.Initialized())(obj)).To(BeTrue())
+		Expect(EnsureCondition(conditions.Initialized(corev1.ConditionTrue, "", ""))(obj)).To(BeTrue())
 		Expect(obj.Conditions.IsTrueFor(conditions.TypeInitialized)).To(BeTrue())
 	})
 
 	It("should not add duplicate condition", func() {
-		obj.Conditions.SetCondition(conditions.Initialized())
-		Expect(EnsureCondition(conditions.Initialized())(obj)).To(BeFalse())
+		obj.Conditions.SetCondition(conditions.Initialized(corev1.ConditionTrue, "", ""))
+		Expect(EnsureCondition(conditions.Initialized(corev1.ConditionTrue, "", ""))(obj)).To(BeFalse())
 		Expect(obj.Conditions.IsTrueFor(conditions.TypeInitialized)).To(BeTrue())
 	})
 })

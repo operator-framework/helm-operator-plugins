@@ -15,6 +15,8 @@
 package conditions
 
 import (
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/joelanford/helm-operator/pkg/internal/sdk/status"
@@ -30,42 +32,35 @@ const (
 	ReasonUpgradeSuccessful   = status.ConditionReason("UpgradeSuccessful")
 	ReasonUninstallSuccessful = status.ConditionReason("UninstallSuccessful")
 
-	ReasonInstallError   = status.ConditionReason("InstallError")
-	ReasonUpgradeError   = status.ConditionReason("UpgradeError")
-	ReasonReconcileError = status.ConditionReason("ReconcileError")
-	ReasonUninstallError = status.ConditionReason("UninstallError")
+	ReasonErrorGatheringState = status.ConditionReason("ErrorGatheringState")
+	ReasonInstallError        = status.ConditionReason("InstallError")
+	ReasonUpgradeError        = status.ConditionReason("UpgradeError")
+	ReasonReconcileError      = status.ConditionReason("ReconcileError")
+	ReasonUninstallError      = status.ConditionReason("UninstallError")
 )
 
-func Initialized() status.Condition {
-	return status.Condition{
-		Type:   TypeInitialized,
-		Status: corev1.ConditionTrue,
-	}
+func Initialized(stat corev1.ConditionStatus, reason status.ConditionReason, message interface{}) status.Condition {
+	return newCondition(TypeInitialized, stat, reason, message)
 }
 
-func Deployed(stat corev1.ConditionStatus, reason status.ConditionReason, message string) status.Condition {
+func Deployed(stat corev1.ConditionStatus, reason status.ConditionReason, message interface{}) status.Condition {
+	return newCondition(TypeDeployed, stat, reason, message)
+}
+
+func ReleaseFailed(stat corev1.ConditionStatus, reason status.ConditionReason, message interface{}) status.Condition {
+	return newCondition(TypeReleaseFailed, stat, reason, message)
+}
+
+func Irreconcilable(stat corev1.ConditionStatus, reason status.ConditionReason, message interface{}) status.Condition {
+	return newCondition(TypeIrreconcilable, stat, reason, message)
+}
+
+func newCondition(t status.ConditionType, s corev1.ConditionStatus, r status.ConditionReason, m interface{}) status.Condition {
+	message := fmt.Sprintf("%s", m)
 	return status.Condition{
-		Type:    TypeDeployed,
-		Status:  stat,
-		Reason:  reason,
+		Type:    t,
+		Status:  s,
+		Reason:  r,
 		Message: message,
-	}
-}
-
-func ReleaseFailed(reason status.ConditionReason, err error) status.Condition {
-	return status.Condition{
-		Type:    TypeReleaseFailed,
-		Status:  corev1.ConditionTrue,
-		Reason:  reason,
-		Message: err.Error(),
-	}
-}
-
-func Irreconcilable(err error) status.Condition {
-	return status.Condition{
-		Type:    TypeIrreconcilable,
-		Status:  corev1.ConditionTrue,
-		Reason:  ReasonReconcileError,
-		Message: err.Error(),
 	}
 }

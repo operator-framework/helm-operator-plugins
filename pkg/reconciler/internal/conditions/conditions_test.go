@@ -14,10 +14,13 @@ import (
 var _ = Describe("Conditions", func() {
 	var _ = Describe("Initialized", func() {
 		It("should return an Initialized condition with status True", func() {
-			Expect(Initialized()).To(Equal(status.Condition{
-				Type:   TypeInitialized,
-				Status: corev1.ConditionTrue,
-			}))
+			e := status.Condition{
+				Type:    TypeInitialized,
+				Status:  corev1.ConditionTrue,
+				Reason:  "reason",
+				Message: "message",
+			}
+			Expect(Initialized(e.Status, e.Reason, e.Message)).To(Equal(e))
 		})
 	})
 
@@ -42,7 +45,7 @@ var _ = Describe("Conditions", func() {
 				Reason:  "reason",
 				Message: err.Error(),
 			}
-			Expect(ReleaseFailed(e.Reason, err)).To(Equal(e))
+			Expect(ReleaseFailed(e.Status, e.Reason, err)).To(Equal(e))
 		})
 	})
 
@@ -55,7 +58,7 @@ var _ = Describe("Conditions", func() {
 				Reason:  ReasonReconcileError,
 				Message: err.Error(),
 			}
-			Expect(Irreconcilable(err)).To(Equal(e))
+			Expect(Irreconcilable(e.Status, e.Reason, err)).To(Equal(e))
 		})
 	})
 })
