@@ -28,12 +28,11 @@ import (
 
 var _ genericclioptions.RESTClientGetter = &restClientGetter{}
 
-func newRESTClientGetter(cfg *rest.Config, cdc discovery.CachedDiscoveryInterface, rm meta.RESTMapper, ns string) genericclioptions.RESTClientGetter {
+func newRESTClientGetter(cfg *rest.Config, rm meta.RESTMapper, ns string) genericclioptions.RESTClientGetter {
 	return &restClientGetter{
-		restConfig:            cfg,
-		cachedDiscoveryClient: cdc,
-		restMapper:            rm,
-		namespaceConfig:       &namespaceClientConfig{ns},
+		restConfig:      cfg,
+		restMapper:      rm,
+		namespaceConfig: &namespaceClientConfig{ns},
 	}
 }
 
@@ -56,13 +55,11 @@ func (c *restClientGetter) ToDiscoveryClient() (discovery.CachedDiscoveryInterfa
 		err error
 	)
 	c.setupDiscoveryClient.Do(func() {
-		if c.cachedDiscoveryClient == nil {
-			dc, err = discovery.NewDiscoveryClientForConfig(c.restConfig)
-			if err != nil {
-				return
-			}
-			c.cachedDiscoveryClient = cached.NewMemCacheClient(dc)
+		dc, err = discovery.NewDiscoveryClientForConfig(c.restConfig)
+		if err != nil {
+			return
 		}
+		c.cachedDiscoveryClient = cached.NewMemCacheClient(dc)
 	})
 	if err != nil {
 		return nil, err

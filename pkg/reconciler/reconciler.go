@@ -120,10 +120,7 @@ func (r *Reconciler) setupAnnotationMaps() {
 func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	controllerName := fmt.Sprintf("%v-controller", strings.ToLower(r.gvk.Kind))
 
-	if err := r.addDefaults(mgr, controllerName); err != nil {
-		return err
-	}
-
+	r.addDefaults(mgr, controllerName)
 	r.setupScheme(mgr)
 
 	c, err := controller.New(controllerName, mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: r.maxConcurrentReconciles})
@@ -677,7 +674,7 @@ func (r *Reconciler) validate() error {
 	return nil
 }
 
-func (r *Reconciler) addDefaults(mgr ctrl.Manager, controllerName string) error {
+func (r *Reconciler) addDefaults(mgr ctrl.Manager, controllerName string) {
 	if r.client == nil {
 		r.client = mgr.GetClient()
 	}
@@ -685,10 +682,7 @@ func (r *Reconciler) addDefaults(mgr ctrl.Manager, controllerName string) error 
 		r.log = ctrl.Log.WithName("controllers").WithName("Helm")
 	}
 	if r.actionClientGetter == nil {
-		actionConfigGetter, err := helmclient.NewActionConfigGetter(mgr.GetConfig(), mgr.GetRESTMapper(), r.log)
-		if err != nil {
-			return err
-		}
+		actionConfigGetter := helmclient.NewActionConfigGetter(mgr.GetConfig(), mgr.GetRESTMapper(), r.log)
 		r.actionClientGetter = helmclient.NewActionClientGetter(actionConfigGetter)
 	}
 	if r.eventRecorder == nil {
@@ -697,7 +691,6 @@ func (r *Reconciler) addDefaults(mgr ctrl.Manager, controllerName string) error 
 	if r.valueMapper == nil {
 		r.valueMapper = values.DefaultMapper
 	}
-	return nil
 }
 
 func (r *Reconciler) setupScheme(mgr ctrl.Manager) {

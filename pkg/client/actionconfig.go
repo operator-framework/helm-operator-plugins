@@ -41,12 +41,12 @@ type ActionConfigGetter interface {
 	ActionConfigFor(obj Object) (*action.Configuration, error)
 }
 
-func NewActionConfigGetter(cfg *rest.Config, rm meta.RESTMapper, log logr.Logger) (ActionConfigGetter, error) {
+func NewActionConfigGetter(cfg *rest.Config, rm meta.RESTMapper, log logr.Logger) ActionConfigGetter {
 	return &actionConfigGetter{
 		cfg:        cfg,
 		restMapper: rm,
 		log:        log,
-	}, nil
+	}
 }
 
 var _ ActionConfigGetter = &actionConfigGetter{}
@@ -59,11 +59,13 @@ type actionConfigGetter struct {
 
 func (acg *actionConfigGetter) ActionConfigFor(obj Object) (*action.Configuration, error) {
 	// Create a RESTClientGetter
-	rcg := newRESTClientGetter(acg.cfg, nil, acg.restMapper, obj.GetNamespace())
+	rcg := newRESTClientGetter(acg.cfg, acg.restMapper, obj.GetNamespace())
 
 	// Setup the debug log function that Helm will use
 	debugLog := func(format string, v ...interface{}) {
-		acg.log.V(1).Info(fmt.Sprintf(format, v...))
+		if acg.log != nil {
+			acg.log.V(1).Info(fmt.Sprintf(format, v...))
+		}
 	}
 
 	// Create a client that helm will use to manage release resources.

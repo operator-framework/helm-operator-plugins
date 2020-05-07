@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -13,13 +12,10 @@ import (
 	. "github.com/onsi/gomega"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
-	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/chartutil"
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/storage/driver"
-	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -28,7 +24,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -38,6 +33,7 @@ import (
 	"github.com/joelanford/helm-operator/pkg/hook"
 	"github.com/joelanford/helm-operator/pkg/internal/sdk/controllerutil"
 	"github.com/joelanford/helm-operator/pkg/internal/sdk/status"
+	"github.com/joelanford/helm-operator/pkg/internal/testutil"
 	"github.com/joelanford/helm-operator/pkg/reconciler/internal/conditions"
 	"github.com/joelanford/helm-operator/pkg/reconciler/internal/values"
 )
@@ -87,9 +83,7 @@ var _ = Describe("Reconciler", func() {
 		})
 		var _ = Describe("WithActionClientGetter", func() {
 			It("should set the reconciler action client getter", func() {
-				cfgGetter, err := helmclient.NewActionConfigGetter(nil, nil, nil)
-				Expect(err).To(BeNil())
-
+				cfgGetter := helmclient.NewActionConfigGetter(nil, nil, nil)
 				acg := helmclient.NewActionClientGetter(cfgGetter)
 				Expect(WithActionClientGetter(acg)(r)).To(Succeed())
 				Expect(r.actionClientGetter).To(Equal(acg))
@@ -364,8 +358,6 @@ var _ = Describe("Reconciler", func() {
 			objKey          types.NamespacedName
 			req             reconcile.Request
 			mgr             manager.Manager
-			gvk             schema.GroupVersionKind
-			chrt            chart.Chart
 			actionClient    helmfake.ActionClient
 			reconcilePeriod time.Duration
 			preHookCalled   bool
@@ -374,9 +366,6 @@ var _ = Describe("Reconciler", func() {
 		)
 
 		BeforeEach(func() {
-			gvk = schema.GroupVersionKind{Group: "test.domain", Version: "v1", Kind: "Test"}
-			createTestCRDOrFail(gvk)
-			chrt = loadChartOrFail()
 			mgr = getManagerOrFail()
 			valueMapper := values.MapperFunc(func(vals chartutil.Values) chartutil.Values {
 				if v, ok := vals["replicas"]; ok {
@@ -409,7 +398,7 @@ var _ = Describe("Reconciler", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(r.SetupWithManager(mgr)).NotTo(HaveOccurred())
 
-			obj = getTestCR(gvk)
+			obj = testutil.BuildTestCR(gvk)
 			objKey = types.NamespacedName{Namespace: obj.GetNamespace(), Name: obj.GetName()}
 			req = reconcile.Request{NamespacedName: objKey}
 
@@ -859,65 +848,6 @@ func getManagerOrFail() manager.Manager {
 	})
 	Expect(err).NotTo(HaveOccurred())
 	return mgr
-}
-
-func createTestCRDOrFail(gvk schema.GroupVersionKind) {
-	trueVal := true
-	singular := strings.ToLower(gvk.Kind)
-	plural := fmt.Sprintf("%ss", singular)
-	crd := apiextv1.CustomResourceDefinition{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: fmt.Sprintf("%s.%s", plural, gvk.Group),
-		},
-		Spec: apiextv1.CustomResourceDefinitionSpec{
-			Group: gvk.Group,
-			Names: apiextv1.CustomResourceDefinitionNames{
-				Kind:     gvk.Kind,
-				ListKind: fmt.Sprintf("%sList", gvk.Kind),
-				Singular: singular,
-				Plural:   plural,
-			},
-			Scope: apiextv1.NamespaceScoped,
-			Versions: []apiextv1.CustomResourceDefinitionVersion{
-				{
-					Name: "v1",
-					Schema: &apiextv1.CustomResourceValidation{
-						OpenAPIV3Schema: &apiextv1.JSONSchemaProps{
-							Type:                   "object",
-							XPreserveUnknownFields: &trueVal,
-						},
-					},
-					Subresources: &apiextv1.CustomResourceSubresources{
-						Status: &apiextv1.CustomResourceSubresourceStatus{},
-					},
-					Served:  true,
-					Storage: true,
-				},
-			},
-		},
-	}
-
-	crdInstallOpts := envtest.CRDInstallOptions{
-		CRDs: []runtime.Object{&crd},
-	}
-	_, err := envtest.InstallCRDs(cfg, crdInstallOpts)
-	Expect(err).NotTo(HaveOccurred())
-}
-
-func loadChartOrFail() chart.Chart {
-	chrt, err := loader.Load("../../testdata/test-chart-0.1.0.tgz")
-	Expect(err).NotTo(HaveOccurred())
-	return *chrt
-}
-
-func getTestCR(gvk schema.GroupVersionKind) *unstructured.Unstructured {
-	obj := &unstructured.Unstructured{Object: map[string]interface{}{
-		"spec": map[string]interface{}{"replicas": 2},
-	}}
-	obj.SetName("test")
-	obj.SetNamespace("default")
-	obj.SetGroupVersionKind(gvk)
-	return obj
 }
 
 func getRelease(name string, version int) *release.Release {

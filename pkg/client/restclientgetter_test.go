@@ -3,7 +3,6 @@ package client
 import (
 	. "github.com/onsi/ginkgo"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 )
 
@@ -11,7 +10,6 @@ var _ = PDescribe("restClientGetter", func() {
 	var _ = PDescribe("newRESTClientGetter", func() {
 		var (
 			cfg *rest.Config
-			cdc discovery.CachedDiscoveryInterface
 			rm  meta.RESTMapper
 		)
 
@@ -20,7 +18,7 @@ var _ = PDescribe("restClientGetter", func() {
 		})
 
 		It("returns a working genericclioptions.RESTClientGetter", func() {
-			newRESTClientGetter(cfg, cdc, rm, "")
+			newRESTClientGetter(cfg, rm, "")
 		})
 	})
 })
