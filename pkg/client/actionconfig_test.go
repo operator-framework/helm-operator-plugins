@@ -1,11 +1,10 @@
-package client_test
+package client
 
 import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
-	. "github.com/joelanford/helm-operator/pkg/client"
 	"github.com/joelanford/helm-operator/pkg/internal/testutil"
 )
 
