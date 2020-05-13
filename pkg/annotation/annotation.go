@@ -30,7 +30,7 @@ type InstallDisableHooks struct {
 var _ Install = &InstallDisableHooks{}
 
 const (
-	DefaultDomain                    = "helm.sdk.operator-framework.io"
+	DefaultDomain                    = "helm.sdk.operatorframework.io"
 	DefaultInstallDisableHooksName   = DefaultDomain + "/install-disable-hooks"
 	DefaultUpgradeDisableHooksName   = DefaultDomain + "/upgrade-disable-hooks"
 	DefaultUninstallDisableHooksName = DefaultDomain + "/uninstall-disable-hooks"

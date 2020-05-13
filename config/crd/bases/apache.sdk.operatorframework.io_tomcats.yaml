@@ -6,9 +6,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.2.4
   creationTimestamp: null
-  name: tomcats.apache.sdk.operator-framework.io
+  name: tomcats.apache.sdk.operatorframework.io
 spec:
-  group: apache.sdk.operator-framework.io
+  group: apache.sdk.operatorframework.io
   names:
     kind: Tomcat
     listKind: TomcatList

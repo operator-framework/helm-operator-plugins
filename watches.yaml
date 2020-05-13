@@ -1,4 +1,4 @@
-- group: apache.sdk.operator-framework.io
+- group: apache.sdk.operatorframework.io
   version: v1
   kind: Tomcat
   chart: ./helm-charts/tomcat

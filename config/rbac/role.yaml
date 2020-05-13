@@ -4,7 +4,7 @@ metadata:
   name: manager-role
 rules:
   - apiGroups:
-      - apache.sdk.operator-framework.io
+      - apache.sdk.operatorframework.io
     resources:
       - tomcats
     verbs:
@@ -16,7 +16,7 @@ rules:
       - update
       - watch
   - apiGroups:
-      - apache.sdk.operator-framework.io
+      - apache.sdk.operatorframework.io
     resources:
       - tomcats/status
     verbs:
