@@ -72,7 +72,7 @@ golangci-lint:
 ifeq (, $(shell which golangci-lint))
 	@{ \
 	set -e ;\
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v1.24.0 ;\
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v1.27.0 ;\
 	}
 GOLANGCI_LINT=$(shell go env GOPATH)/bin/golangci-lint
 else
