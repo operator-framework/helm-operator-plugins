@@ -852,7 +852,7 @@ func getManagerOrFail() manager.Manager {
 
 func getRelease(name string, version int) *release.Release {
 	return &release.Release{
-		Name:     "name",
+		Name:     name,
 		Version:  version,
 		Manifest: fmt.Sprintf("v%d manifest", version),
 		Info: &release.Info{

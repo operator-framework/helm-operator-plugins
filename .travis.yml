@@ -6,6 +6,5 @@ before_install:
   - (cd /tmp && go get github.com/mattn/goveralls)
 
 script:
-- pwd
 - make test manager lint && git diff
 - $GOPATH/bin/goveralls -service=travis-ci -coverprofile=cover.out
