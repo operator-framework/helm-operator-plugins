@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"strconv"
 
 	. "github.com/onsi/ginkgo"
@@ -109,6 +110,14 @@ var _ = Describe("ActionClient", func() {
 					})
 					verifyNoRelease(cl, obj.GetNamespace(), obj.GetName(), nil)
 				})
+				When("using an option function that returns an error", func() {
+					It("should fail", func() {
+						opt := func(*action.Install) error { return errors.New("expect this error") }
+						r, err := ac.Install(obj.GetName(), obj.GetNamespace(), &chrt, vals, opt)
+						Expect(err).To(MatchError("expect this error"))
+						Expect(r).To(BeNil())
+					})
+				})
 			})
 			var _ = Describe("Upgrade", func() {
 				It("should fail", func() {
@@ -142,17 +151,39 @@ var _ = Describe("ActionClient", func() {
 			})
 
 			var _ = Describe("Get", func() {
+				var (
+					rel *release.Release
+					err error
+				)
 				It("should succeed", func() {
-					var (
-						rel *release.Release
-						err error
-					)
 					By("getting the release", func() {
 						rel, err = ac.Get(obj.GetName())
 						Expect(err).To(BeNil())
 						Expect(rel).NotTo(BeNil())
 					})
 					verifyRelease(cl, obj.GetNamespace(), rel)
+				})
+				When("using an option function that returns an error", func() {
+					It("should fail", func() {
+						opt := func(*action.Get) error { return errors.New("expect this error") }
+						rel, err = ac.Get(obj.GetName(), opt)
+						Expect(err).To(MatchError("expect this error"))
+						Expect(rel).To(BeNil())
+					})
+				})
+				When("setting the version option", func() {
+					It("should succeed with an existing version", func() {
+						opt := func(g *action.Get) error { g.Version = 1; return nil }
+						rel, err = ac.Get(obj.GetName(), opt)
+						Expect(err).To(BeNil())
+						Expect(rel).NotTo(BeNil())
+					})
+					It("should fail with a non-existent version", func() {
+						opt := func(g *action.Get) error { g.Version = 10; return nil }
+						rel, err = ac.Get(obj.GetName(), opt)
+						Expect(err).NotTo(BeNil())
+						Expect(rel).To(BeNil())
+					})
 				})
 			})
 			var _ = Describe("Install", func() {
@@ -188,6 +219,14 @@ var _ = Describe("ActionClient", func() {
 					rollbackRelease.Version = installedRelease.Version + 2
 					verifyRelease(cl, obj.GetNamespace(), rollbackRelease)
 				})
+				When("using an option function that returns an error", func() {
+					It("should fail", func() {
+						opt := func(*action.Upgrade) error { return errors.New("expect this error") }
+						r, err := ac.Upgrade(obj.GetName(), obj.GetNamespace(), &chrt, vals, opt)
+						Expect(err).To(MatchError("expect this error"))
+						Expect(r).To(BeNil())
+					})
+				})
 			})
 			var _ = Describe("Uninstall", func() {
 				It("should succeed", func() {
@@ -203,7 +242,14 @@ var _ = Describe("ActionClient", func() {
 					})
 					verifyNoRelease(cl, obj.GetNamespace(), obj.GetName(), resp)
 				})
-
+				When("using an option function that returns an error", func() {
+					It("should fail", func() {
+						opt := func(*action.Uninstall) error { return errors.New("expect this error") }
+						r, err := ac.Uninstall(obj.GetName(), opt)
+						Expect(err).To(MatchError("expect this error"))
+						Expect(r).To(BeNil())
+					})
+				})
 			})
 			var _ = Describe("Reconcile", func() {
 				It("should succeed", func() {

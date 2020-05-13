@@ -8,6 +8,7 @@ import (
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -44,7 +45,6 @@ var _ = Describe("NewDelegatingClientFunc", func() {
 
 		cl, err := clientFunc(c, cfg, client.Options{})
 		Expect(err).To(BeNil())
-		_ = cl
 
 		Expect(cl.Create(context.TODO(), podNs)).To(Succeed())
 		Expect(cl.Create(context.TODO(), pod)).To(Succeed())
@@ -62,5 +62,19 @@ var _ = Describe("NewDelegatingClientFunc", func() {
 		Expect(cl.Get(context.TODO(), client.ObjectKey{Namespace: "pod-ns", Name: "pod"}, pod)).To(Succeed())
 		close(done)
 		wg.Wait()
+	})
+
+	It("should fail with an invalid config", func() {
+		clientFunc := NewDelegatingClientFunc()
+		Expect(clientFunc).NotTo(BeNil())
+
+		c, err := cache.New(cfg, cache.Options{})
+		Expect(err).To(BeNil())
+
+		badConfig := rest.Config{
+			Host: "/path/to/foobar",
+		}
+		_, err = clientFunc(c, &badConfig, client.Options{})
+		Expect(err).NotTo(BeNil())
 	})
 })

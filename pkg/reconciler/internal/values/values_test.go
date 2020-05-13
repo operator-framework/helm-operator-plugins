@@ -3,6 +3,7 @@ package values_test
 import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"helm.sh/helm/v3/pkg/chartutil"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	. "github.com/joelanford/helm-operator/pkg/reconciler/internal/values"
@@ -76,5 +77,13 @@ var _ = Describe("Values", func() {
 			v := New(map[string]interface{}{"foo": "bar"})
 			Expect(v.ApplyOverrides(map[string]string{"foo[": "test"})).ToNot(BeNil())
 		})
+	})
+})
+
+var _ = Describe("DefaultMapper", func() {
+	It("returns values untouched", func() {
+		in := chartutil.Values{"foo": map[string]interface{}{"bar": "baz"}}
+		out := DefaultMapper.Map(in)
+		Expect(out).To(Equal(in))
 	})
 })

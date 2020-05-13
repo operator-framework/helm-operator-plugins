@@ -52,6 +52,11 @@ var _ = Describe("Hook", func() {
 				}
 				drw = internalhook.NewDependentResourceWatcher(c, rm, owner)
 			})
+			It("should fail with an invalid release manifest", func() {
+				rel.Manifest = "---\nfoobar"
+				err := drw.Exec(nil, rel, log)
+				Expect(err).NotTo(BeNil())
+			})
 			It("should fail with unknown owner kind", func() {
 				Expect(drw.Exec(nil, rel, log)).To(MatchError(&meta.NoKindMatchError{
 					GroupKind:        schema.GroupKind{Group: "apps", Kind: "Deployment"},

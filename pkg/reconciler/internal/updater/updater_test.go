@@ -7,6 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 	"helm.sh/helm/v3/pkg/release"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubectl/pkg/scheme"
@@ -40,7 +41,17 @@ var _ = Describe("Updater", func() {
 		Expect(client.Create(context.TODO(), obj)).To(Succeed())
 	})
 
-	Context("when an update is a change", func() {
+	When("the object does not exist", func() {
+		It("should fail", func() {
+			Expect(client.Delete(context.TODO(), obj)).To(Succeed())
+			u.Update(EnsureFinalizer(testFinalizer))
+			err := u.Apply(context.TODO(), obj)
+			Expect(err).NotTo(BeNil())
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
+		})
+	})
+
+	When("an update is a change", func() {
 		It("should apply an update function", func() {
 			u.Update(EnsureFinalizer(testFinalizer))
 			resourceVersion := obj.GetResourceVersion()
@@ -198,6 +209,10 @@ var _ = Describe("statusFor", func() {
 
 		obj = nil
 		Expect(statusFor(obj)).To(BeNil())
+	})
+
+	It("should handle status not present", func() {
+		Expect(statusFor(obj)).To(Equal(&helmAppStatus{}))
 	})
 
 	It("should handle *helmAppsStatus", func() {
