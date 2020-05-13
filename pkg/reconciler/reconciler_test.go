@@ -29,12 +29,12 @@ import (
 
 	"github.com/joelanford/helm-operator/pkg/annotation"
 	helmclient "github.com/joelanford/helm-operator/pkg/client"
-	helmfake "github.com/joelanford/helm-operator/pkg/client/fake"
 	"github.com/joelanford/helm-operator/pkg/hook"
 	"github.com/joelanford/helm-operator/pkg/internal/sdk/controllerutil"
 	"github.com/joelanford/helm-operator/pkg/internal/sdk/status"
 	"github.com/joelanford/helm-operator/pkg/internal/testutil"
 	"github.com/joelanford/helm-operator/pkg/reconciler/internal/conditions"
+	helmfake "github.com/joelanford/helm-operator/pkg/reconciler/internal/fake"
 	"github.com/joelanford/helm-operator/pkg/reconciler/internal/values"
 )
 
