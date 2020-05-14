@@ -32,11 +32,13 @@ const (
 	ReasonUpgradeSuccessful   = status.ConditionReason("UpgradeSuccessful")
 	ReasonUninstallSuccessful = status.ConditionReason("UninstallSuccessful")
 
-	ReasonErrorGatheringState = status.ConditionReason("ErrorGatheringState")
-	ReasonInstallError        = status.ConditionReason("InstallError")
-	ReasonUpgradeError        = status.ConditionReason("UpgradeError")
-	ReasonReconcileError      = status.ConditionReason("ReconcileError")
-	ReasonUninstallError      = status.ConditionReason("UninstallError")
+	ReasonErrorGettingClient       = status.ConditionReason("ErrorGettingClient")
+	ReasonErrorMappingValues       = status.ConditionReason("ErrorMappingValues")
+	ReasonErrorGettingReleaseState = status.ConditionReason("ErrorGettingReleaseState")
+	ReasonInstallError             = status.ConditionReason("InstallError")
+	ReasonUpgradeError             = status.ConditionReason("UpgradeError")
+	ReasonReconcileError           = status.ConditionReason("ReconcileError")
+	ReasonUninstallError           = status.ConditionReason("UninstallError")
 )
 
 func Initialized(stat corev1.ConditionStatus, reason status.ConditionReason, message interface{}) status.Condition {

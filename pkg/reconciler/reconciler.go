@@ -410,13 +410,18 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 
 	actionClient, err := r.actionClientGetter.ActionClientFor(obj)
 	if err != nil {
-		u.UpdateStatus(updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionTrue, conditions.ReasonErrorGatheringState, err)))
+		u.UpdateStatus(updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionTrue, conditions.ReasonErrorGettingClient, err)))
+		return ctrl.Result{}, err
+	}
+
+	if obj.GetDeletionTimestamp() != nil {
+		err := r.handleDeletion(ctx, actionClient, obj, log)
 		return ctrl.Result{}, err
 	}
 
 	vals, err := r.getValues(obj)
 	if err != nil {
-		u.UpdateStatus(updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionTrue, conditions.ReasonErrorGatheringState, err)))
+		u.UpdateStatus(updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionTrue, conditions.ReasonErrorMappingValues, err)))
 		return ctrl.Result{}, err
 	}
 
@@ -428,50 +433,14 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 
 	rel, state, err := r.getReleaseState(actionClient, obj, vals.AsMap())
 	if err != nil {
-		u.UpdateStatus(updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionTrue, conditions.ReasonErrorGatheringState, err)))
+		u.UpdateStatus(updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionTrue, conditions.ReasonErrorGettingReleaseState, err)))
 		return ctrl.Result{}, err
 	}
-	u.UpdateStatus(updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionFalse, "", "")))
-
-	switch state {
-	case stateAlreadyUninstalled:
-		log.Info("Resource is terminated, skipping reconciliation")
-		return ctrl.Result{}, nil
-	case stateNeedsUninstall:
-		// Use defer in a closure so that it executes before we wait for
-		// the deletion of the CR. This might seem unnecessary since we're
-		// applying changes to the CR after is has a deletion timestamp.
-		// However, if uninstall fails, the finalizer will not be removed
-		// and we need to be able to update the conditions on the CR to
-		// indicate that the uninstall failed.
-		if err := func() (err error) {
-			uninstallUpdater := updater.New(r.client)
-			defer func() {
-				applyErr := uninstallUpdater.Apply(ctx, obj)
-				if err == nil {
-					err = applyErr
-				}
-			}()
-			return r.doUninstall(actionClient, &uninstallUpdater, obj, log)
-		}(); err != nil {
-			return ctrl.Result{}, err
-		}
-
-		// Since the client is hitting a cache, waiting for the
-		// deletion here will guarantee that the next reconciliation
-		// will see that the CR has been deleted and that there's
-		// nothing left to do.
-		if err := controllerutil.WaitForDeletion(ctx, r.client, obj); err != nil {
-			return ctrl.Result{}, err
-		}
-
-		return ctrl.Result{}, nil
-	}
-
-	u.UpdateStatus(updater.EnsureCondition(conditions.Initialized(corev1.ConditionTrue, "", "")))
 	if rel != nil {
 		ensureDeployedRelease(&u, rel)
 	}
+	u.UpdateStatus(updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionFalse, "", "")))
+	u.UpdateStatus(updater.EnsureCondition(conditions.Initialized(corev1.ConditionTrue, "", "")))
 
 	switch state {
 	case stateNeedsInstall:
@@ -495,7 +464,6 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 	}
 
 	ensureDeployedRelease(&u, rel)
-
 	u.Update(updater.EnsureFinalizer(uninstallFinalizer))
 	u.UpdateStatus(
 		updater.EnsureCondition(conditions.ReleaseFailed(corev1.ConditionFalse, "", "")),
@@ -530,13 +498,46 @@ func (r *Reconciler) getValues(obj *unstructured.Unstructured) (chartutil.Values
 type helmReleaseState string
 
 const (
-	stateNeedsInstall       helmReleaseState = "needs install"
-	stateNeedsUpgrade       helmReleaseState = "needs upgrade"
-	stateNeedsUninstall     helmReleaseState = "needs uninstall"
-	stateUnchanged          helmReleaseState = "unchanged"
-	stateAlreadyUninstalled helmReleaseState = "already uninstalled"
-	stateError              helmReleaseState = "error"
+	stateNeedsInstall helmReleaseState = "needs install"
+	stateNeedsUpgrade helmReleaseState = "needs upgrade"
+	stateUnchanged    helmReleaseState = "unchanged"
+	stateError        helmReleaseState = "error"
 )
+
+func (r *Reconciler) handleDeletion(ctx context.Context, actionClient helmclient.ActionInterface, obj *unstructured.Unstructured, log logr.Logger) error {
+	if !controllerutil.ContainsFinalizer(obj, uninstallFinalizer) {
+		log.Info("Resource is terminated, skipping reconciliation")
+		return nil
+	}
+
+	// Use defer in a closure so that it executes before we wait for
+	// the deletion of the CR. This might seem unnecessary since we're
+	// applying changes to the CR after is has a deletion timestamp.
+	// However, if uninstall fails, the finalizer will not be removed
+	// and we need to be able to update the conditions on the CR to
+	// indicate that the uninstall failed.
+	if err := func() (err error) {
+		uninstallUpdater := updater.New(r.client)
+		defer func() {
+			applyErr := uninstallUpdater.Apply(ctx, obj)
+			if err == nil {
+				err = applyErr
+			}
+		}()
+		return r.doUninstall(actionClient, &uninstallUpdater, obj, log)
+	}(); err != nil {
+		return err
+	}
+
+	// Since the client is hitting a cache, waiting for the
+	// deletion here will guarantee that the next reconciliation
+	// will see that the CR has been deleted and that there's
+	// nothing left to do.
+	if err := controllerutil.WaitForDeletion(ctx, r.client, obj); err != nil {
+		return err
+	}
+	return nil
+}
 
 func (r *Reconciler) getReleaseState(client helmclient.ActionInterface, obj metav1.Object, vals map[string]interface{}) (*release.Release, helmReleaseState, error) {
 	deployedRelease, err := client.Get(obj.GetName())
@@ -544,20 +545,21 @@ func (r *Reconciler) getReleaseState(client helmclient.ActionInterface, obj meta
 		return nil, stateError, err
 	}
 
-	if obj.GetDeletionTimestamp() != nil {
-		if controllerutil.ContainsFinalizer(obj, uninstallFinalizer) {
-			return deployedRelease, stateNeedsUninstall, nil
-		}
-		return deployedRelease, stateAlreadyUninstalled, nil
-	}
 	if errors.Is(err, driver.ErrReleaseNotFound) {
 		return nil, stateNeedsInstall, nil
 	}
 
-	specRelease, err := client.Upgrade(obj.GetName(), obj.GetNamespace(), r.chrt, vals, func(u *action.Upgrade) error {
+	var opts []helmclient.UpgradeOption
+	for name, annot := range r.upgradeAnnotations {
+		if v, ok := obj.GetAnnotations()[name]; ok {
+			opts = append(opts, annot.UpgradeOption(v))
+		}
+	}
+	opts = append(opts, func(u *action.Upgrade) error {
 		u.DryRun = true
 		return nil
 	})
+	specRelease, err := client.Upgrade(obj.GetName(), obj.GetNamespace(), r.chrt, vals, opts...)
 	if err != nil {
 		return deployedRelease, stateError, err
 	}
