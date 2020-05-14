@@ -50,6 +50,7 @@ func main() {
 	var (
 		metricsAddr          string
 		enableLeaderElection bool
+		leaderElectionID     string
 
 		watchesFile             string
 		maxConcurrentReconciles int
@@ -59,6 +60,8 @@ func main() {
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
+	flag.StringVar(&leaderElectionID, "leader-election-id", "leader-lock",
+		"Name of the configmap that is used for holding the leader lock.")
 
 	flag.StringVar(&watchesFile, "watches-file", "./watches.yaml", "Path to watches.yaml file.")
 	flag.IntVar(&maxConcurrentReconciles, "max-concurrent-reconciles", 1, "Default maximum number of concurrent reconciles for controllers.")
@@ -70,7 +73,7 @@ func main() {
 	logLvl := zap.NewAtomicLevelAt(zap.InfoLevel)
 	sttLvl := zap.NewAtomicLevelAt(zap.PanicLevel)
 	ctrl.SetLogger(zapl.New(
-		zapl.UseDevMode(true),
+		zapl.UseDevMode(false),
 		zapl.Level(&logLvl),
 		zapl.StacktraceLevel(&sttLvl),
 	))
@@ -79,6 +82,7 @@ func main() {
 		Scheme:             scheme,
 		MetricsBindAddress: metricsAddr,
 		LeaderElection:     enableLeaderElection,
+		LeaderElectionID:   leaderElectionID,
 		Port:               9443,
 		NewClient:          manager.NewDelegatingClientFunc(),
 	}

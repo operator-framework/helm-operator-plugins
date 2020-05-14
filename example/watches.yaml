@@ -1,0 +1,8 @@
+- group: helm.sdk.operatorframework.io
+  version: v1
+  kind: Nginx
+  chart: ./helm-charts/nginx
+  maxConcurrentReconciles: 4
+  reconcilePeriod: 0
+  overrideValues:
+    image.repository: nginx

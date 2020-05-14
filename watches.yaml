@@ -1,9 +1,0 @@
-- group: apache.sdk.operatorframework.io
-  version: v1
-  kind: Tomcat
-  chart: ./helm-charts/tomcat
-  maxConcurrentReconciles: 4
-  reconcilePeriod: 2m
-  overrideValues:
-    image.tomcat.tag: "8.0"
-    replicaCount: 1
