@@ -381,8 +381,6 @@ func WithValueMapper(m values.Mapper) Option {
 // `status.conditions` based on reconciliation progress and success. Condition
 // types include:
 //
-//   - Initialized - initial Reconciler-managed fields added (e.g. the uninstall
-//                   finalizer
 //   - Deployed - a release for this CR is deployed (but not necessarily ready).
 //   - ReleaseFailed - an installation or upgrade failed.
 //   - Irreconcilable - an error occurred during reconciliation
@@ -400,6 +398,11 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 		return ctrl.Result{}, err
 	}
 
+	// We always create the status from scratch since
+	// we don't know if the previous status is still
+	// valid from the last time we reconciled
+	obj.Object["status"] = nil
+
 	u := updater.New(r.client)
 	defer func() {
 		applyErr := u.Apply(ctx, obj)
@@ -410,8 +413,35 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 
 	actionClient, err := r.actionClientGetter.ActionClientFor(obj)
 	if err != nil {
-		u.UpdateStatus(updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionTrue, conditions.ReasonErrorGettingClient, err)))
+		u.UpdateStatus(
+			updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionTrue, conditions.ReasonErrorGettingClient, err)),
+			updater.EnsureCondition(conditions.Deployed(corev1.ConditionUnknown, conditions.ReasonErrorGettingClient, err)),
+		)
+		// NOTE: If obj has the uninstall finalizer, that means a release WAS deployed at some point
+		//   in the past, but we don't know if it still is because we don't have an actionClient to check.
+		//   So the question is, what do we do with the finalizer? We could:
+		//      - Leave it in place. This would make the CR impossible to delete without either resolving this error, or
+		//        manually uninstalling the release, deleting the finalizer, and deleting the CR.
+		//      - Remove the finalizer. This would make it possible to delete the CR, but it would leave around any
+		//        release resources that are not owned by the CR (those in the cluster scope or in other namespaces).
+		//
+		// The decision made for now is to leave the finalizer in place, so that the user can intervene and try to
+		// resolve the issue, instead of the operator silently leaving some dangling resources hanging around after the
+		// CR is deleted.
 		return ctrl.Result{}, err
+	}
+
+	// As soon as we get the actionClient, lookup the release and
+	// update the status with this info. We need to do this as
+	// early as possible in case other irreconcilable errors occur.
+	//
+	// We also make sure not to return any errors we encounter so
+	// we can still attempt an uninstall if the CR is being deleted.
+	rel, err := actionClient.Get(obj.GetName())
+	if errors.Is(err, driver.ErrReleaseNotFound) {
+		u.UpdateStatus(updater.EnsureCondition(conditions.Deployed(corev1.ConditionFalse, "", "")))
+	} else if err == nil {
+		ensureDeployedRelease(&u, rel)
 	}
 
 	if obj.GetDeletionTimestamp() != nil {
@@ -421,14 +451,8 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 
 	vals, err := r.getValues(obj)
 	if err != nil {
-		u.UpdateStatus(updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionTrue, conditions.ReasonErrorMappingValues, err)))
+		u.UpdateStatus(updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionTrue, conditions.ReasonErrorGettingValues, err)))
 		return ctrl.Result{}, err
-	}
-
-	for _, h := range r.preHooks {
-		if err := h.Exec(obj, &vals, log); err != nil {
-			log.Error(err, "failed to execute pre-release hook")
-		}
 	}
 
 	rel, state, err := r.getReleaseState(actionClient, obj, vals.AsMap())
@@ -436,11 +460,13 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 		u.UpdateStatus(updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionTrue, conditions.ReasonErrorGettingReleaseState, err)))
 		return ctrl.Result{}, err
 	}
-	if rel != nil {
-		ensureDeployedRelease(&u, rel)
-	}
 	u.UpdateStatus(updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionFalse, "", "")))
-	u.UpdateStatus(updater.EnsureCondition(conditions.Initialized(corev1.ConditionTrue, "", "")))
+
+	for _, h := range r.preHooks {
+		if err := h.Exec(obj, vals, log); err != nil {
+			log.Error(err, "pre-release hook failed")
+		}
+	}
 
 	switch state {
 	case stateNeedsInstall:
@@ -463,18 +489,17 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 		return ctrl.Result{}, fmt.Errorf("unexpected release state: %s", state)
 	}
 
+	for _, h := range r.postHooks {
+		if err := h.Exec(obj, *rel, log); err != nil {
+			log.Error(err, "post-release hook failed", "name", rel.Name, "version", rel.Version)
+		}
+	}
+
 	ensureDeployedRelease(&u, rel)
-	u.Update(updater.EnsureFinalizer(uninstallFinalizer))
 	u.UpdateStatus(
 		updater.EnsureCondition(conditions.ReleaseFailed(corev1.ConditionFalse, "", "")),
 		updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionFalse, "", "")),
 	)
-
-	for _, h := range r.postHooks {
-		if err := h.Exec(obj, rel, log); err != nil {
-			log.Error(err, "failed to execute post-release hook", "name", rel.Name, "version", rel.Version)
-		}
-	}
 
 	return ctrl.Result{RequeueAfter: r.reconcilePeriod}, nil
 }
@@ -651,8 +676,10 @@ func (r *Reconciler) doUninstall(actionClient helmclient.ActionInterface, u *upd
 	if errors.Is(err, driver.ErrReleaseNotFound) {
 		log.Info("Release not found, removing finalizer")
 	} else if err != nil {
-		log.Error(err, "Failed to uninstall release")
-		u.UpdateStatus(updater.EnsureCondition(conditions.ReleaseFailed(corev1.ConditionTrue, conditions.ReasonUninstallError, err)))
+		u.UpdateStatus(
+			updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionTrue, conditions.ReasonReconcileError, err)),
+			updater.EnsureCondition(conditions.ReleaseFailed(corev1.ConditionTrue, conditions.ReasonUninstallError, err)),
+		)
 		return err
 	} else {
 		log.Info("Release uninstalled", "name", resp.Release.Name, "version", resp.Release.Version)
@@ -743,6 +770,7 @@ func ensureDeployedRelease(u *updater.Updater, rel *release.Release) {
 	if rel.Info != nil && len(rel.Info.Notes) > 0 {
 		message = rel.Info.Notes
 	}
+	u.Update(updater.EnsureFinalizer(uninstallFinalizer))
 	u.UpdateStatus(
 		updater.EnsureCondition(conditions.Deployed(corev1.ConditionTrue, reason, message)),
 		updater.EnsureDeployedRelease(rel),

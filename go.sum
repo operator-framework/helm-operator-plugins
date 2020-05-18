@@ -503,6 +503,7 @@ github.com/smartystreets/goconvey v0.0.0-20190330032615-68dc04aab96a/go.mod h1:s
 github.com/soheilhy/cmux v0.1.4/go.mod h1:IM3LyeVVIOuxMH7sFAkER9+bJ4dT7Ms6E4xg4kGIyLM=
 github.com/spaolacci/murmur3 v0.0.0-20180118202830-f09979ecbc72/go.mod h1:JwIasOWyU6f++ZhiEuf87xNszmSA2myDM2Kzu9HwQUA=
 github.com/spf13/afero v1.1.2/go.mod h1:j4pytiNVoe2o6bmDsKpLACNPDBIoEAkihy7loJ1B0CQ=
+github.com/spf13/afero v1.2.2 h1:5jhuqJyZCZf2JRofRvN/nIFgIWNzPa3/Vz8mYylgbWc=
 github.com/spf13/afero v1.2.2/go.mod h1:9ZxEEn6pIJ8Rxe320qSDBk6AsU0r9pR7Q4OcevTdifk=
 github.com/spf13/cast v1.3.0 h1:oget//CVOEoFewqQxwr0Ej5yjygnqGkvggSE/gB35Q8=
 github.com/spf13/cast v1.3.0/go.mod h1:Qx5cxh0v+4UWYiBimWS+eyWzqEqokIECu5etghLkUJE=
@@ -778,6 +779,7 @@ k8s.io/apimachinery v0.18.0/go.mod h1:9SnR/e11v5IbyPCGbvJViimtJ0SwHG4nfZFjU77ftc
 k8s.io/apimachinery v0.18.2 h1:44CmtbmkzVDAhCpRVSiP2R5PPrC2RtlIv/MoB8xpdRA=
 k8s.io/apimachinery v0.18.2/go.mod h1:9SnR/e11v5IbyPCGbvJViimtJ0SwHG4nfZFjU77ftcA=
 k8s.io/apiserver v0.18.0/go.mod h1:3S2O6FeBBd6XTo0njUrLxiqk8GNy6wWOftjhJcXYnjw=
+k8s.io/apiserver v0.18.2 h1:fwKxdTWwwYhxvtjo0UUfX+/fsitsNtfErPNegH2x9ic=
 k8s.io/apiserver v0.18.2/go.mod h1:Xbh066NqrZO8cbsoenCwyDJ1OSi8Ag8I2lezeHxzwzw=
 k8s.io/cli-runtime v0.18.0/go.mod h1:1eXfmBsIJosjn9LjEBUd2WVPoPAY9XGTqTFcPMIBsUQ=
 k8s.io/cli-runtime v0.18.2 h1:JiTN5RgkFNTiMxHBRyrl6n26yKWAuNRlei1ZJALUmC8=
@@ -801,6 +803,7 @@ k8s.io/kube-openapi v0.0.0-20200121204235-bf4fb3bd569c/go.mod h1:GRQhZsXIAJ1xR0C
 k8s.io/kubectl v0.18.0/go.mod h1:LOkWx9Z5DXMEg5KtOjHhRiC1fqJPLyCr3KtQgEolCkU=
 k8s.io/kubectl v0.18.2 h1:9jnGSOC2DDVZmMUTMi0D1aed438mfQcgqa5TAzVjA1k=
 k8s.io/kubectl v0.18.2/go.mod h1:OdgFa3AlsPKRpFFYE7ICTwulXOcMGXHTc+UKhHKvrb4=
+k8s.io/kubernetes v1.13.0 h1:qTfB+u5M92k2fCCCVP2iuhgwwSOv1EkAkvQY1tQODD8=
 k8s.io/kubernetes v1.13.0/go.mod h1:ocZa8+6APFNC2tX1DZASIbocyYT5jHzqFVsY5aoB7Jk=
 k8s.io/metrics v0.18.0/go.mod h1:8aYTW18koXqjLVKL7Ds05RPMX9ipJZI3mywYvBOxXd4=
 k8s.io/metrics v0.18.2/go.mod h1:qga8E7QfYNR9Q89cSCAjinC9pTZ7yv1XSVGUB0vJypg=

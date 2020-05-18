@@ -23,7 +23,6 @@ import (
 )
 
 const (
-	TypeInitialized    = "Initialized"
 	TypeDeployed       = "Deployed"
 	TypeReleaseFailed  = "ReleaseFailed"
 	TypeIrreconcilable = "Irreconcilable"
@@ -33,17 +32,13 @@ const (
 	ReasonUninstallSuccessful = status.ConditionReason("UninstallSuccessful")
 
 	ReasonErrorGettingClient       = status.ConditionReason("ErrorGettingClient")
-	ReasonErrorMappingValues       = status.ConditionReason("ErrorMappingValues")
+	ReasonErrorGettingValues       = status.ConditionReason("ErrorGettingValues")
 	ReasonErrorGettingReleaseState = status.ConditionReason("ErrorGettingReleaseState")
 	ReasonInstallError             = status.ConditionReason("InstallError")
 	ReasonUpgradeError             = status.ConditionReason("UpgradeError")
 	ReasonReconcileError           = status.ConditionReason("ReconcileError")
 	ReasonUninstallError           = status.ConditionReason("UninstallError")
 )
-
-func Initialized(stat corev1.ConditionStatus, reason status.ConditionReason, message interface{}) status.Condition {
-	return newCondition(TypeInitialized, stat, reason, message)
-}
 
 func Deployed(stat corev1.ConditionStatus, reason status.ConditionReason, message interface{}) status.Condition {
 	return newCondition(TypeDeployed, stat, reason, message)

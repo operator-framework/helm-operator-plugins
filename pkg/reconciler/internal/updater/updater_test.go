@@ -63,7 +63,7 @@ var _ = Describe("Updater", func() {
 		})
 
 		It("should apply an update status function", func() {
-			u.UpdateStatus(EnsureCondition(conditions.Initialized(corev1.ConditionTrue, "", "")))
+			u.UpdateStatus(EnsureCondition(conditions.Deployed(corev1.ConditionTrue, "", "")))
 			resourceVersion := obj.GetResourceVersion()
 
 			Expect(u.Apply(context.TODO(), obj)).To(Succeed())
@@ -120,14 +120,14 @@ var _ = Describe("EnsureCondition", func() {
 	})
 
 	It("should add condition if not present", func() {
-		Expect(EnsureCondition(conditions.Initialized(corev1.ConditionTrue, "", ""))(obj)).To(BeTrue())
-		Expect(obj.Conditions.IsTrueFor(conditions.TypeInitialized)).To(BeTrue())
+		Expect(EnsureCondition(conditions.Deployed(corev1.ConditionTrue, "", ""))(obj)).To(BeTrue())
+		Expect(obj.Conditions.IsTrueFor(conditions.TypeDeployed)).To(BeTrue())
 	})
 
 	It("should not add duplicate condition", func() {
-		obj.Conditions.SetCondition(conditions.Initialized(corev1.ConditionTrue, "", ""))
-		Expect(EnsureCondition(conditions.Initialized(corev1.ConditionTrue, "", ""))(obj)).To(BeFalse())
-		Expect(obj.Conditions.IsTrueFor(conditions.TypeInitialized)).To(BeTrue())
+		obj.Conditions.SetCondition(conditions.Deployed(corev1.ConditionTrue, "", ""))
+		Expect(EnsureCondition(conditions.Deployed(corev1.ConditionTrue, "", ""))(obj)).To(BeFalse())
+		Expect(obj.Conditions.IsTrueFor(conditions.TypeDeployed)).To(BeTrue())
 	})
 })
 

@@ -54,7 +54,7 @@ type dependentResourceWatcher struct {
 	watches map[schema.GroupVersionKind]struct{}
 }
 
-func (d *dependentResourceWatcher) Exec(_ *unstructured.Unstructured, rel *release.Release, log logr.Logger) error {
+func (d *dependentResourceWatcher) Exec(_ *unstructured.Unstructured, rel release.Release, log logr.Logger) error {
 	// using predefined functions for filtering events
 	dependentPredicate := predicate.DependentPredicateFuncs()
 

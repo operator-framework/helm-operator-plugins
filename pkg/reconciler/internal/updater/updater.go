@@ -16,7 +16,6 @@ package updater
 
 import (
 	"context"
-	"fmt"
 
 	"helm.sh/helm/v3/pkg/release"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -54,20 +53,11 @@ func (u *Updater) UpdateStatus(fs ...UpdateStatusFunc) {
 func (u *Updater) Apply(ctx context.Context, obj *unstructured.Unstructured) error {
 	backoff := retry.DefaultRetry
 
-	objKey, err := client.ObjectKeyFromObject(obj)
-	if err != nil {
-		return fmt.Errorf("could not key object key: %w", err)
-	}
-
-	if err := u.client.Get(ctx, objKey, obj); err != nil {
-		return err
-	}
-
 	// Always update the status first. During uninstall, if
 	// we remove the finalizer, updating the status will fail
 	// because the object and its status will be garbage-collected
 	if err := retry.RetryOnConflict(backoff, func() error {
-		st := &helmAppStatus{}
+		st := statusFor(obj)
 		needsStatusUpdate := false
 		for _, f := range u.updateStatusFuncs {
 			needsStatusUpdate = f(st) || needsStatusUpdate

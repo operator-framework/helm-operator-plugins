@@ -15,10 +15,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/yaml"
@@ -64,7 +62,6 @@ var _ = Describe("ActionClient", func() {
 		)
 		BeforeEach(func() {
 			obj = testutil.BuildTestCR(gvk)
-			obj.SetUID(types.UID("test-uid"))
 
 			var err error
 			actionConfigGetter := NewActionConfigGetter(cfg, rm, nil)
@@ -84,7 +81,13 @@ var _ = Describe("ActionClient", func() {
 
 		When("release is not installed", func() {
 			AfterEach(func() {
-				ensureUninstalled(ac, obj)
+				if _, err := ac.Get(obj.GetName()); err == driver.ErrReleaseNotFound {
+					return
+				}
+				_, err := ac.Uninstall(obj.GetName())
+				if err != nil {
+					panic(err)
+				}
 			})
 			var _ = Describe("Install", func() {
 				It("should succeed", func() {
@@ -147,9 +150,14 @@ var _ = Describe("ActionClient", func() {
 				Expect(installedRelease).NotTo(BeNil())
 			})
 			AfterEach(func() {
-				ensureUninstalled(ac, obj)
+				if _, err := ac.Get(obj.GetName()); err == driver.ErrReleaseNotFound {
+					return
+				}
+				_, err := ac.Uninstall(obj.GetName())
+				if err != nil {
+					panic(err)
+				}
 			})
-
 			var _ = Describe("Get", func() {
 				var (
 					rel *release.Release
@@ -240,7 +248,7 @@ var _ = Describe("ActionClient", func() {
 						Expect(err).To(BeNil())
 						Expect(resp).NotTo(BeNil())
 					})
-					verifyNoRelease(cl, obj.GetNamespace(), obj.GetName(), resp)
+					verifyNoRelease(cl, obj.GetNamespace(), obj.GetName(), resp.Release)
 				})
 				When("using an option function that returns an error", func() {
 					It("should fail", func() {
@@ -315,15 +323,6 @@ func manifestToObjects(manifest string) []runtime.Object {
 	return objs
 }
 
-func ensureUninstalled(ac ActionInterface, obj metav1.Object) {
-	if _, err := ac.Get(obj.GetName()); err == driver.ErrReleaseNotFound {
-		return
-	}
-	resp, err := ac.Uninstall(obj.GetName())
-	Expect(err).To(BeNil())
-	Expect(resp).NotTo(BeNil())
-}
-
 func verifyRelease(cl client.Client, ns string, rel *release.Release) {
 	By("verifying release secret exists at release version", func() {
 		releaseSecrets := &v1.SecretList{}
@@ -351,7 +350,7 @@ func verifyRelease(cl client.Client, ns string, rel *release.Release) {
 	})
 }
 
-func verifyNoRelease(cl client.Client, ns string, name string, resp *release.UninstallReleaseResponse) {
+func verifyNoRelease(cl client.Client, ns string, name string, rel *release.Release) {
 	By("verifying all release secrets are removed", func() {
 		releaseSecrets := &v1.SecretList{}
 		err := cl.List(context.TODO(), releaseSecrets, client.InNamespace(ns), client.MatchingLabels{"owner": "helm", "name": name})
@@ -359,13 +358,13 @@ func verifyNoRelease(cl client.Client, ns string, name string, resp *release.Uni
 		Expect(releaseSecrets.Items).To(HaveLen(0))
 	})
 	By("verifying the uninstall description option was honored", func() {
-		if resp != nil {
-			Expect(resp.Release.Info.Description).To(Equal("Test Description"))
+		if rel != nil {
+			Expect(rel.Info.Description).To(Equal("Test Description"))
 		}
 	})
 	By("verifying all release resources are removed", func() {
-		if resp != nil {
-			for _, r := range releaseutil.SplitManifests(resp.Release.Manifest) {
+		if rel != nil {
+			for _, r := range releaseutil.SplitManifests(rel.Manifest) {
 				u := &unstructured.Unstructured{}
 				err := yaml.Unmarshal([]byte(r), u)
 				Expect(err).To(BeNil())

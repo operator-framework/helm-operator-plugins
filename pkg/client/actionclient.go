@@ -48,6 +48,12 @@ type ActionClientGetter interface {
 	ActionClientFor(obj Object) (ActionInterface, error)
 }
 
+type ActionClientGetterFunc func(obj Object) (ActionInterface, error)
+
+func (acgf ActionClientGetterFunc) ActionClientFor(obj Object) (ActionInterface, error) {
+	return acgf(obj)
+}
+
 type ActionInterface interface {
 	Get(name string, opts ...GetOption) (*release.Release, error)
 	Install(name, namespace string, chrt *chart.Chart, vals map[string]interface{}, opts ...InstallOption) (*release.Release, error)

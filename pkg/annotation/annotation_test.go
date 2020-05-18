@@ -34,20 +34,43 @@ var _ = Describe("Annotation", func() {
 			})
 
 			It("should disable hooks", func() {
-				Expect(a.InstallOption("true")(&install)).NotTo(HaveOccurred())
+				Expect(a.InstallOption("true")(&install)).To(Succeed())
 				Expect(install.DisableHooks).To(BeTrue())
 			})
 
 			It("should enable hooks", func() {
 				install.DisableHooks = true
-				Expect(a.InstallOption("false")(&install)).NotTo(HaveOccurred())
+				Expect(a.InstallOption("false")(&install)).To(Succeed())
 				Expect(install.DisableHooks).To(BeFalse())
 			})
 
 			It("should default to false with invalid value", func() {
 				install.DisableHooks = true
-				Expect(a.InstallOption("invalid")(&install)).NotTo(HaveOccurred())
+				Expect(a.InstallOption("invalid")(&install)).To(Succeed())
 				Expect(install.DisableHooks).To(BeFalse())
+			})
+		})
+
+		Describe("Description", func() {
+			var a annotation.InstallDescription
+
+			BeforeEach(func() {
+				a = annotation.InstallDescription{}
+			})
+
+			It("should return a default name", func() {
+				Expect(a.Name()).To(Equal(annotation.DefaultInstallDescriptionName))
+			})
+
+			It("should return a custom name", func() {
+				const customName = "custom.domain/custom-name"
+				a.CustomName = customName
+				Expect(a.Name()).To(Equal(customName))
+			})
+
+			It("should set a description", func() {
+				Expect(a.InstallOption("test description")(&install)).To(Succeed())
+				Expect(install.Description).To(Equal("test description"))
 			})
 		})
 	})
@@ -77,19 +100,19 @@ var _ = Describe("Annotation", func() {
 			})
 
 			It("should disable hooks", func() {
-				Expect(a.UpgradeOption("true")(&upgrade)).NotTo(HaveOccurred())
+				Expect(a.UpgradeOption("true")(&upgrade)).To(Succeed())
 				Expect(upgrade.DisableHooks).To(BeTrue())
 			})
 
 			It("should enable hooks", func() {
 				upgrade.DisableHooks = true
-				Expect(a.UpgradeOption("false")(&upgrade)).NotTo(HaveOccurred())
+				Expect(a.UpgradeOption("false")(&upgrade)).To(Succeed())
 				Expect(upgrade.DisableHooks).To(BeFalse())
 			})
 
 			It("should default to false with invalid value", func() {
 				upgrade.DisableHooks = true
-				Expect(a.UpgradeOption("invalid")(&upgrade)).NotTo(HaveOccurred())
+				Expect(a.UpgradeOption("invalid")(&upgrade)).To(Succeed())
 				Expect(upgrade.DisableHooks).To(BeFalse())
 			})
 		})
@@ -112,20 +135,43 @@ var _ = Describe("Annotation", func() {
 			})
 
 			It("should force upgrades", func() {
-				Expect(a.UpgradeOption("true")(&upgrade)).NotTo(HaveOccurred())
+				Expect(a.UpgradeOption("true")(&upgrade)).To(Succeed())
 				Expect(upgrade.Force).To(BeTrue())
 			})
 
 			It("should not force upgrades", func() {
 				upgrade.Force = true
-				Expect(a.UpgradeOption("false")(&upgrade)).NotTo(HaveOccurred())
+				Expect(a.UpgradeOption("false")(&upgrade)).To(Succeed())
 				Expect(upgrade.Force).To(BeFalse())
 			})
 
 			It("should default to not forcing upgrades", func() {
 				upgrade.Force = true
-				Expect(a.UpgradeOption("invalid")(&upgrade)).NotTo(HaveOccurred())
+				Expect(a.UpgradeOption("invalid")(&upgrade)).To(Succeed())
 				Expect(upgrade.Force).To(BeFalse())
+			})
+		})
+
+		Describe("Description", func() {
+			var a annotation.UpgradeDescription
+
+			BeforeEach(func() {
+				a = annotation.UpgradeDescription{}
+			})
+
+			It("should return a default name", func() {
+				Expect(a.Name()).To(Equal(annotation.DefaultUpgradeDescriptionName))
+			})
+
+			It("should return a custom name", func() {
+				const customName = "custom.domain/custom-name"
+				a.CustomName = customName
+				Expect(a.Name()).To(Equal(customName))
+			})
+
+			It("should set a description", func() {
+				Expect(a.UpgradeOption("test description")(&upgrade)).To(Succeed())
+				Expect(upgrade.Description).To(Equal("test description"))
 			})
 		})
 	})
@@ -155,20 +201,43 @@ var _ = Describe("Annotation", func() {
 			})
 
 			It("should disable hooks", func() {
-				Expect(a.UninstallOption("true")(&uninstall)).NotTo(HaveOccurred())
+				Expect(a.UninstallOption("true")(&uninstall)).To(Succeed())
 				Expect(uninstall.DisableHooks).To(BeTrue())
 			})
 
 			It("should enable hooks", func() {
 				uninstall.DisableHooks = true
-				Expect(a.UninstallOption("false")(&uninstall)).NotTo(HaveOccurred())
+				Expect(a.UninstallOption("false")(&uninstall)).To(Succeed())
 				Expect(uninstall.DisableHooks).To(BeFalse())
 			})
 
 			It("should default to false with invalid value", func() {
 				uninstall.DisableHooks = true
-				Expect(a.UninstallOption("invalid")(&uninstall)).NotTo(HaveOccurred())
+				Expect(a.UninstallOption("invalid")(&uninstall)).To(Succeed())
 				Expect(uninstall.DisableHooks).To(BeFalse())
+			})
+		})
+
+		Describe("Description", func() {
+			var a annotation.UninstallDescription
+
+			BeforeEach(func() {
+				a = annotation.UninstallDescription{}
+			})
+
+			It("should return a default name", func() {
+				Expect(a.Name()).To(Equal(annotation.DefaultUninstallDescriptionName))
+			})
+
+			It("should return a custom name", func() {
+				const customName = "custom.domain/custom-name"
+				a.CustomName = customName
+				Expect(a.Name()).To(Equal(customName))
+			})
+
+			It("should set a description", func() {
+				Expect(a.UninstallOption("test description")(&uninstall)).To(Succeed())
+				Expect(uninstall.Description).To(Equal("test description"))
 			})
 		})
 	})
