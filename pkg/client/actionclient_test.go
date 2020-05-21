@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"strconv"
@@ -9,14 +10,20 @@ import (
 	. "github.com/onsi/gomega"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chartutil"
+	"helm.sh/helm/v3/pkg/kube"
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/releaseutil"
 	"helm.sh/helm/v3/pkg/storage/driver"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	apitypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/cli-runtime/pkg/resource"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/yaml"
@@ -37,6 +44,21 @@ var _ = Describe("ActionClient", func() {
 		It("should return a valid ActionConfigGetter", func() {
 			actionConfigGetter := NewActionConfigGetter(cfg, rm, nil)
 			Expect(NewActionClientGetter(actionConfigGetter)).NotTo(BeNil())
+		})
+	})
+
+	var _ = Describe("ActionClientGetterFunc", func() {
+		It("implements the ActionClientGetter interface", func() {
+			gvk := schema.GroupVersionKind{Group: "test", Version: "v1alpha1", Kind: "Test"}
+			expectedObj := &unstructured.Unstructured{}
+			expectedObj.SetGroupVersionKind(gvk)
+			var actualObj Object
+			f := ActionClientGetterFunc(func(obj Object) (ActionInterface, error) {
+				actualObj = obj
+				return nil, nil
+			})
+			_, _ = f.ActionClientFor(expectedObj)
+			Expect(actualObj.GetObjectKind().GroupVersionKind()).To(Equal(gvk))
 		})
 	})
 
@@ -310,6 +332,201 @@ var _ = Describe("ActionClient", func() {
 			})
 		})
 	})
+
+	var _ = Describe("createPatch", func() {
+		It("ignores extra fields in custom resource types", func() {
+			o1 := newTestUnstructured([]interface{}{
+				map[string]interface{}{
+					"name": "test1",
+				},
+				map[string]interface{}{
+					"name": "test2",
+				},
+			})
+			o2 := &resource.Info{
+				Object: newTestUnstructured([]interface{}{
+					map[string]interface{}{
+						"name": "test1",
+					},
+				}),
+			}
+			patch, patchType, err := createPatch(o1, o2)
+			Expect(err).To(BeNil())
+			Expect(string(patch)).To(Equal(``))
+			Expect(patchType).To(Equal(apitypes.JSONPatchType))
+		})
+		It("patches missing fields in custom resource types", func() {
+			o1 := newTestUnstructured([]interface{}{
+				map[string]interface{}{
+					"name": "test1",
+				},
+			})
+			o2 := &resource.Info{
+				Object: newTestUnstructured([]interface{}{
+					map[string]interface{}{
+						"name": "test1",
+					},
+					map[string]interface{}{
+						"name": "test2",
+					},
+				}),
+			}
+			patch, patchType, err := createPatch(o1, o2)
+			Expect(err).To(BeNil())
+			Expect(string(patch)).To(Equal(`[{"op":"add","path":"/spec/template/spec/containers/1","value":{"name":"test2"}}]`))
+			Expect(patchType).To(Equal(apitypes.JSONPatchType))
+		})
+		It("ignores nil fields in custom resource types", func() {
+			o1 := newTestUnstructured([]interface{}{
+				map[string]interface{}{
+					"name": "test1",
+				},
+			})
+			o2 := &resource.Info{
+				Object: newTestUnstructured([]interface{}{
+					map[string]interface{}{
+						"name": "test1",
+						"test": nil,
+					},
+				}),
+			}
+			patch, patchType, err := createPatch(o1, o2)
+			Expect(err).To(BeNil())
+			Expect(string(patch)).To(Equal(``))
+			Expect(patchType).To(Equal(apitypes.JSONPatchType))
+		})
+		It("replaces incorrect fields in custom resource types", func() {
+			o1 := newTestUnstructured([]interface{}{
+				map[string]interface{}{
+					"name": "test1",
+				},
+			})
+			o2 := &resource.Info{
+				Object: newTestUnstructured([]interface{}{
+					map[string]interface{}{
+						"name": "test2",
+					},
+				}),
+			}
+			patch, patchType, err := createPatch(o1, o2)
+			Expect(err).To(BeNil())
+			Expect(string(patch)).To(Equal(`[{"op":"replace","path":"/spec/template/spec/containers/0/name","value":"test2"}]`))
+			Expect(patchType).To(Equal(apitypes.JSONPatchType))
+		})
+		It("ignores extra fields in core types", func() {
+			o1 := newTestDeployment([]v1.Container{
+				{Name: "test1"},
+				{Name: "test2"},
+			})
+			o2 := &resource.Info{
+				Object: newTestDeployment([]v1.Container{
+					{Name: "test1"},
+				}),
+			}
+			patch, patchType, err := createPatch(o1, o2)
+			Expect(err).To(BeNil())
+			Expect(string(patch)).To(Equal(`{"spec":{"template":{"spec":{"$setElementOrder/containers":[{"name":"test1"}]}}}}`))
+			Expect(patchType).To(Equal(apitypes.StrategicMergePatchType))
+		})
+		It("patches missing fields in core types", func() {
+			o1 := newTestDeployment([]v1.Container{
+				{Name: "test1"},
+			})
+			o2 := &resource.Info{
+				Object: newTestDeployment([]v1.Container{
+					{Name: "test1"},
+					{Name: "test2"},
+				}),
+			}
+			patch, patchType, err := createPatch(o1, o2)
+			Expect(err).To(BeNil())
+			Expect(string(patch)).To(Equal(`{"spec":{"template":{"spec":{"$setElementOrder/containers":[{"name":"test1"},{"name":"test2"}],"containers":[{"name":"test2","resources":{}}]}}}}`))
+			Expect(patchType).To(Equal(apitypes.StrategicMergePatchType))
+		})
+		It("ignores nil fields in core types", func() {
+			o1 := newTestDeployment([]v1.Container{
+				{Name: "test1"},
+			})
+			o2 := &resource.Info{
+				Object: newTestDeployment([]v1.Container{
+					{Name: "test1", LivenessProbe: nil},
+				}),
+			}
+			patch, patchType, err := createPatch(o1, o2)
+			Expect(err).To(BeNil())
+			Expect(string(patch)).To(Equal(`{}`))
+			Expect(patchType).To(Equal(apitypes.StrategicMergePatchType))
+		})
+		It("replaces incorrect fields in core types", func() {
+			o1 := newTestDeployment([]v1.Container{
+				{Name: "test1"},
+			})
+			o2 := &resource.Info{
+				Object: newTestDeployment([]v1.Container{
+					{Name: "test2"},
+				}),
+			}
+			patch, patchType, err := createPatch(o1, o2)
+			Expect(err).To(BeNil())
+			Expect(string(patch)).To(Equal(`{"spec":{"template":{"spec":{"$setElementOrder/containers":[{"name":"test2"}],"containers":[{"name":"test2","resources":{}}]}}}}`))
+			Expect(patchType).To(Equal(apitypes.StrategicMergePatchType))
+		})
+		It("does not remove extra annotations in core types", func() {
+			o1 := &appsv1.Deployment{
+				TypeMeta: metav1.TypeMeta{Kind: "Deployment", APIVersion: "apps/v1"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "ns",
+					Annotations: map[string]string{
+						"testannotation": "testvalue",
+					},
+				},
+				Spec: appsv1.DeploymentSpec{},
+			}
+			o2 := &resource.Info{
+				Object: &appsv1.Deployment{
+					TypeMeta: metav1.TypeMeta{Kind: "Deployment", APIVersion: "apps/v1"},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test",
+						Namespace: "ns",
+					},
+					Spec: appsv1.DeploymentSpec{},
+				},
+			}
+			patch, patchType, err := createPatch(o1, o2)
+			Expect(err).To(BeNil())
+			Expect(string(patch)).To(Equal(`{}`))
+			Expect(patchType).To(Equal(apitypes.StrategicMergePatchType))
+		})
+	})
+
+	var _ = Describe("ownerPostRenderer", func() {
+		var (
+			pr    ownerPostRenderer
+			owner Object
+		)
+
+		BeforeEach(func() {
+			rm, err := apiutil.NewDynamicRESTMapper(cfg)
+			Expect(err).To(BeNil())
+
+			owner = newTestUnstructured([]interface{}{
+				map[string]interface{}{
+					"name": "test1",
+				},
+			})
+			pr = ownerPostRenderer{
+				owner:      owner,
+				rm:         rm,
+				kubeClient: kube.New(newRESTClientGetter(cfg, rm, owner.GetNamespace())),
+			}
+		})
+
+		It("fails on invalid input", func() {
+			_, err := pr.Run(bytes.NewBufferString("test"))
+			Expect(err).NotTo(BeNil())
+		})
+	})
 })
 
 func manifestToObjects(manifest string) []runtime.Object {
@@ -377,4 +594,38 @@ func verifyNoRelease(cl client.Client, ns string, name string, rel *release.Rele
 			}
 		}
 	})
+}
+
+func newTestUnstructured(containers []interface{}) *unstructured.Unstructured {
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "MyResource",
+			"apiVersion": "myApi",
+			"metadata": map[string]interface{}{
+				"name":      "test",
+				"namespace": "ns",
+			},
+			"spec": map[string]interface{}{
+				"template": map[string]interface{}{
+					"spec": map[string]interface{}{
+						"containers": containers,
+					},
+				},
+			},
+		},
+	}
+}
+
+func newTestDeployment(containers []v1.Container) *appsv1.Deployment {
+	return &appsv1.Deployment{
+		TypeMeta:   metav1.TypeMeta{Kind: "Deployment", APIVersion: "apps/v1"},
+		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "ns"},
+		Spec: appsv1.DeploymentSpec{
+			Template: v1.PodTemplateSpec{
+				Spec: v1.PodSpec{
+					Containers: containers,
+				},
+			},
+		},
+	}
 }
