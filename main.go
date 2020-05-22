@@ -52,9 +52,9 @@ func main() {
 		enableLeaderElection bool
 		leaderElectionID     string
 
-		watchesFile             string
-		maxConcurrentReconciles int
-		reconcilePeriod         time.Duration
+		watchesFile                    string
+		defaultMaxConcurrentReconciles int
+		defaultReconcilePeriod         time.Duration
 	)
 
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
@@ -64,8 +64,8 @@ func main() {
 		"Name of the configmap that is used for holding the leader lock.")
 
 	flag.StringVar(&watchesFile, "watches-file", "./watches.yaml", "Path to watches.yaml file.")
-	flag.IntVar(&maxConcurrentReconciles, "max-concurrent-reconciles", 1, "Default maximum number of concurrent reconciles for controllers.")
-	flag.DurationVar(&reconcilePeriod, "reconcile-period", time.Minute, "Default reconcile period for controllers.")
+	flag.IntVar(&defaultMaxConcurrentReconciles, "max-concurrent-reconciles", 1, "Default maximum number of concurrent reconciles for controllers.")
+	flag.DurationVar(&defaultReconcilePeriod, "reconcile-period", 0, "Default reconcile period for controllers (use 0 to disable periodic reconciliation)")
 
 	klog.InitFlags(flag.CommandLine)
 	flag.Parse()
@@ -100,9 +100,12 @@ func main() {
 	}
 
 	for _, w := range ws {
+		reconcilePeriod := defaultReconcilePeriod
 		if w.ReconcilePeriod != nil {
 			reconcilePeriod = *w.ReconcilePeriod
 		}
+
+		maxConcurrentReconciles := defaultMaxConcurrentReconciles
 		if w.MaxConcurrentReconciles != nil {
 			maxConcurrentReconciles = *w.MaxConcurrentReconciles
 		}
@@ -114,10 +117,9 @@ func main() {
 			reconciler.SkipDependentWatches(w.WatchDependentResources != nil && !*w.WatchDependentResources),
 			reconciler.WithMaxConcurrentReconciles(maxConcurrentReconciles),
 			reconciler.WithReconcilePeriod(reconcilePeriod),
-			reconciler.WithInstallAnnotation(&annotation.InstallDisableHooks{}),
-			reconciler.WithUpgradeAnnotation(&annotation.UpgradeDisableHooks{}),
-			reconciler.WithUpgradeAnnotation(&annotation.UpgradeForce{}),
-			reconciler.WithUninstallAnnotation(&annotation.UninstallDisableHooks{}),
+			reconciler.WithInstallAnnotations(annotation.DefaultInstallAnnotations...),
+			reconciler.WithUpgradeAnnotations(annotation.DefaultUpgradeAnnotations...),
+			reconciler.WithUninstallAnnotations(annotation.DefaultUninstallAnnotations...),
 		)
 		if err != nil {
 			setupLog.Error(err, "unable to create helm reconciler", "controller", "Helm")

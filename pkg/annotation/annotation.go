@@ -8,6 +8,12 @@ import (
 	helmclient "github.com/joelanford/helm-operator/pkg/client"
 )
 
+var (
+	DefaultInstallAnnotations   = []Install{InstallDescription{}, InstallDisableHooks{}}
+	DefaultUpgradeAnnotations   = []Upgrade{UpgradeDescription{}, UpgradeDisableHooks{}, UpgradeForce{}}
+	DefaultUninstallAnnotations = []Uninstall{UninstallDescription{}, UninstallDisableHooks{}}
+)
+
 type Install interface {
 	Name() string
 	InstallOption(string) helmclient.InstallOption

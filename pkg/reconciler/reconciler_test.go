@@ -157,12 +157,11 @@ var _ = Describe("Reconciler", func() {
 				Expect(WithReconcilePeriod(-time.Nanosecond)(r)).NotTo(Succeed())
 			})
 		})
-		var _ = Describe("WithInstallAnnotation", func() {
+		var _ = Describe("WithInstallAnnotations", func() {
 			It("should set multiple reconciler install annotations", func() {
 				a1 := annotation.InstallDisableHooks{CustomName: "my.domain/custom-name1"}
 				a2 := annotation.InstallDisableHooks{CustomName: "my.domain/custom-name2"}
-				Expect(WithInstallAnnotation(a1)(r)).To(Succeed())
-				Expect(WithInstallAnnotation(a2)(r)).To(Succeed())
+				Expect(WithInstallAnnotations(a1, a2)(r)).To(Succeed())
 				Expect(r.annotations).To(Equal(map[string]struct{}{
 					"my.domain/custom-name1": struct{}{},
 					"my.domain/custom-name2": struct{}{},
@@ -175,8 +174,7 @@ var _ = Describe("Reconciler", func() {
 			It("should error with duplicate install annotation", func() {
 				a1 := annotation.InstallDisableHooks{CustomName: "my.domain/custom-name1"}
 				a2 := annotation.InstallDisableHooks{CustomName: "my.domain/custom-name1"}
-				Expect(WithInstallAnnotation(a1)(r)).To(Succeed())
-				Expect(WithInstallAnnotation(a2)(r)).To(HaveOccurred())
+				Expect(WithInstallAnnotations(a1, a2)(r)).NotTo(Succeed())
 				Expect(r.annotations).To(Equal(map[string]struct{}{
 					"my.domain/custom-name1": struct{}{},
 				}))
@@ -187,8 +185,8 @@ var _ = Describe("Reconciler", func() {
 			It("should error with duplicate upgrade annotation", func() {
 				a1 := annotation.InstallDisableHooks{CustomName: "my.domain/custom-name1"}
 				a2 := annotation.UpgradeDisableHooks{CustomName: "my.domain/custom-name1"}
-				Expect(WithInstallAnnotation(a1)(r)).To(Succeed())
-				Expect(WithUpgradeAnnotation(a2)(r)).To(HaveOccurred())
+				Expect(WithInstallAnnotations(a1)(r)).To(Succeed())
+				Expect(WithUpgradeAnnotations(a2)(r)).To(HaveOccurred())
 				Expect(r.annotations).To(Equal(map[string]struct{}{
 					"my.domain/custom-name1": struct{}{},
 				}))
@@ -199,8 +197,8 @@ var _ = Describe("Reconciler", func() {
 			It("should error with duplicate uninstall annotation", func() {
 				a1 := annotation.InstallDisableHooks{CustomName: "my.domain/custom-name1"}
 				a2 := annotation.UninstallDisableHooks{CustomName: "my.domain/custom-name1"}
-				Expect(WithInstallAnnotation(a1)(r)).To(Succeed())
-				Expect(WithUninstallAnnotation(a2)(r)).To(HaveOccurred())
+				Expect(WithInstallAnnotations(a1)(r)).To(Succeed())
+				Expect(WithUninstallAnnotations(a2)(r)).To(HaveOccurred())
 				Expect(r.annotations).To(Equal(map[string]struct{}{
 					"my.domain/custom-name1": struct{}{},
 				}))
@@ -209,12 +207,11 @@ var _ = Describe("Reconciler", func() {
 				}))
 			})
 		})
-		var _ = Describe("WithUpgradeAnnotation", func() {
+		var _ = Describe("WithUpgradeAnnotations", func() {
 			It("should set multiple reconciler upgrade annotations", func() {
 				a1 := annotation.UpgradeDisableHooks{CustomName: "my.domain/custom-name1"}
 				a2 := annotation.UpgradeDisableHooks{CustomName: "my.domain/custom-name2"}
-				Expect(WithUpgradeAnnotation(a1)(r)).To(Succeed())
-				Expect(WithUpgradeAnnotation(a2)(r)).To(Succeed())
+				Expect(WithUpgradeAnnotations(a1, a2)(r)).To(Succeed())
 				Expect(r.annotations).To(Equal(map[string]struct{}{
 					"my.domain/custom-name1": struct{}{},
 					"my.domain/custom-name2": struct{}{},
@@ -227,8 +224,8 @@ var _ = Describe("Reconciler", func() {
 			It("should error with duplicate install annotation", func() {
 				a1 := annotation.UpgradeDisableHooks{CustomName: "my.domain/custom-name1"}
 				a2 := annotation.InstallDisableHooks{CustomName: "my.domain/custom-name1"}
-				Expect(WithUpgradeAnnotation(a1)(r)).To(Succeed())
-				Expect(WithInstallAnnotation(a2)(r)).To(HaveOccurred())
+				Expect(WithUpgradeAnnotations(a1)(r)).To(Succeed())
+				Expect(WithInstallAnnotations(a2)(r)).To(HaveOccurred())
 				Expect(r.annotations).To(Equal(map[string]struct{}{
 					"my.domain/custom-name1": struct{}{},
 				}))
@@ -239,8 +236,7 @@ var _ = Describe("Reconciler", func() {
 			It("should error with duplicate upgrade annotation", func() {
 				a1 := annotation.UpgradeDisableHooks{CustomName: "my.domain/custom-name1"}
 				a2 := annotation.UpgradeDisableHooks{CustomName: "my.domain/custom-name1"}
-				Expect(WithUpgradeAnnotation(a1)(r)).To(Succeed())
-				Expect(WithUpgradeAnnotation(a2)(r)).To(HaveOccurred())
+				Expect(WithUpgradeAnnotations(a1, a2)(r)).NotTo(Succeed())
 				Expect(r.annotations).To(Equal(map[string]struct{}{
 					"my.domain/custom-name1": struct{}{},
 				}))
@@ -251,8 +247,8 @@ var _ = Describe("Reconciler", func() {
 			It("should error with duplicate uninstall annotation", func() {
 				a1 := annotation.UpgradeDisableHooks{CustomName: "my.domain/custom-name1"}
 				a2 := annotation.UninstallDisableHooks{CustomName: "my.domain/custom-name1"}
-				Expect(WithUpgradeAnnotation(a1)(r)).To(Succeed())
-				Expect(WithUninstallAnnotation(a2)(r)).To(HaveOccurred())
+				Expect(WithUpgradeAnnotations(a1)(r)).To(Succeed())
+				Expect(WithUninstallAnnotations(a2)(r)).To(HaveOccurred())
 				Expect(r.annotations).To(Equal(map[string]struct{}{
 					"my.domain/custom-name1": struct{}{},
 				}))
@@ -261,12 +257,11 @@ var _ = Describe("Reconciler", func() {
 				}))
 			})
 		})
-		var _ = Describe("WithUninstallAnnotation", func() {
+		var _ = Describe("WithUninstallAnnotations", func() {
 			It("should set multiple reconciler uninstall annotations", func() {
 				a1 := annotation.UninstallDisableHooks{CustomName: "my.domain/custom-name1"}
 				a2 := annotation.UninstallDisableHooks{CustomName: "my.domain/custom-name2"}
-				Expect(WithUninstallAnnotation(a1)(r)).To(Succeed())
-				Expect(WithUninstallAnnotation(a2)(r)).To(Succeed())
+				Expect(WithUninstallAnnotations(a1, a2)(r)).To(Succeed())
 				Expect(r.annotations).To(Equal(map[string]struct{}{
 					"my.domain/custom-name1": struct{}{},
 					"my.domain/custom-name2": struct{}{},
@@ -279,8 +274,8 @@ var _ = Describe("Reconciler", func() {
 			It("should error with duplicate install annotation", func() {
 				a1 := annotation.UninstallDisableHooks{CustomName: "my.domain/custom-name1"}
 				a2 := annotation.InstallDisableHooks{CustomName: "my.domain/custom-name1"}
-				Expect(WithUninstallAnnotation(a1)(r)).To(Succeed())
-				Expect(WithInstallAnnotation(a2)(r)).To(HaveOccurred())
+				Expect(WithUninstallAnnotations(a1)(r)).To(Succeed())
+				Expect(WithInstallAnnotations(a2)(r)).To(HaveOccurred())
 				Expect(r.annotations).To(Equal(map[string]struct{}{
 					"my.domain/custom-name1": struct{}{},
 				}))
@@ -291,8 +286,8 @@ var _ = Describe("Reconciler", func() {
 			It("should error with duplicate uninstall annotation", func() {
 				a1 := annotation.UninstallDisableHooks{CustomName: "my.domain/custom-name1"}
 				a2 := annotation.UpgradeDisableHooks{CustomName: "my.domain/custom-name1"}
-				Expect(WithUninstallAnnotation(a1)(r)).To(Succeed())
-				Expect(WithUpgradeAnnotation(a2)(r)).To(HaveOccurred())
+				Expect(WithUninstallAnnotations(a1)(r)).To(Succeed())
+				Expect(WithUpgradeAnnotations(a2)(r)).To(HaveOccurred())
 				Expect(r.annotations).To(Equal(map[string]struct{}{
 					"my.domain/custom-name1": struct{}{},
 				}))
@@ -303,8 +298,7 @@ var _ = Describe("Reconciler", func() {
 			It("should error with duplicate uninstall annotation", func() {
 				a1 := annotation.UninstallDisableHooks{CustomName: "my.domain/custom-name1"}
 				a2 := annotation.UninstallDisableHooks{CustomName: "my.domain/custom-name1"}
-				Expect(WithUninstallAnnotation(a1)(r)).To(Succeed())
-				Expect(WithUninstallAnnotation(a2)(r)).To(HaveOccurred())
+				Expect(WithUninstallAnnotations(a1, a2)(r)).NotTo(Succeed())
 				Expect(r.annotations).To(Equal(map[string]struct{}{
 					"my.domain/custom-name1": struct{}{},
 				}))
@@ -378,9 +372,9 @@ var _ = Describe("Reconciler", func() {
 			r, err = New(
 				WithGroupVersionKind(gvk),
 				WithChart(chrt),
-				WithInstallAnnotation(annotation.InstallDescription{}),
-				WithUpgradeAnnotation(annotation.UpgradeDescription{}),
-				WithUninstallAnnotation(annotation.UninstallDescription{}),
+				WithInstallAnnotations(annotation.InstallDescription{}),
+				WithUpgradeAnnotations(annotation.UpgradeDescription{}),
+				WithUninstallAnnotations(annotation.UninstallDescription{}),
 				WithOverrideValues(map[string]string{
 					"image.repository": "custom-nginx",
 				}),

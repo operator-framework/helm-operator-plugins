@@ -275,59 +275,65 @@ func WithReconcilePeriod(rp time.Duration) Option {
 	}
 }
 
-// WithInstallAnnotation is an Option that configures an Install annotation
+// WithInstallAnnotations is an Option that configures Install annotations
 // to enable custom action.Install fields to be set based on the value of
 // annotations found in the custom resource watched by this reconciler.
 // Duplicate annotation names will result in an error.
-func WithInstallAnnotation(a annotation.Install) Option {
+func WithInstallAnnotations(as ...annotation.Install) Option {
 	return func(r *Reconciler) error {
 		r.annotSetupOnce.Do(r.setupAnnotationMaps)
 
-		name := a.Name()
-		if _, ok := r.annotations[name]; ok {
-			return fmt.Errorf("annotation %q already exists", name)
-		}
+		for _, a := range as {
+			name := a.Name()
+			if _, ok := r.annotations[name]; ok {
+				return fmt.Errorf("annotation %q already exists", name)
+			}
 
-		r.annotations[name] = struct{}{}
-		r.installAnnotations[name] = a
+			r.annotations[name] = struct{}{}
+			r.installAnnotations[name] = a
+		}
 		return nil
 	}
 }
 
-// WithUpgradeAnnotation is an Option that configures an Upgrade annotation
+// WithUpgradeAnnotations is an Option that configures Upgrade annotations
 // to enable custom action.Upgrade fields to be set based on the value of
 // annotations found in the custom resource watched by this reconciler.
 // Duplicate annotation names will result in an error.
-func WithUpgradeAnnotation(a annotation.Upgrade) Option {
+func WithUpgradeAnnotations(as ...annotation.Upgrade) Option {
 	return func(r *Reconciler) error {
 		r.annotSetupOnce.Do(r.setupAnnotationMaps)
 
-		name := a.Name()
-		if _, ok := r.annotations[name]; ok {
-			return fmt.Errorf("annotation %q already exists", name)
-		}
+		for _, a := range as {
+			name := a.Name()
+			if _, ok := r.annotations[name]; ok {
+				return fmt.Errorf("annotation %q already exists", name)
+			}
 
-		r.annotations[name] = struct{}{}
-		r.upgradeAnnotations[name] = a
+			r.annotations[name] = struct{}{}
+			r.upgradeAnnotations[name] = a
+		}
 		return nil
 	}
 }
 
-// WithUninstallAnnotation is an Option that configures an Uninstall annotation
+// WithUninstallAnnotations is an Option that configures Uninstall annotations
 // to enable custom action.Uninstall fields to be set based on the value of
 // annotations found in the custom resource watched by this reconciler.
 // Duplicate annotation names will result in an error.
-func WithUninstallAnnotation(a annotation.Uninstall) Option {
+func WithUninstallAnnotations(as ...annotation.Uninstall) Option {
 	return func(r *Reconciler) error {
 		r.annotSetupOnce.Do(r.setupAnnotationMaps)
 
-		name := a.Name()
-		if _, ok := r.annotations[name]; ok {
-			return fmt.Errorf("annotation %q already exists", name)
-		}
+		for _, a := range as {
+			name := a.Name()
+			if _, ok := r.annotations[name]; ok {
+				return fmt.Errorf("annotation %q already exists", name)
+			}
 
-		r.annotations[name] = struct{}{}
-		r.uninstallAnnotations[name] = a
+			r.annotations[name] = struct{}{}
+			r.uninstallAnnotations[name] = a
+		}
 		return nil
 	}
 }
