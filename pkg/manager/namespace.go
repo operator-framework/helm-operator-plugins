@@ -15,8 +15,8 @@ const (
 )
 
 func ConfigureWatchNamespaces(options *manager.Options, log logr.Logger) {
-	namespaces, found := lookupEnv()
-	if found && len(namespaces) != 0 {
+	namespaces := lookupEnv()
+	if len(namespaces) != 0 {
 		log.Info("watching namespaces", "namespaces", namespaces)
 		if len(namespaces) > 1 {
 			options.NewCache = cache.MultiNamespacedCacheBuilder(namespaces)
@@ -29,11 +29,11 @@ func ConfigureWatchNamespaces(options *manager.Options, log logr.Logger) {
 	options.Namespace = v1.NamespaceAll
 }
 
-func lookupEnv() ([]string, bool) {
+func lookupEnv() []string {
 	if watchNamespace, found := os.LookupEnv(WatchNamespaceEnvVar); found {
-		return splitNamespaces(watchNamespace), true
+		return splitNamespaces(watchNamespace)
 	}
-	return nil, false
+	return nil
 }
 
 func splitNamespaces(namespaces string) []string {
@@ -41,7 +41,7 @@ func splitNamespaces(namespaces string) []string {
 	out := []string{}
 	for _, ns := range list {
 		if ns != "" {
-			out = append(out, ns)
+			out = append(out, strings.TrimSpace(ns))
 		}
 	}
 	return out

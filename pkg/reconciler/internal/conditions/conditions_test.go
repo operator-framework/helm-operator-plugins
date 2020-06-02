@@ -12,6 +12,18 @@ import (
 )
 
 var _ = Describe("Conditions", func() {
+	var _ = Describe("Initialized", func() {
+		It("should return an Initialized condition with the correct status, reason, and message", func() {
+			e := status.Condition{
+				Type:    TypeInitialized,
+				Status:  corev1.ConditionTrue,
+				Reason:  "reason",
+				Message: "message",
+			}
+			Expect(Initialized(e.Status, e.Reason, e.Message)).To(Equal(e))
+		})
+	})
+
 	var _ = Describe("Deployed", func() {
 		It("should return a Deployed condition with the correct status, reason, and message", func() {
 			e := status.Condition{

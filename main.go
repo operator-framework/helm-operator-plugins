@@ -21,9 +21,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/spf13/pflag"
 	"go.uber.org/zap"
-	"k8s.io/apimachinery/pkg/runtime"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/klog"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -36,15 +35,8 @@ import (
 )
 
 var (
-	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
 )
-
-func init() {
-	_ = clientgoscheme.AddToScheme(scheme)
-
-	// +kubebuilder:scaffold:scheme
-}
 
 func main() {
 	var (
@@ -55,20 +47,36 @@ func main() {
 		watchesFile                    string
 		defaultMaxConcurrentReconciles int
 		defaultReconcilePeriod         time.Duration
+
+		// Deprecated: use defaultMaxConcurrentReconciles
+		defaultMaxWorkers int
 	)
 
-	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
-	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
+	pflag.StringVar(&metricsAddr, "metrics-addr", "0.0.0.0:8383", "The address the metric endpoint binds to.")
+	pflag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
-	flag.StringVar(&leaderElectionID, "leader-election-id", "leader-lock",
+	pflag.StringVar(&leaderElectionID, "leader-election-id", "leader-lock",
 		"Name of the configmap that is used for holding the leader lock.")
 
-	flag.StringVar(&watchesFile, "watches-file", "./watches.yaml", "Path to watches.yaml file.")
-	flag.IntVar(&defaultMaxConcurrentReconciles, "max-concurrent-reconciles", 1, "Default maximum number of concurrent reconciles for controllers.")
-	flag.DurationVar(&defaultReconcilePeriod, "reconcile-period", 0, "Default reconcile period for controllers (use 0 to disable periodic reconciliation)")
+	pflag.StringVar(&watchesFile, "watches-file", "./watches.yaml", "Path to watches.yaml file.")
+	pflag.DurationVar(&defaultReconcilePeriod, "reconcile-period", 0, "Default reconcile period for controllers (use 0 to disable periodic reconciliation)")
+	pflag.IntVar(&defaultMaxConcurrentReconciles, "max-concurrent-reconciles", 1, "Default maximum number of concurrent reconciles for controllers.")
+
+	// Deprecated: --max-workers flag is currently supported, but it does not align well with the name of the option it
+	//   configures on the controller (MaxConcurrentReconciles). Flag `--max-concurrent-reconciles` should be used
+	//   instead.
+	pflag.IntVar(&defaultMaxWorkers, "max-workers", 1, "Default maximum number of concurrent reconciles for controllers.")
+	if err := pflag.CommandLine.MarkDeprecated("max-workers", "use --default-max-concurrent-reconciles instead"); err != nil {
+		setupLog.Error(err, "failed to mark --max-workers flag as deprecated")
+		os.Exit(1)
+	}
+	if err := pflag.CommandLine.MarkHidden("max-workers"); err != nil {
+		setupLog.Error(err, "failed to hide --max-workers flag")
+		os.Exit(1)
+	}
 
 	klog.InitFlags(flag.CommandLine)
-	flag.Parse()
+	pflag.Parse()
 
 	logLvl := zap.NewAtomicLevelAt(zap.InfoLevel)
 	sttLvl := zap.NewAtomicLevelAt(zap.PanicLevel)
@@ -78,12 +86,17 @@ func main() {
 		zapl.StacktraceLevel(&sttLvl),
 	))
 
+	if pflag.Lookup("max-workers").Changed {
+		if !pflag.Lookup("max-concurrent-reconciles").Changed {
+			defaultMaxConcurrentReconciles = defaultMaxWorkers
+		}
+		setupLog.Info("ignoring --max-workers since --max-concurrent-reconciles is set")
+	}
+
 	options := ctrl.Options{
-		Scheme:             scheme,
-		MetricsBindAddress: metricsAddr,
+		MetricsBindAddress: "0.0.0.0:8383",
 		LeaderElection:     enableLeaderElection,
 		LeaderElectionID:   leaderElectionID,
-		Port:               9443,
 		NewClient:          manager.NewDelegatingClientFunc(),
 	}
 	manager.ConfigureWatchNamespaces(&options, setupLog)
@@ -133,7 +146,7 @@ func main() {
 		setupLog.Info("configured watch", "gvk", w.GroupVersionKind, "chartPath", w.ChartPath, "maxConcurrentReconciles", maxConcurrentReconciles, "reconcilePeriod", reconcilePeriod)
 	}
 
-	// +kubebuilder:scaffold:builder
+	// TODO(joelanford): kube-state-metrics?
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
