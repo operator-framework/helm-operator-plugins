@@ -19,6 +19,7 @@ package main
 import (
 	"flag"
 	"os"
+	"runtime"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -32,11 +33,20 @@ import (
 	"github.com/joelanford/helm-operator/pkg/manager"
 	"github.com/joelanford/helm-operator/pkg/reconciler"
 	"github.com/joelanford/helm-operator/pkg/watches"
+	"github.com/joelanford/helm-operator/version"
 )
 
 var (
 	setupLog = ctrl.Log.WithName("setup")
 )
+
+func printVersion() {
+	setupLog.Info("version information",
+		"go", runtime.Version(),
+		"GOOS", runtime.GOOS,
+		"GOARCH", runtime.GOARCH,
+		"helm-operator", version.Version)
+}
 
 func main() {
 	var (
@@ -83,6 +93,8 @@ func main() {
 		zapl.Level(&logLvl),
 		zapl.StacktraceLevel(&sttLvl),
 	))
+
+	printVersion()
 
 	// Deprecated: --max-workers flag does not align well with the name of the option it configures on the controller
 	//   (MaxConcurrentReconciles). Flag `--max-concurrent-reconciles` should be used instead.
