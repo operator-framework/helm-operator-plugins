@@ -28,7 +28,7 @@ import (
 	"github.com/go-logr/logr/testing"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"helm.sh/helm/v3/pkg/chart"
+    pkgchart "helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chartutil"
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/releaseutil"
@@ -63,7 +63,7 @@ import (
 var _ = Describe("Reconciler", func() {
 	var _ = Describe("New", func() {
 		It("should fail without a GVK", func() {
-			r, err := New(WithChart(chart.Chart{}))
+			r, err := New(WithChart(pkgchart.Chart{}))
 			Expect(r).To(BeNil())
 			Expect(err).NotTo(BeNil())
 		})
@@ -73,7 +73,7 @@ var _ = Describe("Reconciler", func() {
 			Expect(err).NotTo(BeNil())
 		})
 		It("should succeed with just a GVK and chart", func() {
-			r, err := New(WithChart(chart.Chart{}), WithGroupVersionKind(schema.GroupVersionKind{}))
+			r, err := New(WithChart(pkgchart.Chart{}), WithGroupVersionKind(schema.GroupVersionKind{}))
 			Expect(r).NotTo(BeNil())
 			Expect(err).To(BeNil())
 		})
@@ -127,9 +127,9 @@ var _ = Describe("Reconciler", func() {
 		})
 		var _ = Describe("WithChart", func() {
 			It("should set the reconciler chart", func() {
-				chrt := chart.Chart{Metadata: &chart.Metadata{Name: "my-chart"}}
-				Expect(WithChart(chrt)(r)).To(Succeed())
-				Expect(r.chrt).To(Equal(&chrt))
+				chart := pkgchart.Chart{Metadata: &pkgchart.Metadata{Name: "my-chart"}}
+				Expect(WithChart(chart)(r)).To(Succeed())
+				Expect(r.chart).To(Equal(&chart))
 			})
 		})
 		var _ = Describe("WithOverrideValues", func() {
@@ -387,7 +387,7 @@ var _ = Describe("Reconciler", func() {
 			var err error
 			r, err = New(
 				WithGroupVersionKind(gvk),
-				WithChart(chrt),
+				WithChart(chart),
 				WithInstallAnnotations(annotation.InstallDescription{}),
 				WithUpgradeAnnotations(annotation.UpgradeDescription{}),
 				WithUninstallAnnotations(annotation.UninstallDescription{}),

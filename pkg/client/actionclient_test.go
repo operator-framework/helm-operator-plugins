@@ -135,7 +135,7 @@ var _ = Describe("ActionClient", func() {
 					)
 					By("installing the release", func() {
 						opt := func(i *action.Install) error { i.Description = "Test Description"; return nil }
-						rel, err = ac.Install(obj.GetName(), obj.GetNamespace(), &chrt, vals, opt)
+						rel, err = ac.Install(obj.GetName(), obj.GetNamespace(), &chart, vals, opt)
 						Expect(err).To(BeNil())
 						Expect(rel).NotTo(BeNil())
 					})
@@ -143,9 +143,9 @@ var _ = Describe("ActionClient", func() {
 				})
 				It("should uninstall a failed install", func() {
 					By("failing to install the release", func() {
-						chrt := testutil.MustLoadChart("../../testdata/test-chart-0.1.0.tgz")
-						chrt.Templates[2].Data = append(chrt.Templates[2].Data, []byte("\ngibberish")...)
-						r, err := ac.Install(obj.GetName(), obj.GetNamespace(), &chrt, vals)
+						chart := testutil.MustLoadChart("../../testdata/test-chart-0.1.0.tgz")
+						chart.Templates[2].Data = append(chart.Templates[2].Data, []byte("\ngibberish")...)
+						r, err := ac.Install(obj.GetName(), obj.GetNamespace(), &chart, vals)
 						Expect(err).NotTo(BeNil())
 						Expect(r).To(BeNil())
 					})
@@ -154,7 +154,7 @@ var _ = Describe("ActionClient", func() {
 				When("using an option function that returns an error", func() {
 					It("should fail", func() {
 						opt := func(*action.Install) error { return errors.New("expect this error") }
-						r, err := ac.Install(obj.GetName(), obj.GetNamespace(), &chrt, vals, opt)
+						r, err := ac.Install(obj.GetName(), obj.GetNamespace(), &chart, vals, opt)
 						Expect(err).To(MatchError("expect this error"))
 						Expect(r).To(BeNil())
 					})
@@ -162,7 +162,7 @@ var _ = Describe("ActionClient", func() {
 			})
 			var _ = Describe("Upgrade", func() {
 				It("should fail", func() {
-					r, err := ac.Upgrade(obj.GetName(), obj.GetNamespace(), &chrt, vals)
+					r, err := ac.Upgrade(obj.GetName(), obj.GetNamespace(), &chart, vals)
 					Expect(err).NotTo(BeNil())
 					Expect(r).To(BeNil())
 				})
@@ -183,7 +183,7 @@ var _ = Describe("ActionClient", func() {
 			BeforeEach(func() {
 				var err error
 				opt := func(i *action.Install) error { i.Description = "Test Description"; return nil }
-				installedRelease, err = ac.Install(obj.GetName(), obj.GetNamespace(), &chrt, vals, opt)
+				installedRelease, err = ac.Install(obj.GetName(), obj.GetNamespace(), &chart, vals, opt)
 				Expect(err).To(BeNil())
 				Expect(installedRelease).NotTo(BeNil())
 			})
@@ -234,7 +234,7 @@ var _ = Describe("ActionClient", func() {
 			})
 			var _ = Describe("Install", func() {
 				It("should fail", func() {
-					r, err := ac.Install(obj.GetName(), obj.GetNamespace(), &chrt, vals)
+					r, err := ac.Install(obj.GetName(), obj.GetNamespace(), &chart, vals)
 					Expect(err).NotTo(BeNil())
 					Expect(r).To(BeNil())
 				})
@@ -247,7 +247,7 @@ var _ = Describe("ActionClient", func() {
 					)
 					By("upgrading the release", func() {
 						opt := func(u *action.Upgrade) error { u.Description = "Test Description"; return nil }
-						rel, err = ac.Upgrade(obj.GetName(), obj.GetNamespace(), &chrt, vals, opt)
+						rel, err = ac.Upgrade(obj.GetName(), obj.GetNamespace(), &chart, vals, opt)
 						Expect(err).To(BeNil())
 						Expect(rel).NotTo(BeNil())
 					})
@@ -256,7 +256,7 @@ var _ = Describe("ActionClient", func() {
 				It("should rollback a failed upgrade", func() {
 					By("failing to install the release", func() {
 						vals = chartutil.Values{"service": map[string]interface{}{"type": "ClusterIP"}}
-						r, err := ac.Upgrade(obj.GetName(), obj.GetNamespace(), &chrt, vals)
+						r, err := ac.Upgrade(obj.GetName(), obj.GetNamespace(), &chart, vals)
 						Expect(err).NotTo(BeNil())
 						Expect(r).To(BeNil())
 					})
@@ -268,7 +268,7 @@ var _ = Describe("ActionClient", func() {
 				When("using an option function that returns an error", func() {
 					It("should fail", func() {
 						opt := func(*action.Upgrade) error { return errors.New("expect this error") }
-						r, err := ac.Upgrade(obj.GetName(), obj.GetNamespace(), &chrt, vals, opt)
+						r, err := ac.Upgrade(obj.GetName(), obj.GetNamespace(), &chart, vals, opt)
 						Expect(err).To(MatchError("expect this error"))
 						Expect(r).To(BeNil())
 					})

@@ -26,7 +26,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/chart"
+	pkgchart "helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chartutil"
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/storage/driver"
@@ -66,7 +66,7 @@ type Reconciler struct {
 
 	log                     logr.Logger
 	gvk                     *schema.GroupVersionKind
-	chrt                    *chart.Chart
+	chart                   *pkgchart.Chart
 	overrideValues          map[string]string
 	skipDependentWatches    bool
 	maxConcurrentReconciles int
@@ -202,9 +202,9 @@ func WithGroupVersionKind(gvk schema.GroupVersionKind) Option {
 // WithChart is an Option that configures a Reconciler's helm chart.
 //
 // This option is required.
-func WithChart(chrt chart.Chart) Option {
+func WithChart(chart pkgchart.Chart) Option {
 	return func(r *Reconciler) error {
-		r.chrt = &chrt
+		r.chart = &chart
 		return nil
 	}
 }
@@ -522,7 +522,7 @@ func (r *Reconciler) getValues(obj *unstructured.Unstructured) (chartutil.Values
 		return chartutil.Values{}, err
 	}
 	vals := r.valueMapper.Map(crVals.Map())
-	vals, err = chartutil.CoalesceValues(r.chrt, vals)
+	vals, err = chartutil.CoalesceValues(r.chart, vals)
 	if err != nil {
 		return chartutil.Values{}, err
 	}
@@ -593,7 +593,7 @@ func (r *Reconciler) getReleaseState(client helmclient.ActionInterface, obj meta
 		u.DryRun = true
 		return nil
 	})
-	specRelease, err := client.Upgrade(obj.GetName(), obj.GetNamespace(), r.chrt, vals, opts...)
+	specRelease, err := client.Upgrade(obj.GetName(), obj.GetNamespace(), r.chart, vals, opts...)
 	if err != nil {
 		return deployedRelease, stateError, err
 	}
@@ -610,7 +610,7 @@ func (r *Reconciler) doInstall(actionClient helmclient.ActionInterface, u *updat
 			opts = append(opts, annot.InstallOption(v))
 		}
 	}
-	rel, err := actionClient.Install(obj.GetName(), obj.GetNamespace(), r.chrt, vals, opts...)
+	rel, err := actionClient.Install(obj.GetName(), obj.GetNamespace(), r.chart, vals, opts...)
 	if err != nil {
 		u.UpdateStatus(
 			updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionTrue, conditions.ReasonReconcileError, err)),
@@ -632,7 +632,7 @@ func (r *Reconciler) doUpgrade(actionClient helmclient.ActionInterface, u *updat
 		}
 	}
 
-	rel, err := actionClient.Upgrade(obj.GetName(), obj.GetNamespace(), r.chrt, vals, opts...)
+	rel, err := actionClient.Upgrade(obj.GetName(), obj.GetNamespace(), r.chart, vals, opts...)
 	if err != nil {
 		u.UpdateStatus(
 			updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionTrue, conditions.ReasonReconcileError, err)),
@@ -706,7 +706,7 @@ func (r *Reconciler) validate() error {
 	if r.gvk == nil {
 		return errors.New("gvk must not be nil")
 	}
-	if r.chrt == nil {
+	if r.chart == nil {
 		return errors.New("chart must not be nil")
 	}
 	return nil

@@ -42,7 +42,7 @@ var (
 	cfg     *rest.Config
 
 	gvk  = schema.GroupVersionKind{Group: "example.com", Version: "v1", Kind: "TestApp"}
-	chrt = testutil.MustLoadChart("../../testdata/test-chart-0.1.0.tgz")
+	chart = testutil.MustLoadChart("../../testdata/test-chart-0.1.0.tgz")
 )
 
 var _ = BeforeSuite(func(done Done) {

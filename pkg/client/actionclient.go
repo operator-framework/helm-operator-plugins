@@ -22,9 +22,9 @@ import (
 	"errors"
 	"fmt"
 
+	pkgchart "helm.sh/helm/v3/pkg/chart"
 	"gomodules.xyz/jsonpatch/v2"
 	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/kube"
 	helmkube "helm.sh/helm/v3/pkg/kube"
 	"helm.sh/helm/v3/pkg/postrender"
@@ -58,8 +58,8 @@ func (acgf ActionClientGetterFunc) ActionClientFor(obj Object) (ActionInterface,
 
 type ActionInterface interface {
 	Get(name string, opts ...GetOption) (*release.Release, error)
-	Install(name, namespace string, chrt *chart.Chart, vals map[string]interface{}, opts ...InstallOption) (*release.Release, error)
-	Upgrade(name, namespace string, chrt *chart.Chart, vals map[string]interface{}, opts ...UpgradeOption) (*release.Release, error)
+	Install(name, namespace string, chart *pkgchart.Chart, vals map[string]interface{}, opts ...InstallOption) (*release.Release, error)
+	Upgrade(name, namespace string, chart *pkgchart.Chart, vals map[string]interface{}, opts ...UpgradeOption) (*release.Release, error)
 	Uninstall(name string, opts ...UninstallOption) (*release.UninstallReleaseResponse, error)
 	Reconcile(rel *release.Release) error
 }
@@ -109,7 +109,7 @@ func (c *actionClient) Get(name string, opts ...GetOption) (*release.Release, er
 	return get.Run(name)
 }
 
-func (c *actionClient) Install(name, namespace string, chrt *chart.Chart, vals map[string]interface{}, opts ...InstallOption) (*release.Release, error) {
+func (c *actionClient) Install(name, namespace string, chart *pkgchart.Chart, vals map[string]interface{}, opts ...InstallOption) (*release.Release, error) {
 	install := action.NewInstall(c.conf)
 	install.PostRenderer = c.postRenderer
 	for _, o := range opts {
@@ -120,7 +120,7 @@ func (c *actionClient) Install(name, namespace string, chrt *chart.Chart, vals m
 	install.ReleaseName = name
 	install.Namespace = namespace
 	c.conf.Log("Starting install")
-	rel, err := install.Run(chrt, vals)
+	rel, err := install.Run(chart, vals)
 	if err != nil {
 		c.conf.Log("Install failed")
 		if rel != nil {
@@ -147,7 +147,7 @@ func (c *actionClient) Install(name, namespace string, chrt *chart.Chart, vals m
 	return rel, nil
 }
 
-func (c *actionClient) Upgrade(name, namespace string, chrt *chart.Chart, vals map[string]interface{}, opts ...UpgradeOption) (*release.Release, error) {
+func (c *actionClient) Upgrade(name, namespace string, chart *pkgchart.Chart, vals map[string]interface{}, opts ...UpgradeOption) (*release.Release, error) {
 	upgrade := action.NewUpgrade(c.conf)
 	upgrade.PostRenderer = c.postRenderer
 	for _, o := range opts {
@@ -156,7 +156,7 @@ func (c *actionClient) Upgrade(name, namespace string, chrt *chart.Chart, vals m
 		}
 	}
 	upgrade.Namespace = namespace
-	rel, err := upgrade.Run(name, chrt, vals)
+	rel, err := upgrade.Run(name, chart, vals)
 	if err != nil {
 		if rel != nil {
 			rollback := action.NewRollback(c.conf)

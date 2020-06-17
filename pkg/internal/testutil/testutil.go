@@ -66,11 +66,11 @@ func BuildTestCRD(gvk schema.GroupVersionKind) apiextv1.CustomResourceDefinition
 }
 
 func MustLoadChart(path string) chart.Chart {
-	chrt, err := loader.Load(path)
+	chart, err := loader.Load(path)
 	if err != nil {
 		panic(err)
 	}
-	return *chrt
+	return *chart
 }
 
 func BuildTestCR(gvk schema.GroupVersionKind) *unstructured.Unstructured {

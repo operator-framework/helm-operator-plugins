@@ -19,7 +19,7 @@ package fake
 import (
 	"errors"
 
-	"helm.sh/helm/v3/pkg/chart"
+	pkgchart "helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/release"
 
 	"github.com/joelanford/helm-operator/pkg/client"
@@ -95,7 +95,7 @@ type GetCall struct {
 type InstallCall struct {
 	Name      string
 	Namespace string
-	Chart     *chart.Chart
+	Chart     *pkgchart.Chart
 	Values    map[string]interface{}
 	Opts      []client.InstallOption
 }
@@ -103,7 +103,7 @@ type InstallCall struct {
 type UpgradeCall struct {
 	Name      string
 	Namespace string
-	Chart     *chart.Chart
+	Chart     *pkgchart.Chart
 	Values    map[string]interface{}
 	Opts      []client.UpgradeOption
 }
@@ -122,13 +122,13 @@ func (c *ActionClient) Get(name string, opts ...client.GetOption) (*release.Rele
 	return c.HandleGet()
 }
 
-func (c *ActionClient) Install(name, namespace string, chrt *chart.Chart, vals map[string]interface{}, opts ...client.InstallOption) (*release.Release, error) {
-	c.Installs = append(c.Installs, InstallCall{name, namespace, chrt, vals, opts})
+func (c *ActionClient) Install(name, namespace string, chart *pkgchart.Chart, vals map[string]interface{}, opts ...client.InstallOption) (*release.Release, error) {
+	c.Installs = append(c.Installs, InstallCall{name, namespace, chart, vals, opts})
 	return c.HandleInstall()
 }
 
-func (c *ActionClient) Upgrade(name, namespace string, chrt *chart.Chart, vals map[string]interface{}, opts ...client.UpgradeOption) (*release.Release, error) {
-	c.Upgrades = append(c.Upgrades, UpgradeCall{name, namespace, chrt, vals, opts})
+func (c *ActionClient) Upgrade(name, namespace string, chart *pkgchart.Chart, vals map[string]interface{}, opts ...client.UpgradeOption) (*release.Release, error) {
+	c.Upgrades = append(c.Upgrades, UpgradeCall{name, namespace, chart, vals, opts})
 	return c.HandleUpgrade()
 }
 
