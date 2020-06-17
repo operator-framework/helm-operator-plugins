@@ -151,7 +151,7 @@ func (c *actionClient) Upgrade(name, namespace string, chrt *chart.Chart, vals m
 	upgrade := action.NewUpgrade(c.conf)
 	upgrade.PostRenderer = c.postRenderer
 	for _, o := range opts {
-		if err := o(upgrade); err != nil {
+		if err := o(upgrade); err != nil { // todo: check I did not get it.
 			return nil, err
 		}
 	}

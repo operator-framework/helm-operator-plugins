@@ -13,7 +13,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-
+//todo: could we doc why it is required?
+//Should not it be part of SDK lib instead of?
 package fake
 
 import (

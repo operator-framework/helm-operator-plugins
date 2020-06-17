@@ -127,9 +127,9 @@ var _ = Describe("Reconciler", func() {
 		})
 		var _ = Describe("WithChart", func() {
 			It("should set the reconciler chart", func() {
-				chrt := chart.Chart{Metadata: &chart.Metadata{Name: "my-chart"}}
+				chart := chart.Chart{Metadata: &chart.Metadata{Name: "my-chart"}}
 				Expect(WithChart(chrt)(r)).To(Succeed())
-				Expect(r.chrt).To(Equal(&chrt))
+				Expect(r.chart).To(Equal(&chart))
 			})
 		})
 		var _ = Describe("WithOverrideValues", func() {

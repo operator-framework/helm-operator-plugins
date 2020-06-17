@@ -64,15 +64,17 @@ type Reconciler struct {
 	preHooks           []hook.PreHook
 	postHooks          []hook.PostHook
 
-	log                     logr.Logger
-	gvk                     *schema.GroupVersionKind
-	chrt                    *chart.Chart
+	log logr.Logger
+	gvk *schema.GroupVersionKind
+	// Before we have the watch here and we did the load which is done in the main.go now.
+	// However, it was changed but the bahaviour still the same
+	chart                   *chart.Chart //renamed - typo //todo a PR for thaat
 	overrideValues          map[string]string
 	skipDependentWatches    bool
 	maxConcurrentReconciles int
 	reconcilePeriod         time.Duration
 
-	annotSetupOnce       sync.Once
+	annotSetupOnce       sync.Once // just to confirm. It is just for we known that the annotation was already setup
 	annotations          map[string]struct{}
 	installAnnotations   map[string]annotation.Install
 	upgradeAnnotations   map[string]annotation.Upgrade
@@ -146,6 +148,7 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 // Option is a function that configures the helm Reconciler.
 type Option func(r *Reconciler) error
 
+// todo: check why it is not used in the main.go. When and how it can be setup? What  is the user case?
 // WithClient is an Option that configures a Reconciler's client.
 //
 // By default, manager.GetClient() is used if this option is not configured.
@@ -156,6 +159,7 @@ func WithClient(cl client.Client) Option {
 	}
 }
 
+// todo: Why it is not used in the main.go? When and how it can be setup? What  is the user case?
 // WithActionClientGetter is an Option that configures a Reconciler's
 // ActionClientGetter.
 //
@@ -167,6 +171,7 @@ func WithActionClientGetter(actionClientGetter helmclient.ActionClientGetter) Op
 	}
 }
 
+// todo: check why it is not used in the main.go. When and how it can be setup? What  is the user case?
 // WithEventRecorder is an Option that configures a Reconciler's EventRecorder.
 //
 // By default, manager.GetEventRecorderFor() is used if this option is not
@@ -178,6 +183,7 @@ func WithEventRecorder(er record.EventRecorder) Option {
 	}
 }
 
+// todo: check why it is not used in the main.go. When and how it can be setup? What  is the user case?
 // WithLog is an Option that configures a Reconciler's logger.
 //
 // A default logger is used if this option is not configured.
@@ -202,9 +208,9 @@ func WithGroupVersionKind(gvk schema.GroupVersionKind) Option {
 // WithChart is an Option that configures a Reconciler's helm chart.
 //
 // This option is required.
-func WithChart(chrt chart.Chart) Option {
+func WithChart(chart chart.Chart) Option { //todo: pr for typo fix
 	return func(r *Reconciler) error {
-		r.chrt = &chrt
+		r.chart = &chart
 		return nil
 	}
 }
@@ -340,6 +346,7 @@ func WithUninstallAnnotations(as ...annotation.Uninstall) Option {
 	}
 }
 
+// todo: why it is not used/called in the main.go?
 // WithPreHook is an Option that configures the reconciler to run the given
 // PreHook just before performing any actions (e.g. install, upgrade, uninstall,
 // or reconciliation).
@@ -350,6 +357,7 @@ func WithPreHook(h hook.PreHook) Option {
 	}
 }
 
+// todo: why it is not used/called in the main.go?
 // WithPostHook is an Option that configures the reconciler to run the given
 // PostHook just after performing any non-uninstall release actions.
 func WithPostHook(h hook.PostHook) Option {
@@ -359,6 +367,7 @@ func WithPostHook(h hook.PostHook) Option {
 	}
 }
 
+// todo: why it is not used/called in the main.go? What is the user case? Why it would be required?
 // WithValueMapper is an Option that configures a function that maps values
 // from a custom resource spec to the values passed to Helm
 func WithValueMapper(m values.Mapper) Option {
@@ -394,6 +403,8 @@ func WithValueMapper(m values.Mapper) Option {
 //   - Irreconcilable - an error occurred during reconciliation
 func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 	ctx := context.Background()
+	// why we are using the Background instead of the TODO ? Is because of it will be used for the deletion was well?
+	// also, should we not add a timeout on that if we really should use the Background one?
 	log := r.log.WithValues(strings.ToLower(r.gvk.Kind), req.NamespacedName)
 
 	obj := &unstructured.Unstructured{}
@@ -403,6 +414,7 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 		return ctrl.Result{}, nil
 	}
 	if err != nil {
+		log.Error(err, "Failed to lookup resource") //todo: pr
 		return ctrl.Result{}, err
 	}
 
@@ -419,6 +431,7 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 		}
 	}()
 
+	// todo: understand better the ActionClient motivations
 	actionClient, err := r.actionClientGetter.ActionClientFor(obj)
 	if err != nil {
 		u.UpdateStatus(
@@ -436,6 +449,7 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 		// The decision made for now is to leave the finalizer in place, so that the user can intervene and try to
 		// resolve the issue, instead of the operator silently leaving some dangling resources hanging around after the
 		// CR is deleted.
+		// todo: check : Is this the same behaviour in SDK or it was introduced with the ActionClient?
 		return ctrl.Result{}, err
 	}
 
@@ -460,6 +474,7 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 
 	vals, err := r.getValues(obj)
 	if err != nil {
+		log.Error(err, "Failed to get values") //todo: pr to add logs across the reconciler as well. Otherwise, we have not any info in the logs to know that something is wrong
 		u.UpdateStatus(updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionTrue, conditions.ReasonErrorGettingValues, err)))
 		return ctrl.Result{}, err
 	}
@@ -471,6 +486,9 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 	}
 	u.UpdateStatus(updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionFalse, "", "")))
 
+	// Before we have just releaseHooks, now we have pre and post hooks.
+	// Before the release one shows accepting all: https://helm.sh/docs/topics/charts_hooks/
+	// todo: check it better
 	for _, h := range r.preHooks {
 		if err := h.Exec(obj, vals, log); err != nil {
 			log.Error(err, "pre-release hook failed")
@@ -522,7 +540,7 @@ func (r *Reconciler) getValues(obj *unstructured.Unstructured) (chartutil.Values
 		return chartutil.Values{}, err
 	}
 	vals := r.valueMapper.Map(crVals.Map())
-	vals, err = chartutil.CoalesceValues(r.chrt, vals)
+	vals, err = chartutil.CoalesceValues(r.chart, vals)
 	if err != nil {
 		return chartutil.Values{}, err
 	}
@@ -593,7 +611,7 @@ func (r *Reconciler) getReleaseState(client helmclient.ActionInterface, obj meta
 		u.DryRun = true
 		return nil
 	})
-	specRelease, err := client.Upgrade(obj.GetName(), obj.GetNamespace(), r.chrt, vals, opts...)
+	specRelease, err := client.Upgrade(obj.GetName(), obj.GetNamespace(), r.chart, vals, opts...)
 	if err != nil {
 		return deployedRelease, stateError, err
 	}
@@ -610,7 +628,7 @@ func (r *Reconciler) doInstall(actionClient helmclient.ActionInterface, u *updat
 			opts = append(opts, annot.InstallOption(v))
 		}
 	}
-	rel, err := actionClient.Install(obj.GetName(), obj.GetNamespace(), r.chrt, vals, opts...)
+	rel, err := actionClient.Install(obj.GetName(), obj.GetNamespace(), r.chart, vals, opts...)
 	if err != nil {
 		u.UpdateStatus(
 			updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionTrue, conditions.ReasonReconcileError, err)),
@@ -632,7 +650,7 @@ func (r *Reconciler) doUpgrade(actionClient helmclient.ActionInterface, u *updat
 		}
 	}
 
-	rel, err := actionClient.Upgrade(obj.GetName(), obj.GetNamespace(), r.chrt, vals, opts...)
+	rel, err := actionClient.Upgrade(obj.GetName(), obj.GetNamespace(), r.chart, vals, opts...)
 	if err != nil {
 		u.UpdateStatus(
 			updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionTrue, conditions.ReasonReconcileError, err)),
@@ -640,6 +658,8 @@ func (r *Reconciler) doUpgrade(actionClient helmclient.ActionInterface, u *updat
 		)
 		return nil, err
 	}
+	// Since the controller was not created WithEventRecorder will the event be recorded?
+	// Shows that not, so if the idea is let optional now then we need to do the impl for that and doc as well
 	r.reportOverrideEvents(obj)
 
 	log.Info("Release upgraded", "name", rel.Name, "version", rel.Version)
@@ -706,7 +726,7 @@ func (r *Reconciler) validate() error {
 	if r.gvk == nil {
 		return errors.New("gvk must not be nil")
 	}
-	if r.chrt == nil {
+	if r.chart == nil {
 		return errors.New("chart must not be nil")
 	}
 	return nil
@@ -745,7 +765,7 @@ func (r *Reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) err
 	); err != nil {
 		return err
 	}
-
+	// why we are adding the secret here?
 	secret := &corev1.Secret{}
 	secret.SetGroupVersionKind(schema.GroupVersionKind{
 		Group:   "",

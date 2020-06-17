@@ -13,7 +13,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-
+// I think would be nice we are able to do : https://github.com/operator-framework/operator-sdk/issues/2962
+// However, it is part of SDK lib
 package handler
 
 import (

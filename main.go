@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
-	"go.uber.org/zap"
+	"go.uber.org/zap" // todo(camilamacedo86): why we are adding this lib? Shuld we not keep it == kube?
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/klog"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -45,9 +45,11 @@ func printVersion() {
 		"go", runtime.Version(),
 		"GOOS", runtime.GOOS,
 		"GOARCH", runtime.GOARCH,
-		"helm-operator", version.Version)
+		"helm-operator", version.Version) // Should not we inform the helm plugin version here? So, should it not be part of SDK impl and no lib?
 }
 
+// The implementation here is equivalent what we have in the
+// /operator-sdk/pkg/helm/run.go internal/scaffold/helm/main.go and helm flags
 func main() {
 	var (
 		metricsAddr             string
@@ -62,10 +64,12 @@ func main() {
 		// Deprecated: use defaultMaxConcurrentReconciles
 		defaultMaxWorkers int
 	)
-
+	//todo(camilamacedo86): why the port is not 8080?
 	pflag.StringVar(&metricsAddr, "metrics-addr", "0.0.0.0:8383", "The address the metric endpoint binds to.")
 	pflag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
+
+	//todo(camilamacedo86): the following ones has not in the kube. Wy we need the leaderElectionID and leaderElectionNamespace?
 	pflag.StringVar(&leaderElectionID, "leader-election-id", "",
 		"Name of the configmap that is used for holding the leader lock.")
 	pflag.StringVar(&leaderElectionNamespace, "leader-election-namespace", "",
@@ -95,7 +99,7 @@ func main() {
 	))
 
 	printVersion()
-
+	// todo: Should we not to do this deprecations now in SDK (ASAP) and then may we can just remove from here?
 	// Deprecated: --max-workers flag does not align well with the name of the option it configures on the controller
 	//   (MaxConcurrentReconciles). Flag `--max-concurrent-reconciles` should be used instead.
 	if pflag.Lookup("max-workers").Changed {
@@ -106,7 +110,7 @@ func main() {
 			defaultMaxConcurrentReconciles = defaultMaxWorkers
 		}
 	}
-
+	// Why we need a flag for `--leader-election-id`? What is the user case that would be required pass this value?
 	// Deprecated: OPERATOR_NAME environment variable is an artifact of the legacy operator-sdk project scaffolding.
 	//   Flag `--leader-election-id` should be used instead.
 	if operatorName, found := os.LookupEnv("OPERATOR_NAME"); found {
@@ -117,12 +121,13 @@ func main() {
 			leaderElectionID = operatorName
 		}
 	}
-
 	options := ctrl.Options{
-		MetricsBindAddress:      "0.0.0.0:8383",
-		LeaderElection:          enableLeaderElection,
+		MetricsBindAddress: metricsAddr,
+		LeaderElection:     enableLeaderElection,
+		// todo: add:
+		Port:                    9443, // should not it be == kubebuilder?
 		LeaderElectionID:        leaderElectionID,
-		LeaderElectionNamespace: leaderElectionNamespace,
+		LeaderElectionNamespace: leaderElectionNamespace, // todo: why we need the ns?
 		NewClient:               manager.NewDelegatingClientFunc(),
 	}
 	manager.ConfigureWatchNamespaces(&options, setupLog)
@@ -137,7 +142,9 @@ func main() {
 		setupLog.Error(err, "unable to load watches.yaml", "path", watchesFile)
 		os.Exit(1)
 	}
-
+	// Not for now. Just a thought for the future: Could we not work with markers to inject
+	// the code based on the helm/ansible charts instead which would allow users
+	// also add Go code. Could not it be a solution for the hibrid ones?
 	for _, w := range ws {
 		reconcilePeriod := defaultReconcilePeriod
 		if w.ReconcilePeriod != nil {
@@ -173,6 +180,17 @@ func main() {
 	}
 
 	// TODO(joelanford): kube-state-metrics?
+
+	// Are we sure that the "https://godoc.org/sigs.k8s.io/controller-runtime/pkg/manager#LeaderElectionRunnable"
+	// is able to do all that is done with:
+	// Become the leader before proceeding
+	//	err = leader.Become(ctx, operatorName+"-lock")
+	//	if err != nil {
+	//		log.Error(err, "Failed to become leader.")
+	//		return err
+	//	}
+	// Should we check with we would need to keep the leader.Become or try to push something to upstream?
+	// Why we still using it in the legacy projects?
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

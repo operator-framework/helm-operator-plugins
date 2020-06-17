@@ -37,10 +37,13 @@ const (
 	ReasonErrorGettingClient       = status.ConditionReason("ErrorGettingClient")
 	ReasonErrorGettingValues       = status.ConditionReason("ErrorGettingValues")
 	ReasonErrorGettingReleaseState = status.ConditionReason("ErrorGettingReleaseState")
+
 	ReasonInstallError             = status.ConditionReason("InstallError")
-	ReasonUpgradeError             = status.ConditionReason("UpgradeError")
-	ReasonReconcileError           = status.ConditionReason("ReconcileError")
-	ReasonUninstallError           = status.ConditionReason("UninstallError")
+	// it is UpdateError in the sdk. todo: change in SDK since Upgrade shows make more sense
+	ReasonUpgradeError   = status.ConditionReason("UpgradeError")
+	ReasonReconcileError = status.ConditionReason("ReconcileError")
+	ReasonUninstallError = status.ConditionReason("UninstallError")
+
 )
 
 func Initialized(stat corev1.ConditionStatus, reason status.ConditionReason, message interface{}) status.Condition {

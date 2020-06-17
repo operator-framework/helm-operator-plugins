@@ -46,6 +46,10 @@ var (
 )
 
 var _ = BeforeSuite(func(done Done) {
+	// todo: do we really need to set it? Can we not use the k8s and kubectl from the local setup?
+	// check if would be a better solution
+	// also, it shows that were are doing here e2e test. Could we make clear what is e2e and not?
+	// Also, is not the go of `NewActionClientGetter` allow us test it as unit and in this way we would not require the bin/env at all?
 	Expect(os.Setenv("TEST_ASSET_KUBE_APISERVER", "../../testbin/kube-apiserver")).To(Succeed())
 	Expect(os.Setenv("TEST_ASSET_ETCD", "../../testbin/etcd")).To(Succeed())
 	Expect(os.Setenv("TEST_ASSET_KUBECTL", "../../testbin/kubectl")).To(Succeed())

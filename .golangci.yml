@@ -1,16 +1,44 @@
+# todo: we need to add the following for we ensure that all exported methods from the lib will be doc
+# E.g exported method `PostHookFunc.Exec` should have comment or be unexported (golint)
+issues:
+  # don't skip warning about doc comments
+  exclude-use-default: false
+
+  # restore some of the defaults
+  # (fill in the rest as needed)
+  exclude-rules:
+    - linters: [errcheck]
+      text: "Error return value of .((os\\.)?std(out|err)\\..*|.*Close|.*Flush|os\\.Remove(All)?|.*printf?|os\\.(Un)?Setenv). is not checked"
+# todo(camilamacedo86): missing checks  - IMO we need to apply here the same ones which are enable for kb
 linters:
   disable-all: true
   enable:
-    - govet
-    - errcheck
-    - staticcheck
-    - unused
-    - gosimple
-    - structcheck
-    - varcheck
-    - ineffassign
     - deadcode
+    - dupl # need to fix issues found with this check
+    - errcheck
+    - goconst # need to fix issues found with this check
+    - gocyclo
+    - gofmt
+    - goimports
+    - golint
+    - gosec
+    - gosimple
+    - govet
+    - ineffassign
+    - interfacer # need to fix issues found with this check
+    - lll # need to fix issues found with this check
+    - maligned # need to fix issues found with this check
+    - misspell
+    - nakedret
+    - prealloc
+    - scopelint # need to fix issues found with this check
+    - staticcheck
+    - structcheck
     - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - varcheck
 
 run:
   deadline: 5m

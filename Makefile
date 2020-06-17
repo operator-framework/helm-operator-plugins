@@ -1,8 +1,7 @@
-
 # Image URL to use all building/pushing image targets
 IMG ?= quay.io/joelanford/helm-operator
 
-SHELL=/bin/bash
+SHELL=/bin/bash  # todo(camilamacedo86): why it is required?
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
@@ -14,6 +13,7 @@ all: manager
 
 # Run tests
 test: generate fmt vet testbin
+	# todo(camilamacedo86): why `-race -covermode atomic`?
 	go test -race -covermode atomic -coverprofile cover.out ./...
 
 # Build manager binary
@@ -31,6 +31,10 @@ vet:
 lint: golangci-lint
 	$(GOLANGCI_LINT) run
 
+# todo(camilamacedo86): do not work
+# $ make generate
+  #/Users/camilamacedo/go/bin/controller-gen object:headerFile=./hack/boilerplate.go.txt paths="./..."
+  #open ./hack/boilerplate.go.txt: no such file or directory
 # Generate code
 generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile=./hack/boilerplate.go.txt paths="./..."
@@ -43,6 +47,9 @@ docker-build: test
 docker-push:
 	docker push ${IMG}
 
+
+# todo(camilamacedo86): could we not have it just in the travis?
+# IMO: we should have just a target to run the lint with the setup .golangci.yml and we should not download it. Just in the travis.
 # find or download controller-gen
 # download controller-gen if necessary
 golangci-lint:
@@ -84,3 +91,14 @@ testbin:
 	mkdir -p testbin
 	[[ -x testbin/etcd ]] || curl -L https://storage.googleapis.com/etcd/${ETCD_VER}/etcd-${ETCD_VER}-${OS}-${ARCH}.tar.gz | tar zx -C testbin --strip-components=1 etcd-${ETCD_VER}-${OS}-${ARCH}/etcd
 	[[ -x testbin/kube-apiserver && -x testbin/kubectl ]] || curl -L https://dl.k8s.io/${K8S_VER}/kubernetes-server-${OS}-${ARCH}.tar.gz | tar zx -C testbin --strip-components=3 kubernetes/server/bin/kube-apiserver kubernetes/server/bin/kubectl
+
+# $ make testbin
+#  mkdir -p testbin
+#  [[ -x testbin/etcd ]] || curl -L https://storage.googleapis.com/etcd/v3.4.3/etcd-v3.4.3-darwin-amd64.tar.gz | tar zx -C testbin --strip-components=1 etcd-v3.4.3-darwin-amd64/etcd
+#    % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+#                                   Dload  Upload   Total   Spent    Left  Speed
+#  100   205  100   205    0     0    510      0 --:--:-- --:--:-- --:--:--   511
+#  tar: Unrecognized archive format
+#  tar: etcd-v3.4.3-darwin-amd64/etcd: Not found in archive
+#  tar: Error exit delayed from previous errors.
+#  make: *** [Makefile:118: testbin] Error 1

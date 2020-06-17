@@ -21,20 +21,23 @@ import (
 	"os"
 	"time"
 
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v2" // todo: remplace for the k8s lib "sigs.k8s.io/yaml"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 type Watch struct {
-	GroupVersionKind schema.GroupVersionKind `yaml:",inline"`
+	GroupVersionKind schema.GroupVersionKind `yaml:",inline"` // why use yaml instead of json?
 	ChartPath        string                  `yaml:"chart"`
 
 	WatchDependentResources *bool             `yaml:"watchDependentResources,omitempty"`
 	OverrideValues          map[string]string `yaml:"overrideValues,omitempty"`
-	ReconcilePeriod         *time.Duration    `yaml:"reconcilePeriod,omitempty"`
-	MaxConcurrentReconciles *int              `yaml:"maxConcurrentReconciles,omitempty"`
+
+	// the following ones were not in the watch before. However, i agree that it is better here
+	// also, it should not cause changes in its behaviour as well.
+	ReconcilePeriod         *time.Duration `yaml:"reconcilePeriod,omitempty"`
+	MaxConcurrentReconciles *int           `yaml:"maxConcurrentReconciles,omitempty"`
 
 	Chart *chart.Chart `yaml:"-"`
 }
@@ -105,3 +108,23 @@ func verifyGVK(gvk schema.GroupVersionKind) error {
 	}
 	return nil
 }
+
+// the template is not here. Should we not provide the template as well for SDK consume it?
+// Should not be part of the lib provide its specific templates as well?
+// This is a point that in my mind has 2 options;
+
+// A) scaffold also be in the libs and libs provide a plugin
+// which means e.g SDK lib = go sdk plugin
+// then, e2e tests for each in the lib repo
+// sdk cli with just commands and calling plugins
+// e.g helm lib is the helm plugin with its testdata and a project scaffolded
+// e.g helm lib/plugin will use sdk lib to do the base
+// we will able to develop and test the changes standalone
+
+// B) scaffolds be part of sdk tool
+// then libs has just the unit test
+// we will need to bump the new lib version to do the full test and check the changes
+// the e2e test are in sdk cli project
+
+// IMO shows that the option A will make easier work with and solve the CI problems
+// and keep better the cohesion.

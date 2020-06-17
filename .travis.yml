@@ -8,3 +8,5 @@ before_install:
 script:
 - make test manager lint && git diff
 - $GOPATH/bin/goveralls -service=travis-ci -coverprofile=cover.out
+
+#todo: if we will have the scaffolds here as well then we need impl the testdata gen and an e2e test for that.

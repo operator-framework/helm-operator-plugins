@@ -24,6 +24,7 @@ require (
 	sigs.k8s.io/yaml v1.2.0
 )
 
+// Why we are keeping the following comments here?
 //replace (
 //	// github.com/Azure/go-autorest/autorest has different versions for the Go
 //	// modules than it does for releases on the repository. Note the correct

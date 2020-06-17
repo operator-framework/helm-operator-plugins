@@ -27,13 +27,18 @@ import (
 )
 
 const (
-	WatchNamespaceEnvVar = "WATCH_NAMESPACE"
+	WatchNamespaceEnvVar = "WATCH_NAMESPACE" // We need to address WATCH_NAMESPACE to the new layout.
+	// It currently was not added
 )
 
 func ConfigureWatchNamespaces(options *manager.Options, log logr.Logger) {
 	namespaces := lookupEnv()
 	if len(namespaces) != 0 {
 		log.Info("watching namespaces", "namespaces", namespaces)
+		// Currently: cache.MultiNamespacedCacheBuilder(strings.Split(namespace, ","))
+		// because for SDK OLM features and command line arg to work with is an string
+		// However, I agree that use array here is better we just need to first
+		// to do the required checks and fixes in SDK.
 		if len(namespaces) > 1 {
 			options.NewCache = cache.MultiNamespacedCacheBuilder(namespaces)
 		} else {

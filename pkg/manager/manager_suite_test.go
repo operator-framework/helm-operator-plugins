@@ -39,6 +39,10 @@ var (
 )
 
 var _ = BeforeSuite(func(done Done) {
+	// todo: do we really need to set it? Can we not use the k8s and kubectl from the local setup?
+	// check if would be a better solution
+	// also, it shows that were are doing here e2e test. Could we make clear what is e2e and not?
+	// Also, is not the go of `NewActionClientGetter` allow us test it as unit and in this way we would not require the bin/env at all?
 	Expect(os.Setenv("TEST_ASSET_KUBE_APISERVER", "../../testbin/kube-apiserver")).To(Succeed())
 	Expect(os.Setenv("TEST_ASSET_ETCD", "../../testbin/etcd")).To(Succeed())
 	Expect(os.Setenv("TEST_ASSET_KUBECTL", "../../testbin/kubectl")).To(Succeed())
@@ -61,3 +65,16 @@ var _ = AfterSuite(func() {
 	Expect(os.Unsetenv("TEST_ASSET_KUBECTL")).To(Succeed())
 
 })
+
+// Unable to run locally. Probably becaue the testbin is not working for me.
+// Unexpected error:
+//      <*fmt.wrapError | 0xc0001209c0>: {
+//          msg: "failed to start the controlplane. retried 5 times: fork/exec ../../testbin/etcd: no such file or directory",
+//          err: {
+//              Op: "fork/exec",
+//              Path: "../../testbin/etcd",
+//              Err: 0x2,
+//          },
+//      }
+//      failed to start the controlplane. retried 5 times: fork/exec ../../testbin/etcd: no such file or directory
+//  occurred

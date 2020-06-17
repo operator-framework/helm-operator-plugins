@@ -52,11 +52,14 @@ type InstallDisableHooks struct {
 var _ Install = &InstallDisableHooks{}
 
 const (
-	DefaultDomain                    = "helm.operator-sdk"
+	DefaultDomain = "helm.operator-sdk"
+	// The following ones shows a new behaviour introduced as well. todo: understand user case
 	DefaultInstallDisableHooksName   = DefaultDomain + "/install-disable-hooks"
 	DefaultUpgradeDisableHooksName   = DefaultDomain + "/upgrade-disable-hooks"
 	DefaultUninstallDisableHooksName = DefaultDomain + "/uninstall-disable-hooks"
 
+	// we have the annotation here, however where is the  release.ForceUpdate?
+	// shows that we are not forcing the upgrade when it is informed
 	DefaultUpgradeForceName = DefaultDomain + "/upgrade-force"
 
 	DefaultInstallDescriptionName   = DefaultDomain + "/install-description"

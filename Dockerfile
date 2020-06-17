@@ -22,5 +22,6 @@ FROM gcr.io/distroless/static:nonroot
 WORKDIR /
 COPY --from=builder /workspace/manager .
 USER nonroot:nonroot
-
+# todo: should we not do here the same setup valid for OCP (user_setup)
+# and how works here the `exec ${OPERATOR} exec-entrypoint helm --watches-file=$HOME/watches.yaml $@`
 ENTRYPOINT ["/manager"]
