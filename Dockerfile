@@ -24,4 +24,4 @@ WORKDIR /
 COPY --from=builder /workspace/helm-operator .
 USER nonroot:nonroot
 
-ENTRYPOINT ["/helm-operator"]
+ENTRYPOINT ["/helm-operator", "run"]

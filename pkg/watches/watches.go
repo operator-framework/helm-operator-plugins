@@ -27,6 +27,8 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+const WatchesFile = "watches.yaml"
+
 type Watch struct {
 	schema.GroupVersionKind `json:",inline"`
 	ChartPath               string `json:"chart"`
