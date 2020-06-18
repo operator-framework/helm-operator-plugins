@@ -24,4 +24,4 @@ WORKDIR /
 COPY --from=builder /workspace/manager .
 USER nonroot:nonroot
 
-ENTRYPOINT ["/manager"]
+ENTRYPOINT ["/manager", "run"]
