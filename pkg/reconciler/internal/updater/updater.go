@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"helm.sh/helm/v3/pkg/release"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/util/retry"
@@ -116,6 +117,15 @@ func RemoveFinalizer(finalizer string) UpdateFunc {
 func EnsureCondition(condition status.Condition) UpdateStatusFunc {
 	return func(status *helmAppStatus) bool {
 		return status.Conditions.SetCondition(condition)
+	}
+}
+
+func EnsureConditionUnknown(t status.ConditionType) UpdateStatusFunc {
+	return func(s *helmAppStatus) bool {
+		return s.Conditions.SetCondition(status.Condition{
+			Type:   t,
+			Status: corev1.ConditionUnknown,
+		})
 	}
 }
 

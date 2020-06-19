@@ -406,11 +406,6 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 		return ctrl.Result{}, err
 	}
 
-	// We always create the status from scratch since
-	// we don't know if the previous status is still
-	// valid from the last time we reconciled
-	obj.Object["status"] = nil
-
 	u := updater.New(r.client)
 	defer func() {
 		applyErr := u.Apply(ctx, obj)
@@ -423,7 +418,10 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 	if err != nil {
 		u.UpdateStatus(
 			updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionTrue, conditions.ReasonErrorGettingClient, err)),
-			updater.EnsureCondition(conditions.Deployed(corev1.ConditionUnknown, conditions.ReasonErrorGettingClient, err)),
+			updater.EnsureConditionUnknown(conditions.TypeDeployed),
+			updater.EnsureConditionUnknown(conditions.TypeInitialized),
+			updater.EnsureConditionUnknown(conditions.TypeReleaseFailed),
+			updater.EnsureDeployedRelease(nil),
 		)
 		// NOTE: If obj has the uninstall finalizer, that means a release WAS deployed at some point
 		//   in the past, but we don't know if it still is because we don't have an actionClient to check.
@@ -460,13 +458,21 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 
 	vals, err := r.getValues(obj)
 	if err != nil {
-		u.UpdateStatus(updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionTrue, conditions.ReasonErrorGettingValues, err)))
+		u.UpdateStatus(
+			updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionTrue, conditions.ReasonErrorGettingValues, err)),
+			updater.EnsureConditionUnknown(conditions.TypeReleaseFailed),
+		)
 		return ctrl.Result{}, err
 	}
 
 	rel, state, err := r.getReleaseState(actionClient, obj, vals.AsMap())
 	if err != nil {
-		u.UpdateStatus(updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionTrue, conditions.ReasonErrorGettingReleaseState, err)))
+		u.UpdateStatus(
+			updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionTrue, conditions.ReasonErrorGettingReleaseState, err)),
+			updater.EnsureConditionUnknown(conditions.TypeReleaseFailed),
+			updater.EnsureConditionUnknown(conditions.TypeDeployed),
+			updater.EnsureDeployedRelease(nil),
+		)
 		return ctrl.Result{}, err
 	}
 	u.UpdateStatus(updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionFalse, "", "")))
