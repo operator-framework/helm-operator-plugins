@@ -24,7 +24,6 @@ import (
 	"helm.sh/helm/v3/pkg/releaseutil"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -37,10 +36,9 @@ import (
 	"github.com/joelanford/helm-operator/pkg/internal/sdk/predicate"
 )
 
-func NewDependentResourceWatcher(c controller.Controller, rm meta.RESTMapper, owner runtime.Object) hook.PostHook {
+func NewDependentResourceWatcher(c controller.Controller, rm meta.RESTMapper) hook.PostHook {
 	return &dependentResourceWatcher{
 		controller: c,
-		owner:      owner,
 		restMapper: rm,
 		m:          sync.Mutex{},
 		watches:    make(map[schema.GroupVersionKind]struct{}),
@@ -49,14 +47,13 @@ func NewDependentResourceWatcher(c controller.Controller, rm meta.RESTMapper, ow
 
 type dependentResourceWatcher struct {
 	controller controller.Controller
-	owner      runtime.Object
 	restMapper meta.RESTMapper
 
 	m       sync.Mutex
 	watches map[schema.GroupVersionKind]struct{}
 }
 
-func (d *dependentResourceWatcher) Exec(_ *unstructured.Unstructured, rel release.Release, log logr.Logger) error {
+func (d *dependentResourceWatcher) Exec(owner *unstructured.Unstructured, rel release.Release, log logr.Logger) error {
 	// using predefined functions for filtering events
 	dependentPredicate := predicate.DependentPredicateFuncs()
 
@@ -75,17 +72,22 @@ func (d *dependentResourceWatcher) Exec(_ *unstructured.Unstructured, rel releas
 			continue
 		}
 
-		useOwnerRef, err := controllerutil.SupportsOwnerReference(d.restMapper, d.owner, &obj)
+		useOwnerRef, err := controllerutil.SupportsOwnerReference(d.restMapper, owner, &obj)
 		if err != nil {
 			return err
 		}
 
 		if useOwnerRef {
-			if err := d.controller.Watch(&source.Kind{Type: &obj}, &handler.EnqueueRequestForOwner{OwnerType: d.owner}, dependentPredicate); err != nil {
+			if err := d.controller.Watch(&source.Kind{Type: &obj}, &handler.EnqueueRequestForOwner{
+				OwnerType:    owner,
+				IsController: true,
+			}, dependentPredicate); err != nil {
 				return err
 			}
 		} else {
-			if err := d.controller.Watch(&source.Kind{Type: &obj}, &sdkhandler.EnqueueRequestForAnnotation{Type: d.owner.GetObjectKind().GroupVersionKind().GroupKind().String()}, dependentPredicate); err != nil {
+			if err := d.controller.Watch(&source.Kind{Type: &obj}, &sdkhandler.EnqueueRequestForAnnotation{
+				Type: owner.GetObjectKind().GroupVersionKind().GroupKind().String(),
+			}, dependentPredicate); err != nil {
 				return err
 			}
 		}
