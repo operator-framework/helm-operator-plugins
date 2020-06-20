@@ -11,6 +11,7 @@ linters:
     - ineffassign
     - deadcode
     - typecheck
+    - goconst
 
 run:
   deadline: 5m

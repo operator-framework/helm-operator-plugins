@@ -47,6 +47,8 @@ import (
 	"github.com/joelanford/helm-operator/pkg/internal/testutil"
 )
 
+const mockTestDesc = "Test Description"
+
 var _ = Describe("ActionClient", func() {
 	var (
 		rm meta.RESTMapper
@@ -134,7 +136,7 @@ var _ = Describe("ActionClient", func() {
 						err error
 					)
 					By("installing the release", func() {
-						opt := func(i *action.Install) error { i.Description = "Test Description"; return nil }
+						opt := func(i *action.Install) error { i.Description = mockTestDesc; return nil }
 						rel, err = ac.Install(obj.GetName(), obj.GetNamespace(), &chrt, vals, opt)
 						Expect(err).To(BeNil())
 						Expect(rel).NotTo(BeNil())
@@ -182,7 +184,7 @@ var _ = Describe("ActionClient", func() {
 			)
 			BeforeEach(func() {
 				var err error
-				opt := func(i *action.Install) error { i.Description = "Test Description"; return nil }
+				opt := func(i *action.Install) error { i.Description = mockTestDesc; return nil }
 				installedRelease, err = ac.Install(obj.GetName(), obj.GetNamespace(), &chrt, vals, opt)
 				Expect(err).To(BeNil())
 				Expect(installedRelease).NotTo(BeNil())
@@ -246,7 +248,7 @@ var _ = Describe("ActionClient", func() {
 						err error
 					)
 					By("upgrading the release", func() {
-						opt := func(u *action.Upgrade) error { u.Description = "Test Description"; return nil }
+						opt := func(u *action.Upgrade) error { u.Description = mockTestDesc; return nil }
 						rel, err = ac.Upgrade(obj.GetName(), obj.GetNamespace(), &chrt, vals, opt)
 						Expect(err).To(BeNil())
 						Expect(rel).NotTo(BeNil())
@@ -281,7 +283,7 @@ var _ = Describe("ActionClient", func() {
 						err  error
 					)
 					By("uninstalling the release", func() {
-						opt := func(i *action.Uninstall) error { i.Description = "Test Description"; return nil }
+						opt := func(i *action.Uninstall) error { i.Description = mockTestDesc; return nil }
 						resp, err = ac.Uninstall(obj.GetName(), opt)
 						Expect(err).To(BeNil())
 						Expect(resp).NotTo(BeNil())
@@ -568,7 +570,7 @@ func verifyRelease(cl client.Client, ns string, rel *release.Release) {
 	})
 
 	By("verifying release status description option was honored", func() {
-		Expect(rel.Info.Description).To(Equal("Test Description"))
+		Expect(rel.Info.Description).To(Equal(mockTestDesc))
 	})
 
 	By("verifying the release resources exist", func() {
@@ -592,7 +594,7 @@ func verifyNoRelease(cl client.Client, ns string, name string, rel *release.Rele
 	})
 	By("verifying the uninstall description option was honored", func() {
 		if rel != nil {
-			Expect(rel.Info.Description).To(Equal("Test Description"))
+			Expect(rel.Info.Description).To(Equal(mockTestDesc))
 		}
 	})
 	By("verifying all release resources are removed", func() {
