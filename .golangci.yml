@@ -1,16 +1,38 @@
 linters:
   disable-all: true
   enable:
-    - govet
-    - errcheck
-    - staticcheck
-    - unused
-    - gosimple
-    - structcheck
-    - varcheck
-    - ineffassign
     - deadcode
+    # requires fixes
+    # - dupl
+    - errcheck
+    # requires fixes
+    # - goconst
+    - gocyclo
+    # requires fixes
+    # - gofmt
+    - goimports
+    - golint
+    # requires fixes
+    # gosec
+    - gosimple
+    - govet
+    - ineffassign
+    # requires fixes
+    # - interfacer
+    # - lll
+    - maligned
+    - misspell
+    - nakedret
+    - prealloc
+    # requires fixes
+    # - scopelint
+    - staticcheck
+    - structcheck
     - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - varcheck
 
 run:
   deadline: 5m

@@ -56,6 +56,7 @@ import (
 const uninstallFinalizer = "uninstall-helm-release"
 
 // Reconciler reconciles a Helm object
+// nolint:maligned
 type Reconciler struct {
 	client             client.Client
 	actionClientGetter helmclient.ActionClientGetter
