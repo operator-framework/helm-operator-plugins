@@ -27,6 +27,8 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+// Watch represents the feature to observer GKV's
+// Each entry in the watches.yaml file is an Watch
 type Watch struct {
 	schema.GroupVersionKind `json:",inline"`
 	ChartPath               string `json:"chart"`

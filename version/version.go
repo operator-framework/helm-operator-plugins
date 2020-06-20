@@ -17,5 +17,6 @@ limitations under the License.
 package version
 
 const (
+	// Version of the helm-operator binary/base image
 	Version = "0.0.0+git"
 )

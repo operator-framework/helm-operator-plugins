@@ -14,6 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package hook contains pre and post hooks are just custom go functions that can be provided
+// when the reconciler is created in main.go. Note that chart hooks are handled in the helm libraries by
+// the action.Install, action.Upgrade, and action.Uninstall actions.
 package hook
 
 import (
@@ -23,22 +26,28 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+// PreHook just before performing any actions (e.g. install, upgrade, uninstall, or reconciliation).
 type PreHook interface {
 	Exec(*unstructured.Unstructured, chartutil.Values, logr.Logger) error
 }
 
+// PreHookFunc used to set a reconciler PreHook
 type PreHookFunc func(*unstructured.Unstructured, chartutil.Values, logr.Logger) error
 
+// Exec used to executed a reconciler PreHook
 func (f PreHookFunc) Exec(obj *unstructured.Unstructured, vals chartutil.Values, log logr.Logger) error {
 	return f(obj, vals, log)
 }
 
+// PostHook just after performing any actions (e.g. install, upgrade, uninstall, or reconciliation).
 type PostHook interface {
 	Exec(*unstructured.Unstructured, release.Release, logr.Logger) error
 }
 
+// PostHookFunc used to set a reconciler PostHook
 type PostHookFunc func(*unstructured.Unstructured, release.Release, logr.Logger) error
 
+// Exec used to executed a reconciler PostHook
 func (f PostHookFunc) Exec(obj *unstructured.Unstructured, rel release.Release, log logr.Logger) error {
 	return f(obj, rel, log)
 }

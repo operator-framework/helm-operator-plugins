@@ -46,16 +46,21 @@ import (
 	"github.com/joelanford/helm-operator/pkg/internal/sdk/handler"
 )
 
+// ActionClientGetter has a method to return a ActionInterface.
+// A group's client should implement this interface.
 type ActionClientGetter interface {
 	ActionClientFor(obj Object) (ActionInterface, error)
 }
 
+// ActionClientGetterFunc implements ActionInterface
 type ActionClientGetterFunc func(obj Object) (ActionInterface, error)
 
+// ActionClientFor returns the ActionInterface
 func (acgf ActionClientGetterFunc) ActionClientFor(obj Object) (ActionInterface, error) {
 	return acgf(obj)
 }
 
+// ActionInterface has methods to work with Action clients
 type ActionInterface interface {
 	Get(name string, opts ...GetOption) (*release.Release, error)
 	Install(name, namespace string, chrt *chart.Chart, vals map[string]interface{}, opts ...InstallOption) (*release.Release, error)
@@ -64,11 +69,16 @@ type ActionInterface interface {
 	Reconcile(rel *release.Release) error
 }
 
+// GetOption define the func that will be used for the get actions
 type GetOption func(*action.Get) error
+// InstallOption define the func that will be used for the Install actions
 type InstallOption func(*action.Install) error
+// UpgradeOption define the func that will be used for the Upgrade actions
 type UpgradeOption func(*action.Upgrade) error
+// UninstallOption define the func that will be used for the Uninstall actions
 type UninstallOption func(*action.Uninstall) error
 
+// NewActionClientGetter initialize a new ActionClientGetter
 func NewActionClientGetter(acg ActionConfigGetter) ActionClientGetter {
 	return &actionClientGetter{acg}
 }
@@ -79,6 +89,7 @@ type actionClientGetter struct {
 
 var _ ActionClientGetter = &actionClientGetter{}
 
+// ActionClientFor return an actionClient for an CR/release
 func (hcg *actionClientGetter) ActionClientFor(obj Object) (ActionInterface, error) {
 	actionConfig, err := hcg.acg.ActionConfigFor(obj)
 	if err != nil {
@@ -99,6 +110,7 @@ type actionClient struct {
 
 var _ ActionInterface = &actionClient{}
 
+// Get will perform the action to GET a Release/CR with the name and options informed
 func (c *actionClient) Get(name string, opts ...GetOption) (*release.Release, error) {
 	get := action.NewGet(c.conf)
 	for _, o := range opts {
@@ -109,6 +121,7 @@ func (c *actionClient) Get(name string, opts ...GetOption) (*release.Release, er
 	return get.Run(name)
 }
 
+// Install will perform the actions required to install a release/CR
 func (c *actionClient) Install(name, namespace string, chrt *chart.Chart, vals map[string]interface{}, opts ...InstallOption) (*release.Release, error) {
 	install := action.NewInstall(c.conf)
 	install.PostRenderer = c.postRenderer
@@ -147,6 +160,7 @@ func (c *actionClient) Install(name, namespace string, chrt *chart.Chart, vals m
 	return rel, nil
 }
 
+// Upgrade will perform the actions required to Upgrade a release/CR
 func (c *actionClient) Upgrade(name, namespace string, chrt *chart.Chart, vals map[string]interface{}, opts ...UpgradeOption) (*release.Release, error) {
 	upgrade := action.NewUpgrade(c.conf)
 	upgrade.PostRenderer = c.postRenderer
@@ -177,6 +191,7 @@ func (c *actionClient) Upgrade(name, namespace string, chrt *chart.Chart, vals m
 	return rel, nil
 }
 
+// Uninstall will perform the actions required to Uninstall a release/CR
 func (c *actionClient) Uninstall(name string, opts ...UninstallOption) (*release.UninstallReleaseResponse, error) {
 	uninstall := action.NewUninstall(c.conf)
 	for _, o := range opts {
@@ -187,6 +202,7 @@ func (c *actionClient) Uninstall(name string, opts ...UninstallOption) (*release
 	return uninstall.Run(name)
 }
 
+// Reconcile will perform the actions required to Reconcile a release/CR
 func (c *actionClient) Reconcile(rel *release.Release) error {
 	infos, err := c.conf.KubeClient.Build(bytes.NewBufferString(rel.Manifest), false)
 	if err != nil {
@@ -304,6 +320,7 @@ type ownerPostRenderer struct {
 	owner      Object
 }
 
+// Run will perform the actions required to be done after the reconcile such as set the owner reference
 func (pr *ownerPostRenderer) Run(in *bytes.Buffer) (*bytes.Buffer, error) {
 	resourceList, err := pr.kubeClient.Build(in, false)
 	if err != nil {

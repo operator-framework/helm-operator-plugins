@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package fake is specific to the helm operator to fake the actionClient actions in the tests
 package fake
 
 import (
@@ -25,6 +26,7 @@ import (
 	"github.com/joelanford/helm-operator/pkg/client"
 )
 
+// NewActionClientGetter will return an fakeActionClientGetter
 func NewActionClientGetter(actionClient client.ActionInterface, orErr error) client.ActionClientGetter {
 	return &fakeActionClientGetter{
 		actionClient: actionClient,
@@ -39,6 +41,7 @@ type fakeActionClientGetter struct {
 
 var _ client.ActionClientGetter = &fakeActionClientGetter{}
 
+// ActionClientFor will configure a fake client for the release/CR
 func (hcg *fakeActionClientGetter) ActionClientFor(obj client.Object) (client.ActionInterface, error) {
 	if hcg.returnErr != nil {
 		return nil, hcg.returnErr
@@ -46,6 +49,7 @@ func (hcg *fakeActionClientGetter) ActionClientFor(obj client.Object) (client.Ac
 	return hcg.actionClient, nil
 }
 
+// ActionClient implement actionClient methods
 type ActionClient struct {
 	Gets       []GetCall
 	Installs   []InstallCall
@@ -60,6 +64,7 @@ type ActionClient struct {
 	HandleReconcile func() error
 }
 
+// NewActionClient return a new ActionClient with the fake methods
 func NewActionClient() ActionClient {
 	relFunc := func(err error) func() (*release.Release, error) {
 		return func() (*release.Release, error) { return nil, err }
@@ -87,11 +92,13 @@ func NewActionClient() ActionClient {
 
 var _ client.ActionInterface = &ActionClient{}
 
+// GetCall fake a get action
 type GetCall struct {
 	Name string
 	Opts []client.GetOption
 }
 
+// InstallCall fake an Install action
 type InstallCall struct {
 	Name      string
 	Namespace string
@@ -100,6 +107,7 @@ type InstallCall struct {
 	Opts      []client.InstallOption
 }
 
+// UpgradeCall fake an Upgrade action
 type UpgradeCall struct {
 	Name      string
 	Namespace string
@@ -108,35 +116,42 @@ type UpgradeCall struct {
 	Opts      []client.UpgradeOption
 }
 
+// UninstallCall fake an Uninstall action
 type UninstallCall struct {
 	Name string
 	Opts []client.UninstallOption
 }
 
+// ReconcileCall fake an reconcile action
 type ReconcileCall struct {
 	Release *release.Release
 }
 
+// Get will simulate the Get func of the ActionClient
 func (c *ActionClient) Get(name string, opts ...client.GetOption) (*release.Release, error) {
 	c.Gets = append(c.Gets, GetCall{name, opts})
 	return c.HandleGet()
 }
 
+// Install will simulate the Get func of the ActionClient
 func (c *ActionClient) Install(name, namespace string, chrt *chart.Chart, vals map[string]interface{}, opts ...client.InstallOption) (*release.Release, error) {
 	c.Installs = append(c.Installs, InstallCall{name, namespace, chrt, vals, opts})
 	return c.HandleInstall()
 }
 
+// Upgrade will simulate the Upgrade func of the ActionClient
 func (c *ActionClient) Upgrade(name, namespace string, chrt *chart.Chart, vals map[string]interface{}, opts ...client.UpgradeOption) (*release.Release, error) {
 	c.Upgrades = append(c.Upgrades, UpgradeCall{name, namespace, chrt, vals, opts})
 	return c.HandleUpgrade()
 }
 
+// Uninstall will simulate the Uninstall func of the ActionClient
 func (c *ActionClient) Uninstall(name string, opts ...client.UninstallOption) (*release.UninstallReleaseResponse, error) {
 	c.Uninstalls = append(c.Uninstalls, UninstallCall{name, opts})
 	return c.HandleUninstall()
 }
 
+// Reconcile will simulate the Reconcile func of the ActionClient
 func (c *ActionClient) Reconcile(rel *release.Release) error {
 	c.Reconciles = append(c.Reconciles, ReconcileCall{rel})
 	return c.HandleReconcile()

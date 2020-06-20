@@ -24,6 +24,19 @@ import (
 	"github.com/joelanford/helm-operator/pkg/annotation"
 )
 
+const (
+	defaultDomain                    = "helm.operator-sdk"
+	defaultInstallDisableHooksName   = defaultDomain + "/install-disable-hooks"
+	defaultUpgradeDisableHooksName   = defaultDomain + "/upgrade-disable-hooks"
+	defaultUninstallDisableHooksName = defaultDomain + "/uninstall-disable-hooks"
+
+	defaultUpgradeForceName = defaultDomain + "/upgrade-force"
+
+	defaultInstallDescriptionName   = defaultDomain + "/install-description"
+	defaultUpgradeDescriptionName   = defaultDomain + "/upgrade-description"
+	defaultUninstallDescriptionName = defaultDomain + "/uninstall-description"
+)
+
 var _ = Describe("Annotation", func() {
 	Describe("Install", func() {
 		var install action.Install
@@ -40,7 +53,7 @@ var _ = Describe("Annotation", func() {
 			})
 
 			It("should return a default name", func() {
-				Expect(a.Name()).To(Equal(annotation.DefaultInstallDisableHooksName))
+				Expect(a.Name()).To(Equal(defaultInstallDisableHooksName))
 			})
 
 			It("should return a custom name", func() {
@@ -75,7 +88,7 @@ var _ = Describe("Annotation", func() {
 			})
 
 			It("should return a default name", func() {
-				Expect(a.Name()).To(Equal(annotation.DefaultInstallDescriptionName))
+				Expect(a.Name()).To(Equal(defaultInstallDescriptionName))
 			})
 
 			It("should return a custom name", func() {
@@ -106,7 +119,7 @@ var _ = Describe("Annotation", func() {
 			})
 
 			It("should return a default name", func() {
-				Expect(a.Name()).To(Equal(annotation.DefaultUpgradeDisableHooksName))
+				Expect(a.Name()).To(Equal(defaultUpgradeDisableHooksName))
 			})
 
 			It("should return a custom name", func() {
@@ -141,7 +154,7 @@ var _ = Describe("Annotation", func() {
 			})
 
 			It("should return a default name", func() {
-				Expect(a.Name()).To(Equal(annotation.DefaultUpgradeForceName))
+				Expect(a.Name()).To(Equal(defaultUpgradeForceName))
 			})
 
 			It("should return a custom name", func() {
@@ -176,7 +189,7 @@ var _ = Describe("Annotation", func() {
 			})
 
 			It("should return a default name", func() {
-				Expect(a.Name()).To(Equal(annotation.DefaultUpgradeDescriptionName))
+				Expect(a.Name()).To(Equal(defaultUpgradeDescriptionName))
 			})
 
 			It("should return a custom name", func() {
@@ -207,7 +220,7 @@ var _ = Describe("Annotation", func() {
 			})
 
 			It("should return a default name", func() {
-				Expect(a.Name()).To(Equal(annotation.DefaultUninstallDisableHooksName))
+				Expect(a.Name()).To(Equal(defaultUninstallDisableHooksName))
 			})
 
 			It("should return a custom name", func() {
@@ -242,7 +255,7 @@ var _ = Describe("Annotation", func() {
 			})
 
 			It("should return a default name", func() {
-				Expect(a.Name()).To(Equal(annotation.DefaultUninstallDescriptionName))
+				Expect(a.Name()).To(Equal(defaultUninstallDescriptionName))
 			})
 
 			It("should return a custom name", func() {

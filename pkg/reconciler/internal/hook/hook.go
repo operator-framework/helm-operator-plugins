@@ -36,6 +36,7 @@ import (
 	"github.com/joelanford/helm-operator/pkg/internal/sdk/predicate"
 )
 
+// NewDependentResourceWatcher setup as a post hook to manage the watches for the resources
 func NewDependentResourceWatcher(c controller.Controller, rm meta.RESTMapper) hook.PostHook {
 	return &dependentResourceWatcher{
 		controller: c,

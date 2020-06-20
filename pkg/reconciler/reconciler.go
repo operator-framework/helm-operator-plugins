@@ -237,7 +237,7 @@ func WithOverrideValues(overrides map[string]string) Option {
 	}
 }
 
-// WithDependentWatchesEnabled is an Option that configures whether the
+// SkipDependentWatches is an Option that configures whether the
 // Reconciler will register watches for dependent objects in releases and
 // trigger reconciliations when they change.
 //
@@ -343,6 +343,9 @@ func WithUninstallAnnotations(as ...annotation.Uninstall) Option {
 // WithPreHook is an Option that configures the reconciler to run the given
 // PreHook just before performing any actions (e.g. install, upgrade, uninstall,
 // or reconciliation).
+// --
+// The default helm-operator has no custom pre-hooks. However users using this repo as a go library may want to run
+// some custom logic prior to reconciliation that is specific to their operator use case.
 func WithPreHook(h hook.PreHook) Option {
 	return func(r *Reconciler) error {
 		r.preHooks = append(r.preHooks, h)
@@ -352,6 +355,10 @@ func WithPreHook(h hook.PreHook) Option {
 
 // WithPostHook is an Option that configures the reconciler to run the given
 // PostHook just after performing any non-uninstall release actions.
+// --
+// The default helm-operator has no custom post-hooks
+// However users using this repo as a go library may want to run some custom logic after reconciliation
+// that is specific to their operator use case.
 func WithPostHook(h hook.PostHook) Option {
 	return func(r *Reconciler) error {
 		r.postHooks = append(r.postHooks, h)
@@ -361,6 +368,15 @@ func WithPostHook(h hook.PostHook) Option {
 
 // WithValueMapper is an Option that configures a function that maps values
 // from a custom resource spec to the values passed to Helm
+// --
+// Note that the default helm-operator uses the default value mapper, which is a no-op mapper
+// that returns the input CR spec values directly. However users using this repo as a go library
+// may want to have a custom mapping that maps the CR spec to a completely different set of values
+// that their helm charts know about.
+//
+// A common use case that people have asked for is to take one CR value (e.g. dbUser)
+// and set multiple chart values from it (e.g. mysql.dbUser and webserver.dbUser).
+// That way the CR API presented to the user it nice and tidy.
 func WithValueMapper(m values.Mapper) Option {
 	return func(r *Reconciler) error {
 		r.valueMapper = m
@@ -753,6 +769,9 @@ func (r *Reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) err
 		return err
 	}
 
+	// The Secret here is created because Helm will create a release secret. So, we want to watch that and reconcile
+	// if it is deleted or changed. Sometimes that can cause an unrecoverable error, but by watching it,
+	// we can bubble that problem up to the CR status.
 	secret := &corev1.Secret{}
 	secret.SetGroupVersionKind(schema.GroupVersionKind{
 		Group:   "",

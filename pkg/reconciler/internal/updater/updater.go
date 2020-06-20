@@ -30,29 +30,36 @@ import (
 	"github.com/joelanford/helm-operator/pkg/internal/sdk/status"
 )
 
+// New returns new Updater for the client
 func New(client client.Client) Updater {
 	return Updater{
 		client: client,
 	}
 }
 
+// Updater represents the update release needs
 type Updater struct {
 	client            client.Client
 	updateFuncs       []UpdateFunc
 	updateStatusFuncs []UpdateStatusFunc
 }
 
+// UpdateFunc implements the UpdateFunc for an release/CR
 type UpdateFunc func(*unstructured.Unstructured) bool
+// UpdateStatusFunc implements the UpdateStatusFunc for an helmAppStatus
 type UpdateStatusFunc func(*helmAppStatus) bool
 
+// Update add UpdateFuncs to Updater
 func (u *Updater) Update(fs ...UpdateFunc) {
 	u.updateFuncs = append(u.updateFuncs, fs...)
 }
 
+// UpdateStatus add updateStatusFuncs to UpdateStatusFunc
 func (u *Updater) UpdateStatus(fs ...UpdateStatusFunc) {
 	u.updateStatusFuncs = append(u.updateStatusFuncs, fs...)
 }
 
+// Apply update functions to the release/CR
 func (u *Updater) Apply(ctx context.Context, obj *unstructured.Unstructured) error {
 	backoff := retry.DefaultRetry
 
@@ -94,6 +101,7 @@ func (u *Updater) Apply(ctx context.Context, obj *unstructured.Unstructured) err
 	return nil
 }
 
+// EnsureFinalizer ensure that the release/CR will have the finalizer
 func EnsureFinalizer(finalizer string) UpdateFunc {
 	return func(obj *unstructured.Unstructured) bool {
 		if controllerutil.ContainsFinalizer(obj, finalizer) {
@@ -104,6 +112,7 @@ func EnsureFinalizer(finalizer string) UpdateFunc {
 	}
 }
 
+// RemoveFinalizer removes the finalizer informed from the release/CR
 func RemoveFinalizer(finalizer string) UpdateFunc {
 	return func(obj *unstructured.Unstructured) bool {
 		if !controllerutil.ContainsFinalizer(obj, finalizer) {
@@ -114,12 +123,14 @@ func RemoveFinalizer(finalizer string) UpdateFunc {
 	}
 }
 
+// EnsureCondition ensure status conditions updates for the release/CR
 func EnsureCondition(condition status.Condition) UpdateStatusFunc {
 	return func(status *helmAppStatus) bool {
 		return status.Conditions.SetCondition(condition)
 	}
 }
 
+// EnsureConditionUnknown ensure that Unknown status will be set in the release/CR
 func EnsureConditionUnknown(t status.ConditionType) UpdateStatusFunc {
 	return func(s *helmAppStatus) bool {
 		return s.Conditions.SetCondition(status.Condition{
@@ -129,6 +140,7 @@ func EnsureConditionUnknown(t status.ConditionType) UpdateStatusFunc {
 	}
 }
 
+// EnsureDeployedRelease ensure that deploy status will be set in the release/CR
 func EnsureDeployedRelease(rel *release.Release) UpdateStatusFunc {
 	return func(status *helmAppStatus) bool {
 		newRel := helmAppReleaseFor(rel)
@@ -144,6 +156,7 @@ func EnsureDeployedRelease(rel *release.Release) UpdateStatusFunc {
 	}
 }
 
+// RemoveDeployedRelease will call UpdateStatusFunc without a release
 func RemoveDeployedRelease() UpdateStatusFunc {
 	return EnsureDeployedRelease(nil)
 }

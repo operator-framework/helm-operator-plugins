@@ -27,9 +27,13 @@ import (
 )
 
 const (
+	// WatchNamespaceEnvVar define the ENV VAR which is used to define the operator scope
 	WatchNamespaceEnvVar = "WATCH_NAMESPACE"
 )
 
+
+// ConfigureWatchNamespaces will configure the operator scope with the WATCH_NAMESPACE values
+// More info: https://master.sdk.operatorframework.io/docs/golang/operator-scope/
 func ConfigureWatchNamespaces(options *manager.Options, log logr.Logger) {
 	namespaces := lookupEnv()
 	if len(namespaces) != 0 {

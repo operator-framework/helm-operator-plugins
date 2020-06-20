@@ -23,6 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
+// NewDelegatingClientFunc return a manager.NewClientFunc to be used in the manager
 func NewDelegatingClientFunc() manager.NewClientFunc {
 	return func(cache cache.Cache, config *rest.Config, options client.Options) (client.Client, error) {
 		c, err := client.New(config, options)

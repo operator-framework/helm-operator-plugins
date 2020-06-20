@@ -27,6 +27,7 @@ import (
 
 var log = logf.Log.WithName("predicate")
 
+// GenerationChangedPredicate implements a default update predicate function on Generation change.
 type GenerationChangedPredicate = crtpredicate.GenerationChangedPredicate
 
 // DependentPredicateFuncs returns functions defined for filtering events

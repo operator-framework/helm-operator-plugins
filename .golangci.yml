@@ -1,3 +1,6 @@
+issues:
+  # don't skip warning about doc comments
+  exclude-use-default: false
 linters:
   disable-all: true
   enable:
@@ -11,6 +14,10 @@ linters:
     - ineffassign
     - deadcode
     - typecheck
-
+    - golint
 run:
   deadline: 5m
+  # the following dir was just added for we are to do the test. However, this content will be part of sdk lib
+  # so shows not really valid check/improve it here.
+  skip-dirs:
+    - pkg/internal/sdk/*

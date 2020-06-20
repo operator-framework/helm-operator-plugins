@@ -47,10 +47,12 @@ type restClientGetter struct {
 	cachedDiscoveryClient discovery.CachedDiscoveryInterface
 }
 
+// ToRESTConfig returns a *rest.Config for the restClientGetter
 func (c *restClientGetter) ToRESTConfig() (*rest.Config, error) {
 	return c.restConfig, nil
 }
 
+// ToDiscoveryClient returns a discovery.CachedDiscoveryInterface for the restClientGetter
 func (c *restClientGetter) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
 	var (
 		dc  discovery.DiscoveryInterface
@@ -69,10 +71,12 @@ func (c *restClientGetter) ToDiscoveryClient() (discovery.CachedDiscoveryInterfa
 	return c.cachedDiscoveryClient, nil
 }
 
+// ToRESTMapper returns a meta.RESTMapper for the restClientGetter
 func (c *restClientGetter) ToRESTMapper() (meta.RESTMapper, error) {
 	return c.restMapper, nil
 }
 
+// ToRawKubeConfigLoader returns a clientcmd.ClientConfig for the restClientGetter
 func (c *restClientGetter) ToRawKubeConfigLoader() clientcmd.ClientConfig {
 	return c.namespaceConfig
 }
@@ -83,18 +87,23 @@ type namespaceClientConfig struct {
 	namespace string
 }
 
+// RawConfig returns a clientcmdapi.Config for the namespaceClientConfig
 func (c namespaceClientConfig) RawConfig() (clientcmdapi.Config, error) {
 	return clientcmdapi.Config{}, nil
 }
 
+// RawConfig returns a *rest.Config for the namespaceClientConfig
 func (c namespaceClientConfig) ClientConfig() (*rest.Config, error) {
 	return nil, nil
 }
-
+// todo: has no need to return bool, error, nil here.
+// Namespace return the namespace used to configure the client for the CR
 func (c namespaceClientConfig) Namespace() (string, bool, error) {
 	return c.namespace, false, nil
 }
 
+// todo: why we do not delete it?
+// ConfigAccess return nil
 func (c namespaceClientConfig) ConfigAccess() clientcmd.ConfigAccess {
 	return nil
 }

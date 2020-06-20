@@ -30,8 +30,11 @@ import (
 )
 
 var (
+	// AddFinalizer accepts a metav1 object and adds the provided finalizer if not present.
 	AddFinalizer      = controllerutil.AddFinalizer
+	// RemoveFinalizer accepts a metav1 object and removes the provided finalizer if present.
 	RemoveFinalizer   = controllerutil.RemoveFinalizer
+	// ContainsFinalizer return true when a Finalizer is found in the CR
 	ContainsFinalizer = func(obj metav1.Object, finalizer string) bool {
 		for _, f := range obj.GetFinalizers() {
 			if f == finalizer {
@@ -42,6 +45,7 @@ var (
 	}
 )
 
+// WaitForDeletion will wait to delete in order to not face timeout
 func WaitForDeletion(ctx context.Context, cl client.Reader, o runtime.Object) error {
 	key, err := client.ObjectKeyFromObject(o)
 	if err != nil {
