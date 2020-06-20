@@ -23,22 +23,28 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+// PreHook //TODO
 type PreHook interface {
 	Exec(*unstructured.Unstructured, chartutil.Values, logr.Logger) error
 }
 
+// PreHookFunc //TODO
 type PreHookFunc func(*unstructured.Unstructured, chartutil.Values, logr.Logger) error
 
+// Exec //TODO
 func (f PreHookFunc) Exec(obj *unstructured.Unstructured, vals chartutil.Values, log logr.Logger) error {
 	return f(obj, vals, log)
 }
 
+// PostHook //TODO
 type PostHook interface {
 	Exec(*unstructured.Unstructured, release.Release, logr.Logger) error
 }
 
+// PostHookFunc //TODO
 type PostHookFunc func(*unstructured.Unstructured, release.Release, logr.Logger) error
 
+// Exec //TODO
 func (f PostHookFunc) Exec(obj *unstructured.Unstructured, rel release.Release, log logr.Logger) error {
 	return f(obj, rel, log)
 }

@@ -30,29 +30,37 @@ import (
 	"github.com/joelanford/helm-operator/pkg/internal/sdk/status"
 )
 
+// New //TODO
 func New(client client.Client) Updater {
 	return Updater{
 		client: client,
 	}
 }
 
+// Updater //TODO
 type Updater struct {
 	client            client.Client
 	updateFuncs       []UpdateFunc
 	updateStatusFuncs []UpdateStatusFunc
 }
 
+// UpdateFunc //TODO
 type UpdateFunc func(*unstructured.Unstructured) bool
+
+// UpdateStatusFunc //TODO
 type UpdateStatusFunc func(*helmAppStatus) bool
 
+// Update //TODO
 func (u *Updater) Update(fs ...UpdateFunc) {
 	u.updateFuncs = append(u.updateFuncs, fs...)
 }
 
+// UpdateStatus //TODO
 func (u *Updater) UpdateStatus(fs ...UpdateStatusFunc) {
 	u.updateStatusFuncs = append(u.updateStatusFuncs, fs...)
 }
 
+// Apply //TODO
 func (u *Updater) Apply(ctx context.Context, obj *unstructured.Unstructured) error {
 	backoff := retry.DefaultRetry
 
@@ -94,6 +102,7 @@ func (u *Updater) Apply(ctx context.Context, obj *unstructured.Unstructured) err
 	return nil
 }
 
+// EnsureFinalizer //TODO
 func EnsureFinalizer(finalizer string) UpdateFunc {
 	return func(obj *unstructured.Unstructured) bool {
 		if controllerutil.ContainsFinalizer(obj, finalizer) {
@@ -104,6 +113,7 @@ func EnsureFinalizer(finalizer string) UpdateFunc {
 	}
 }
 
+// RemoveFinalizer //TODO
 func RemoveFinalizer(finalizer string) UpdateFunc {
 	return func(obj *unstructured.Unstructured) bool {
 		if !controllerutil.ContainsFinalizer(obj, finalizer) {
@@ -114,12 +124,14 @@ func RemoveFinalizer(finalizer string) UpdateFunc {
 	}
 }
 
+// EnsureCondition //TODO
 func EnsureCondition(condition status.Condition) UpdateStatusFunc {
 	return func(status *helmAppStatus) bool {
 		return status.Conditions.SetCondition(condition)
 	}
 }
 
+// EnsureConditionUnknown //TODO
 func EnsureConditionUnknown(t status.ConditionType) UpdateStatusFunc {
 	return func(s *helmAppStatus) bool {
 		return s.Conditions.SetCondition(status.Condition{
@@ -129,6 +141,7 @@ func EnsureConditionUnknown(t status.ConditionType) UpdateStatusFunc {
 	}
 }
 
+// EnsureDeployedRelease //TODO
 func EnsureDeployedRelease(rel *release.Release) UpdateStatusFunc {
 	return func(status *helmAppStatus) bool {
 		newRel := helmAppReleaseFor(rel)
@@ -144,6 +157,7 @@ func EnsureDeployedRelease(rel *release.Release) UpdateStatusFunc {
 	}
 }
 
+// RemoveDeployedRelease //TODO
 func RemoveDeployedRelease() UpdateStatusFunc {
 	return EnsureDeployedRelease(nil)
 }

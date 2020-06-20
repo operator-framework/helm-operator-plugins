@@ -47,10 +47,12 @@ type restClientGetter struct {
 	cachedDiscoveryClient discovery.CachedDiscoveryInterface
 }
 
+// ToRESTConfig //TODO
 func (c *restClientGetter) ToRESTConfig() (*rest.Config, error) {
 	return c.restConfig, nil
 }
 
+// ToDiscoveryClient //TODO
 func (c *restClientGetter) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
 	var (
 		dc  discovery.DiscoveryInterface
@@ -69,10 +71,12 @@ func (c *restClientGetter) ToDiscoveryClient() (discovery.CachedDiscoveryInterfa
 	return c.cachedDiscoveryClient, nil
 }
 
+// ToRESTMapper //TODO
 func (c *restClientGetter) ToRESTMapper() (meta.RESTMapper, error) {
 	return c.restMapper, nil
 }
 
+// ToRawKubeConfigLoader //TODO
 func (c *restClientGetter) ToRawKubeConfigLoader() clientcmd.ClientConfig {
 	return c.namespaceConfig
 }
@@ -83,18 +87,22 @@ type namespaceClientConfig struct {
 	namespace string
 }
 
+// RawConfig //TODO
 func (c namespaceClientConfig) RawConfig() (clientcmdapi.Config, error) {
 	return clientcmdapi.Config{}, nil
 }
 
+// RawConfig //TODO
 func (c namespaceClientConfig) ClientConfig() (*rest.Config, error) {
 	return nil, nil
 }
 
+// Namespace //TODO
 func (c namespaceClientConfig) Namespace() (string, bool, error) {
 	return c.namespace, false, nil
 }
 
+// ConfigAccess //TODO
 func (c namespaceClientConfig) ConfigAccess() clientcmd.ConfigAccess {
 	return nil
 }

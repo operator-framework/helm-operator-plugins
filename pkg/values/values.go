@@ -20,12 +20,15 @@ import (
 	"helm.sh/helm/v3/pkg/chartutil"
 )
 
+// Mapper //TODO
 type Mapper interface {
 	Map(chartutil.Values) chartutil.Values
 }
 
+// MapperFunc //TODO
 type MapperFunc func(chartutil.Values) chartutil.Values
 
+// Map //TODO
 func (m MapperFunc) Map(v chartutil.Values) chartutil.Values {
 	return m(v)
 }

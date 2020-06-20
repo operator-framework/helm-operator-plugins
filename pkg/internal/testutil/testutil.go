@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+// BuildTestCRD //TODO
 func BuildTestCRD(gvk schema.GroupVersionKind) apiextv1.CustomResourceDefinition {
 	trueVal := true
 	singular := strings.ToLower(gvk.Kind)
@@ -65,6 +66,7 @@ func BuildTestCRD(gvk schema.GroupVersionKind) apiextv1.CustomResourceDefinition
 	}
 }
 
+// MustLoadChart will load the chart and panic if it not be possible
 func MustLoadChart(path string) chart.Chart {
 	chrt, err := loader.Load(path)
 	if err != nil {
@@ -73,6 +75,7 @@ func MustLoadChart(path string) chart.Chart {
 	return *chrt
 }
 
+// BuildTestCR will return a CR with unstructured.Unstructured mocked for the GKV informed.
 func BuildTestCR(gvk schema.GroupVersionKind) *unstructured.Unstructured {
 	obj := &unstructured.Unstructured{Object: map[string]interface{}{
 		"spec": map[string]interface{}{"replicas": 2},

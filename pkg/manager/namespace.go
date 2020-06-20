@@ -27,9 +27,11 @@ import (
 )
 
 const (
+	// WatchNamespaceEnvVar //TODO
 	WatchNamespaceEnvVar = "WATCH_NAMESPACE"
 )
 
+// ConfigureWatchNamespaces //TODO
 func ConfigureWatchNamespaces(options *manager.Options, log logr.Logger) {
 	namespaces := lookupEnv()
 	if len(namespaces) != 0 {

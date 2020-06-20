@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+// Watch  //TODO
 type Watch struct {
 	schema.GroupVersionKind `json:",inline"`
 	ChartPath               string `json:"chart"`

@@ -27,10 +27,12 @@ import (
 	"github.com/joelanford/helm-operator/pkg/values"
 )
 
+// Values //TODO
 type Values struct {
 	m map[string]interface{}
 }
 
+// FromUnstructured //TODO
 func FromUnstructured(obj *unstructured.Unstructured) (*Values, error) {
 	if obj == nil || obj.Object == nil {
 		return nil, fmt.Errorf("nil object")
@@ -46,10 +48,12 @@ func FromUnstructured(obj *unstructured.Unstructured) (*Values, error) {
 	return New(specMap), nil
 }
 
+// New //TODO
 func New(m map[string]interface{}) *Values {
 	return &Values{m: m}
 }
 
+// Map //TODO
 func (v *Values) Map() map[string]interface{} {
 	if v == nil {
 		return nil
@@ -57,6 +61,7 @@ func (v *Values) Map() map[string]interface{} {
 	return v.m
 }
 
+// ApplyOverrides //TODO
 func (v *Values) ApplyOverrides(in map[string]string) error {
 	for inK, inV := range in {
 		val := fmt.Sprintf("%s=%s", inK, os.ExpandEnv(inV))
@@ -67,4 +72,5 @@ func (v *Values) ApplyOverrides(in map[string]string) error {
 	return nil
 }
 
+// DefaultMapper //TODO
 var DefaultMapper = values.MapperFunc(func(v chartutil.Values) chartutil.Values { return v })

@@ -25,36 +25,54 @@ import (
 )
 
 const (
-	TypeInitialized    = "Initialized"
-	TypeDeployed       = "Deployed"
-	TypeReleaseFailed  = "ReleaseFailed"
+	// TypeInitialized //TODO
+	TypeInitialized = "Initialized"
+	// TypeDeployed //TODO
+	TypeDeployed = "Deployed"
+	// TypeReleaseFailed //TODO
+	TypeReleaseFailed = "ReleaseFailed"
+	// TypeIrreconcilable //TODO
 	TypeIrreconcilable = "Irreconcilable"
 
-	ReasonInstallSuccessful   = status.ConditionReason("InstallSuccessful")
-	ReasonUpgradeSuccessful   = status.ConditionReason("UpgradeSuccessful")
+	// ReasonInstallSuccessful //TODO
+	ReasonInstallSuccessful = status.ConditionReason("InstallSuccessful")
+	// ReasonUpgradeSuccessful //TODO
+	ReasonUpgradeSuccessful = status.ConditionReason("UpgradeSuccessful")
+	// ReasonUninstallSuccessful //TODO
 	ReasonUninstallSuccessful = status.ConditionReason("UninstallSuccessful")
 
-	ReasonErrorGettingClient       = status.ConditionReason("ErrorGettingClient")
-	ReasonErrorGettingValues       = status.ConditionReason("ErrorGettingValues")
+	// ReasonErrorGettingClient //TODO
+	ReasonErrorGettingClient = status.ConditionReason("ErrorGettingClient")
+	// ReasonErrorGettingValues //TODO
+	ReasonErrorGettingValues = status.ConditionReason("ErrorGettingValues")
+	// ReasonErrorGettingReleaseState //TODO
 	ReasonErrorGettingReleaseState = status.ConditionReason("ErrorGettingReleaseState")
-	ReasonInstallError             = status.ConditionReason("InstallError")
-	ReasonUpgradeError             = status.ConditionReason("UpgradeError")
-	ReasonReconcileError           = status.ConditionReason("ReconcileError")
-	ReasonUninstallError           = status.ConditionReason("UninstallError")
+	// ReasonInstallError //TODO
+	ReasonInstallError = status.ConditionReason("InstallError")
+	// ReasonUpgradeError //TODO
+	ReasonUpgradeError = status.ConditionReason("UpgradeError")
+	// ReasonReconcileError //TODO
+	ReasonReconcileError = status.ConditionReason("ReconcileError")
+	// ReasonUninstallError //TODO
+	ReasonUninstallError = status.ConditionReason("UninstallError")
 )
 
+// Initialized //TODO
 func Initialized(stat corev1.ConditionStatus, reason status.ConditionReason, message interface{}) status.Condition {
 	return newCondition(TypeInitialized, stat, reason, message)
 }
 
+// Deployed //TODO
 func Deployed(stat corev1.ConditionStatus, reason status.ConditionReason, message interface{}) status.Condition {
 	return newCondition(TypeDeployed, stat, reason, message)
 }
 
+// ReleaseFailed //TODO
 func ReleaseFailed(stat corev1.ConditionStatus, reason status.ConditionReason, message interface{}) status.Condition {
 	return newCondition(TypeReleaseFailed, stat, reason, message)
 }
 
+//Irreconcilable //TODO
 func Irreconcilable(stat corev1.ConditionStatus, reason status.ConditionReason, message interface{}) status.Condition {
 	return newCondition(TypeIrreconcilable, stat, reason, message)
 }

@@ -34,15 +34,18 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
+// Object //TODO
 type Object interface {
 	runtime.Object
 	metav1.Object
 }
 
+// ActionConfigGetter //TODO
 type ActionConfigGetter interface {
 	ActionConfigFor(obj Object) (*action.Configuration, error)
 }
 
+// NewActionConfigGetter //TODO
 func NewActionConfigGetter(cfg *rest.Config, rm meta.RESTMapper, log logr.Logger) ActionConfigGetter {
 	return &actionConfigGetter{
 		cfg:        cfg,
@@ -59,6 +62,7 @@ type actionConfigGetter struct {
 	log        logr.Logger
 }
 
+// ActionConfigFor //TODO
 func (acg *actionConfigGetter) ActionConfigFor(obj Object) (*action.Configuration, error) {
 	// Create a RESTClientGetter
 	rcg := newRESTClientGetter(acg.cfg, acg.restMapper, obj.GetNamespace())
@@ -111,11 +115,13 @@ type ownerRefSecretClient struct {
 	refs []metav1.OwnerReference
 }
 
+// Create //TODO
 func (c *ownerRefSecretClient) Create(ctx context.Context, in *corev1.Secret, opts metav1.CreateOptions) (*corev1.Secret, error) {
 	in.OwnerReferences = append(in.OwnerReferences, c.refs...)
 	return c.SecretInterface.Create(ctx, in, opts)
 }
 
+// Update //TODO
 func (c *ownerRefSecretClient) Update(ctx context.Context, in *corev1.Secret, opts metav1.UpdateOptions) (*corev1.Secret, error) {
 	in.OwnerReferences = append(in.OwnerReferences, c.refs...)
 	return c.SecretInterface.Update(ctx, in, opts)

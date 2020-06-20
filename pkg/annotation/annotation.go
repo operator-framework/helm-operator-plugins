@@ -25,26 +25,33 @@ import (
 )
 
 var (
-	DefaultInstallAnnotations   = []Install{InstallDescription{}, InstallDisableHooks{}}
-	DefaultUpgradeAnnotations   = []Upgrade{UpgradeDescription{}, UpgradeDisableHooks{}, UpgradeForce{}}
+	// DefaultInstallAnnotations //TODO
+	DefaultInstallAnnotations = []Install{InstallDescription{}, InstallDisableHooks{}}
+	// DefaultUpgradeAnnotations //TODO
+	DefaultUpgradeAnnotations = []Upgrade{UpgradeDescription{}, UpgradeDisableHooks{}, UpgradeForce{}}
+	// DefaultUninstallAnnotations //TODO
 	DefaultUninstallAnnotations = []Uninstall{UninstallDescription{}, UninstallDisableHooks{}}
 )
 
+// Install //TODO
 type Install interface {
 	Name() string
 	InstallOption(string) helmclient.InstallOption
 }
 
+// Upgrade //TODO
 type Upgrade interface {
 	Name() string
 	UpgradeOption(string) helmclient.UpgradeOption
 }
 
+// Uninstall //TODO
 type Uninstall interface {
 	Name() string
 	UninstallOption(string) helmclient.UninstallOption
 }
 
+// InstallDisableHooks //TODO
 type InstallDisableHooks struct {
 	CustomName string
 }
@@ -52,25 +59,27 @@ type InstallDisableHooks struct {
 var _ Install = &InstallDisableHooks{}
 
 const (
-	DefaultDomain                    = "helm.operator-sdk"
-	DefaultInstallDisableHooksName   = DefaultDomain + "/install-disable-hooks"
-	DefaultUpgradeDisableHooksName   = DefaultDomain + "/upgrade-disable-hooks"
-	DefaultUninstallDisableHooksName = DefaultDomain + "/uninstall-disable-hooks"
+	defaultDomain                    = "helm.operator-sdk"
+	defaultInstallDisableHooksName   = defaultDomain + "/install-disable-hooks"
+	defaultUpgradeDisableHooksName   = defaultDomain + "/upgrade-disable-hooks"
+	defaultUninstallDisableHooksName = defaultDomain + "/uninstall-disable-hooks"
 
-	DefaultUpgradeForceName = DefaultDomain + "/upgrade-force"
+	defaultUpgradeForceName = defaultDomain + "/upgrade-force"
 
-	DefaultInstallDescriptionName   = DefaultDomain + "/install-description"
-	DefaultUpgradeDescriptionName   = DefaultDomain + "/upgrade-description"
-	DefaultUninstallDescriptionName = DefaultDomain + "/uninstall-description"
+	defaultInstallDescriptionName   = defaultDomain + "/install-description"
+	defaultUpgradeDescriptionName   = defaultDomain + "/upgrade-description"
+	defaultUninstallDescriptionName = defaultDomain + "/uninstall-description"
 )
 
+// Name //TODO
 func (i InstallDisableHooks) Name() string {
 	if i.CustomName != "" {
 		return i.CustomName
 	}
-	return DefaultInstallDisableHooksName
+	return defaultInstallDisableHooksName
 }
 
+// InstallOption //TODO
 func (i InstallDisableHooks) InstallOption(val string) helmclient.InstallOption {
 	disableHooks := false
 	if v, err := strconv.ParseBool(val); err == nil {
@@ -82,19 +91,22 @@ func (i InstallDisableHooks) InstallOption(val string) helmclient.InstallOption 
 	}
 }
 
+// UpgradeDisableHooks  //TODO
 type UpgradeDisableHooks struct {
 	CustomName string
 }
 
 var _ Upgrade = &UpgradeDisableHooks{}
 
+// Name  //TODO
 func (u UpgradeDisableHooks) Name() string {
 	if u.CustomName != "" {
 		return u.CustomName
 	}
-	return DefaultUpgradeDisableHooksName
+	return defaultUpgradeDisableHooksName
 }
 
+// UpgradeOption  //TODO
 func (u UpgradeDisableHooks) UpgradeOption(val string) helmclient.UpgradeOption {
 	disableHooks := false
 	if v, err := strconv.ParseBool(val); err == nil {
@@ -106,19 +118,22 @@ func (u UpgradeDisableHooks) UpgradeOption(val string) helmclient.UpgradeOption 
 	}
 }
 
+// UpgradeForce  //TODO
 type UpgradeForce struct {
 	CustomName string
 }
 
 var _ Upgrade = &UpgradeForce{}
 
+// Name  //TODO
 func (u UpgradeForce) Name() string {
 	if u.CustomName != "" {
 		return u.CustomName
 	}
-	return DefaultUpgradeForceName
+	return defaultUpgradeForceName
 }
 
+// UpgradeOption  //TODO
 func (u UpgradeForce) UpgradeOption(val string) helmclient.UpgradeOption {
 	force := false
 	if v, err := strconv.ParseBool(val); err == nil {
@@ -130,19 +145,22 @@ func (u UpgradeForce) UpgradeOption(val string) helmclient.UpgradeOption {
 	}
 }
 
+// UninstallDisableHooks //TODO
 type UninstallDisableHooks struct {
 	CustomName string
 }
 
 var _ Uninstall = &UninstallDisableHooks{}
 
+// Name //TODO
 func (u UninstallDisableHooks) Name() string {
 	if u.CustomName != "" {
 		return u.CustomName
 	}
-	return DefaultUninstallDisableHooksName
+	return defaultUninstallDisableHooksName
 }
 
+// UninstallOption //TODO
 func (u UninstallDisableHooks) UninstallOption(val string) helmclient.UninstallOption {
 	disableHooks := false
 	if v, err := strconv.ParseBool(val); err == nil {
@@ -156,16 +174,20 @@ func (u UninstallDisableHooks) UninstallOption(val string) helmclient.UninstallO
 
 var _ Install = &InstallDescription{}
 
+// InstallDescription //TODO
 type InstallDescription struct {
 	CustomName string
 }
 
+// Name //TODO
 func (i InstallDescription) Name() string {
 	if i.CustomName != "" {
 		return i.CustomName
 	}
-	return DefaultInstallDescriptionName
+	return defaultInstallDescriptionName
 }
+
+// InstallOption //TODO
 func (i InstallDescription) InstallOption(v string) helmclient.InstallOption {
 	return func(i *action.Install) error {
 		i.Description = v
@@ -175,16 +197,20 @@ func (i InstallDescription) InstallOption(v string) helmclient.InstallOption {
 
 var _ Upgrade = &UpgradeDescription{}
 
+// UpgradeDescription //TODO
 type UpgradeDescription struct {
 	CustomName string
 }
 
+// Name //TODO
 func (u UpgradeDescription) Name() string {
 	if u.CustomName != "" {
 		return u.CustomName
 	}
-	return DefaultUpgradeDescriptionName
+	return defaultUpgradeDescriptionName
 }
+
+// UpgradeOption //TODO
 func (u UpgradeDescription) UpgradeOption(v string) helmclient.UpgradeOption {
 	return func(upgrade *action.Upgrade) error {
 		upgrade.Description = v
@@ -194,16 +220,20 @@ func (u UpgradeDescription) UpgradeOption(v string) helmclient.UpgradeOption {
 
 var _ Uninstall = &UninstallDescription{}
 
+// UninstallDescription //TODO
 type UninstallDescription struct {
 	CustomName string
 }
 
+// Name //TODO
 func (u UninstallDescription) Name() string {
 	if u.CustomName != "" {
 		return u.CustomName
 	}
-	return DefaultUninstallDescriptionName
+	return defaultUninstallDescriptionName
 }
+
+// UninstallOption //TODO
 func (u UninstallDescription) UninstallOption(v string) helmclient.UninstallOption {
 	return func(uninstall *action.Uninstall) error {
 		uninstall.Description = v

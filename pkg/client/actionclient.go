@@ -46,16 +46,20 @@ import (
 	"github.com/joelanford/helm-operator/pkg/internal/sdk/handler"
 )
 
+// ActionClientGetter //TODO
 type ActionClientGetter interface {
 	ActionClientFor(obj Object) (ActionInterface, error)
 }
 
+// ActionClientGetterFunc //TODO
 type ActionClientGetterFunc func(obj Object) (ActionInterface, error)
 
+// ActionClientFor //TODO
 func (acgf ActionClientGetterFunc) ActionClientFor(obj Object) (ActionInterface, error) {
 	return acgf(obj)
 }
 
+// ActionInterface //TODO
 type ActionInterface interface {
 	Get(name string, opts ...GetOption) (*release.Release, error)
 	Install(name, namespace string, chrt *chart.Chart, vals map[string]interface{}, opts ...InstallOption) (*release.Release, error)
@@ -64,11 +68,19 @@ type ActionInterface interface {
 	Reconcile(rel *release.Release) error
 }
 
+// GetOption //TODO
 type GetOption func(*action.Get) error
+
+// InstallOption //TODO
 type InstallOption func(*action.Install) error
+
+// UpgradeOption //TODO
 type UpgradeOption func(*action.Upgrade) error
+
+// UninstallOption //TODO
 type UninstallOption func(*action.Uninstall) error
 
+// NewActionClientGetter //TODO
 func NewActionClientGetter(acg ActionConfigGetter) ActionClientGetter {
 	return &actionClientGetter{acg}
 }
@@ -79,6 +91,7 @@ type actionClientGetter struct {
 
 var _ ActionClientGetter = &actionClientGetter{}
 
+// ActionClientFor //TODO
 func (hcg *actionClientGetter) ActionClientFor(obj Object) (ActionInterface, error) {
 	actionConfig, err := hcg.acg.ActionConfigFor(obj)
 	if err != nil {
@@ -99,6 +112,7 @@ type actionClient struct {
 
 var _ ActionInterface = &actionClient{}
 
+// Get //TODO
 func (c *actionClient) Get(name string, opts ...GetOption) (*release.Release, error) {
 	get := action.NewGet(c.conf)
 	for _, o := range opts {
@@ -109,6 +123,7 @@ func (c *actionClient) Get(name string, opts ...GetOption) (*release.Release, er
 	return get.Run(name)
 }
 
+// Install //TODO
 func (c *actionClient) Install(name, namespace string, chrt *chart.Chart, vals map[string]interface{}, opts ...InstallOption) (*release.Release, error) {
 	install := action.NewInstall(c.conf)
 	install.PostRenderer = c.postRenderer
@@ -147,6 +162,7 @@ func (c *actionClient) Install(name, namespace string, chrt *chart.Chart, vals m
 	return rel, nil
 }
 
+// Upgrade //TODO
 func (c *actionClient) Upgrade(name, namespace string, chrt *chart.Chart, vals map[string]interface{}, opts ...UpgradeOption) (*release.Release, error) {
 	upgrade := action.NewUpgrade(c.conf)
 	upgrade.PostRenderer = c.postRenderer
@@ -177,6 +193,7 @@ func (c *actionClient) Upgrade(name, namespace string, chrt *chart.Chart, vals m
 	return rel, nil
 }
 
+// Uninstall //TODO
 func (c *actionClient) Uninstall(name string, opts ...UninstallOption) (*release.UninstallReleaseResponse, error) {
 	uninstall := action.NewUninstall(c.conf)
 	for _, o := range opts {
@@ -187,6 +204,7 @@ func (c *actionClient) Uninstall(name string, opts ...UninstallOption) (*release
 	return uninstall.Run(name)
 }
 
+// Reconcile //TODO
 func (c *actionClient) Reconcile(rel *release.Release) error {
 	infos, err := c.conf.KubeClient.Build(bytes.NewBufferString(rel.Manifest), false)
 	if err != nil {
@@ -304,6 +322,7 @@ type ownerPostRenderer struct {
 	owner      Object
 }
 
+// Run //TODO
 func (pr *ownerPostRenderer) Run(in *bytes.Buffer) (*bytes.Buffer, error) {
 	resourceList, err := pr.kubeClient.Build(in, false)
 	if err != nil {

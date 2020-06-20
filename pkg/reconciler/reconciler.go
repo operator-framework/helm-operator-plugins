@@ -256,7 +256,7 @@ func WithOverrideValues(overrides map[string]string) Option {
 	}
 }
 
-// WithDependentWatchesEnabled is an Option that configures whether the
+// SkipDependentWatches is an Option that configures whether the
 // Reconciler will register watches for dependent objects in releases and
 // trigger reconciliations when they change.
 //
