@@ -20,6 +20,7 @@ import (
 	"flag"
 	"os"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -34,6 +35,7 @@ import (
 	"github.com/joelanford/helm-operator/pkg/reconciler"
 	"github.com/joelanford/helm-operator/pkg/watches"
 	"github.com/joelanford/helm-operator/version"
+
 )
 
 var (
@@ -62,6 +64,8 @@ func main() {
 		// Deprecated: use defaultMaxConcurrentReconciles
 		defaultMaxWorkers int
 	)
+
+
 
 	pflag.StringVar(&metricsAddr, "metrics-addr", "0.0.0.0:8383", "The address the metric endpoint binds to.")
 	pflag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
@@ -117,6 +121,16 @@ func main() {
 			leaderElectionID = operatorName
 		}
 	}
+	
+	// If the OPERATOR_NAME was not found and the leader-election-id flag was not used then, the
+	// leader-election-id will be set
+	if len(strings.TrimSpace(leaderElectionID)) < 1 {
+		const leaderElectionDomain = ".helm.operator.sdk"
+		leaderElectionID = manager.GenRandomLeaderElectionID(leaderElectionDomain)
+	}
+
+	// todo: check if the leaderElectionID is a valid value using the DNS-1123 validation
+	// https://github.com/kubernetes-sigs/kubebuilder/blob/master/pkg/internal/validation/dns.go#L80
 
 	options := ctrl.Options{
 		MetricsBindAddress:      "0.0.0.0:8383",
