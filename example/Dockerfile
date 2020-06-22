@@ -1,6 +1,6 @@
-FROM quay.io/joelanford/helm-operator:latest
+FROM quay.io/joelanford/helm-operator:master
 
 ENV HOME=/opt/helm
-COPY watches.yaml ${HOME}/watches.yaml
-COPY helm-charts  ${HOME}/helm-charts
+COPY --chown=65532 watches.yaml ${HOME}/watches.yaml
+COPY --chown=65532 helm-charts  ${HOME}/helm-charts
 WORKDIR ${HOME}
