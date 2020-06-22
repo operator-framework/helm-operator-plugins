@@ -52,13 +52,6 @@ else
 GOLANGCI_LINT=$(shell which golangci-lint)
 endif
 
-K8S_VER ?= v1.18.2
-ETCD_VER ?= v3.4.3
-OS=$(shell uname -s | tr '[:upper:]' '[:lower:]')
-ARCH=$(shell uname -m | sed 's/x86_64/amd64/')
-
 .PHONY: testbin
 testbin:
-	mkdir -p testbin
-	[[ -x testbin/etcd ]] || curl -L https://storage.googleapis.com/etcd/${ETCD_VER}/etcd-${ETCD_VER}-${OS}-${ARCH}.tar.gz | tar zx -C testbin --strip-components=1 etcd-${ETCD_VER}-${OS}-${ARCH}/etcd
-	[[ -x testbin/kube-apiserver && -x testbin/kubectl ]] || curl -L https://dl.k8s.io/${K8S_VER}/kubernetes-server-${OS}-${ARCH}.tar.gz | tar zx -C testbin --strip-components=3 kubernetes/server/bin/kube-apiserver kubernetes/server/bin/kubectl
+	./test-setup.sh
