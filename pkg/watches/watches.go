@@ -21,22 +21,22 @@ import (
 	"os"
 	"time"
 
-	"gopkg.in/yaml.v2"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/yaml"
 )
 
 type Watch struct {
-	GroupVersionKind schema.GroupVersionKind `yaml:",inline"`
-	ChartPath        string                  `yaml:"chart"`
+	schema.GroupVersionKind `json:",inline"`
+	ChartPath               string `json:"chart"`
 
-	WatchDependentResources *bool             `yaml:"watchDependentResources,omitempty"`
-	OverrideValues          map[string]string `yaml:"overrideValues,omitempty"`
-	ReconcilePeriod         *time.Duration    `yaml:"reconcilePeriod,omitempty"`
-	MaxConcurrentReconciles *int              `yaml:"maxConcurrentReconciles,omitempty"`
+	WatchDependentResources *bool             `json:"watchDependentResources,omitempty"`
+	OverrideValues          map[string]string `json:"overrideValues,omitempty"`
+	ReconcilePeriod         *time.Duration    `json:"reconcilePeriod,omitempty"`
+	MaxConcurrentReconciles *int              `json:"maxConcurrentReconciles,omitempty"`
 
-	Chart *chart.Chart `yaml:"-"`
+	Chart *chart.Chart `json:"-"`
 }
 
 // Load loads a slice of Watches from the watch file at `path`. For each entry
