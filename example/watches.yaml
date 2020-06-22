@@ -3,6 +3,6 @@
   kind: Nginx
   chart: ./helm-charts/nginx
   maxConcurrentReconciles: 4
-  reconcilePeriod: 0s
+  reconcilePeriod: 0
   overrideValues:
     image.repository: nginx
