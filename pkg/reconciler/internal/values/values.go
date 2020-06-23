@@ -25,10 +25,12 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+// Values is the release/CR values which are the chart.values
 type Values struct {
 	m map[string]interface{}
 }
 
+// FromUnstructured return the Values from an Release/CR
 func FromUnstructured(obj *unstructured.Unstructured) (*Values, error) {
 	if obj == nil || obj.Object == nil {
 		return nil, fmt.Errorf("nil object")
@@ -44,10 +46,12 @@ func FromUnstructured(obj *unstructured.Unstructured) (*Values, error) {
 	return New(specMap), nil
 }
 
+// New returns a new Values structure with the map informed
 func New(m map[string]interface{}) *Values {
 	return &Values{m: m}
 }
 
+// Map returns the map[string]interface{} from the Values
 func (v *Values) Map() map[string]interface{} {
 	if v == nil {
 		return nil
@@ -55,6 +59,7 @@ func (v *Values) Map() map[string]interface{} {
 	return v.m
 }
 
+// ApplyOverrides used to apply in the CR/Release the overrideValues defined in the watches.yaml
 func (v *Values) ApplyOverrides(in map[string]string) error {
 	for inK, inV := range in {
 		val := fmt.Sprintf("%s=%s", inK, os.ExpandEnv(inV))
@@ -65,14 +70,17 @@ func (v *Values) ApplyOverrides(in map[string]string) error {
 	return nil
 }
 
+// Mapper is the interface that that map the chart the values
 type Mapper interface {
 	Map(chartutil.Values) chartutil.Values
 }
-
+// MapperFunc a function that maps values from a custom resource spec to the values passed to Helm
 type MapperFunc func(chartutil.Values) chartutil.Values
 
+// DefaultMapper func used to map chart values will returns values untouched
 var DefaultMapper = MapperFunc(func(v chartutil.Values) chartutil.Values { return v })
 
+// Map return a values.Mapper of the chart values informed
 func (m MapperFunc) Map(v chartutil.Values) chartutil.Values {
 	return m(v)
 }
