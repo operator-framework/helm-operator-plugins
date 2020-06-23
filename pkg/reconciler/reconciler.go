@@ -343,6 +343,8 @@ func WithUninstallAnnotations(as ...annotation.Uninstall) Option {
 // WithPreHook is an Option that configures the reconciler to run the given
 // PreHook just before performing any actions (e.g. install, upgrade, uninstall,
 // or reconciliation).
+// --
+// The default Helm operator image provided by this project has no custom pre-hooks.
 func WithPreHook(h hook.PreHook) Option {
 	return func(r *Reconciler) error {
 		r.preHooks = append(r.preHooks, h)
@@ -352,6 +354,8 @@ func WithPreHook(h hook.PreHook) Option {
 
 // WithPostHook is an Option that configures the reconciler to run the given
 // PostHook just after performing any non-uninstall release actions.
+// --
+// The default Helm operator image provided by this project has no custom post-hooks.
 func WithPostHook(h hook.PostHook) Option {
 	return func(r *Reconciler) error {
 		r.postHooks = append(r.postHooks, h)
@@ -361,6 +365,15 @@ func WithPostHook(h hook.PostHook) Option {
 
 // WithValueMapper is an Option that configures a function that maps values
 // from a custom resource spec to the values passed to Helm
+// --
+// Note that the default Helm operator image provided by this project uses the default value mapper,
+// which is a no-op mapper that returns the input CR spec values directly. This option allows users
+// to have a custom mapping that maps the CR spec to a completely different set of values
+// that their helm charts know about.
+//
+// A an example of use case that can be achieved with is to take one CR value (e.g. dbUser) and then,
+// set multiple chart values from it (e.g. mysql.dbUser and webserver.dbUser) which would allow the CR API
+// be presented to the user it nice and tidy.
 func WithValueMapper(m values.Mapper) Option {
 	return func(r *Reconciler) error {
 		r.valueMapper = m
@@ -753,6 +766,9 @@ func (r *Reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) err
 		return err
 	}
 
+	// The Secret is created because Helm will create a release secret. So, we want to watch that and reconcile
+	// if it is deleted or changed. Sometimes that can cause an unrecoverable error, but by watching it,
+	// we can bubble that problem up to the CR status.
 	secret := &corev1.Secret{}
 	secret.SetGroupVersionKind(schema.GroupVersionKind{
 		Group:   "",
