@@ -141,7 +141,7 @@ func main() {
 	for _, w := range ws {
 		reconcilePeriod := defaultReconcilePeriod
 		if w.ReconcilePeriod != nil {
-			reconcilePeriod = *w.ReconcilePeriod
+			reconcilePeriod = w.ReconcilePeriod.Duration
 		}
 
 		maxConcurrentReconciles := defaultMaxConcurrentReconciles

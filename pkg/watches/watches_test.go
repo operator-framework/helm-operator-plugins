@@ -41,6 +41,7 @@ func TestLoadWatches(t *testing.T) {
   kind: MyKind
   chart: ../../testdata/test-chart-0.1.0.tgz
   watchDependentResources: false
+  reconcilePeriod: 10s
   overrideValues:
     key: value
 `,
