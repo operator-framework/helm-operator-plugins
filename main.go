@@ -119,7 +119,7 @@ func main() {
 	}
 
 	options := ctrl.Options{
-		MetricsBindAddress:      "0.0.0.0:8383",
+		MetricsBindAddress:      metricsAddr,
 		LeaderElection:          enableLeaderElection,
 		LeaderElectionID:        leaderElectionID,
 		LeaderElectionNamespace: leaderElectionNamespace,
