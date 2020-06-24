@@ -46,6 +46,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/yaml"
 
@@ -427,6 +428,7 @@ var _ = Describe("Reconciler", func() {
 				}
 				Expect(err).To(BeNil())
 			})
+			metrics.Registry.Unregister(r.infoMetric)
 			close(done)
 		})
 
