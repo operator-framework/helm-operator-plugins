@@ -18,8 +18,11 @@ package main
 
 import (
 	"flag"
+	"github.com/joelanford/helm-operator/pkg/kbutil"
 	"os"
+	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -117,6 +120,19 @@ func main() {
 			leaderElectionID = operatorName
 		}
 	}
+
+	// If the OPERATOR_NAME was not found and the flag leader-election-id was not used, get the operatorName from
+	// the config (valid just for the new layout)
+	if len(strings.TrimSpace(leaderElectionID)) < 1 && kbutil.HasProjectFile() {
+		cfg, err := kbutil.ReadConfig()
+		if err != nil {
+			setupLog.Error(err, "unable to read project config")
+		}
+		leaderElectionID = filepath.Base(cfg.Repo + "-leader-lock")
+	}
+
+	setupLog.Info("setting Manager options:", "MetricsBindAddress", metricsAddr, "LeaderElection",
+		enableLeaderElection, "LeaderElectionID", leaderElectionID, "LeaderElectionNamespace", leaderElectionNamespace)
 
 	options := ctrl.Options{
 		MetricsBindAddress:      "0.0.0.0:8383",

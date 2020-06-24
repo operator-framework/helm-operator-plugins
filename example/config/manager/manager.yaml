@@ -27,7 +27,6 @@ spec:
         - /manager
         args:
         - --enable-leader-election
-        - --leader-election-id=nginx-operator-leader-lock
         image: controller:latest
         name: manager
         resources:
