@@ -63,7 +63,7 @@ func main() {
 		defaultMaxWorkers int
 	)
 
-	pflag.StringVar(&metricsAddr, "metrics-addr", "0.0.0.0:8383", "The address the metric endpoint binds to.")
+	pflag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	pflag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
 	pflag.StringVar(&leaderElectionID, "leader-election-id", "",

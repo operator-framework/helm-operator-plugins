@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/prometheus/client_golang/prometheus"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chartutil"
@@ -41,6 +42,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/joelanford/helm-operator/pkg/annotation"
@@ -77,6 +79,8 @@ type Reconciler struct {
 	installAnnotations   map[string]annotation.Install
 	upgradeAnnotations   map[string]annotation.Upgrade
 	uninstallAnnotations map[string]annotation.Uninstall
+
+	infoMetric *prometheus.GaugeVec
 }
 
 // New creates a new Reconciler that reconciles custom resources that define a
@@ -102,6 +106,11 @@ func New(opts ...Option) (*Reconciler, error) {
 	if err := r.validate(); err != nil {
 		return nil, err
 	}
+
+	if err := r.setupMetrics(); err != nil {
+		return nil, err
+	}
+
 	return r, nil
 }
 
@@ -110,6 +119,15 @@ func (r *Reconciler) setupAnnotationMaps() {
 	r.installAnnotations = make(map[string]annotation.Install)
 	r.upgradeAnnotations = make(map[string]annotation.Upgrade)
 	r.uninstallAnnotations = make(map[string]annotation.Uninstall)
+}
+
+func (r *Reconciler) setupMetrics() error {
+	r.infoMetric = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: fmt.Sprintf("%s_info", strings.ToLower(r.gvk.Kind)),
+		Help: fmt.Sprintf("Information about the %s custom resource.", r.gvk.Kind),
+	}, []string{"namespace", "name"})
+
+	return metrics.Registry.Register(r.infoMetric)
 }
 
 // SetupWithManager configures a controller for the Reconciler and registers
@@ -505,6 +523,16 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 		return ctrl.Result{}, fmt.Errorf("unexpected release state: %s", state)
 	}
 
+	labels := map[string]string{
+		"namespace": obj.GetNamespace(),
+		"name":      obj.GetName(),
+	}
+	if m, err := r.infoMetric.GetMetricWith(labels); err != nil {
+		panic(err)
+	} else {
+		m.Set(1.0)
+	}
+
 	for _, h := range r.postHooks {
 		if err := h.Exec(obj, *rel, log); err != nil {
 			log.Error(err, "post-release hook failed", "name", rel.Name, "version", rel.Version)
@@ -569,6 +597,12 @@ func (r *Reconciler) handleDeletion(ctx context.Context, actionClient helmclient
 	}(); err != nil {
 		return err
 	}
+
+	labels := map[string]string{
+		"namespace": obj.GetNamespace(),
+		"name":      obj.GetName(),
+	}
+	_ = r.infoMetric.Delete(labels)
 
 	// Since the client is hitting a cache, waiting for the
 	// deletion here will guarantee that the next reconciliation
