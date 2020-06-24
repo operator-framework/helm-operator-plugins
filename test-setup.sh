@@ -21,7 +21,8 @@ set -eu
 # */
 # To use envtest is required etcd, kube-apiserver and kubetcl binaries in the testbin directory.
 # This sript will perform this setup for linux or mac os x envs.
-# todo: follow up the upstream https://github.com/kubernetes-sigs/kubebuilder/issues/686 to simplifies what # we are doing here.  
+# todo: follow up the upstream https://github.com/kubernetes-sigs/kubebuilder/issues/686 to simplifies what 
+# we are doing here.  
 # */
 
 K8S_VER=v1.18.2
