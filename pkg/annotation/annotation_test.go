@@ -22,6 +22,7 @@ import (
 	"helm.sh/helm/v3/pkg/action"
 
 	"github.com/joelanford/helm-operator/pkg/annotation"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 var _ = Describe("Annotation", func() {
@@ -30,6 +31,7 @@ var _ = Describe("Annotation", func() {
 
 		BeforeEach(func() {
 			install = action.Install{}
+
 		})
 
 		Describe("DisableHooks", func() {
@@ -50,19 +52,19 @@ var _ = Describe("Annotation", func() {
 			})
 
 			It("should disable hooks", func() {
-				Expect(a.InstallOption("true")(&install)).To(Succeed())
+				Expect(a.InstallOption("true", ctrl.Log)(&install)).To(Succeed())
 				Expect(install.DisableHooks).To(BeTrue())
 			})
 
 			It("should enable hooks", func() {
 				install.DisableHooks = true
-				Expect(a.InstallOption("false")(&install)).To(Succeed())
+				Expect(a.InstallOption("false", ctrl.Log)(&install)).To(Succeed())
 				Expect(install.DisableHooks).To(BeFalse())
 			})
 
 			It("should default to false with invalid value", func() {
 				install.DisableHooks = true
-				Expect(a.InstallOption("invalid")(&install)).To(Succeed())
+				Expect(a.InstallOption("invalid", ctrl.Log)(&install)).To(Succeed())
 				Expect(install.DisableHooks).To(BeFalse())
 			})
 		})
@@ -85,7 +87,7 @@ var _ = Describe("Annotation", func() {
 			})
 
 			It("should set a description", func() {
-				Expect(a.InstallOption("test description")(&install)).To(Succeed())
+				Expect(a.InstallOption("test description", ctrl.Log)(&install)).To(Succeed())
 				Expect(install.Description).To(Equal("test description"))
 			})
 		})
@@ -116,19 +118,19 @@ var _ = Describe("Annotation", func() {
 			})
 
 			It("should disable hooks", func() {
-				Expect(a.UpgradeOption("true")(&upgrade)).To(Succeed())
+				Expect(a.UpgradeOption("true", ctrl.Log)(&upgrade)).To(Succeed())
 				Expect(upgrade.DisableHooks).To(BeTrue())
 			})
 
 			It("should enable hooks", func() {
 				upgrade.DisableHooks = true
-				Expect(a.UpgradeOption("false")(&upgrade)).To(Succeed())
+				Expect(a.UpgradeOption("false", ctrl.Log)(&upgrade)).To(Succeed())
 				Expect(upgrade.DisableHooks).To(BeFalse())
 			})
 
 			It("should default to false with invalid value", func() {
 				upgrade.DisableHooks = true
-				Expect(a.UpgradeOption("invalid")(&upgrade)).To(Succeed())
+				Expect(a.UpgradeOption("invalid", ctrl.Log)(&upgrade)).To(Succeed())
 				Expect(upgrade.DisableHooks).To(BeFalse())
 			})
 		})
@@ -151,19 +153,19 @@ var _ = Describe("Annotation", func() {
 			})
 
 			It("should force upgrades", func() {
-				Expect(a.UpgradeOption("true")(&upgrade)).To(Succeed())
+				Expect(a.UpgradeOption("true", ctrl.Log)(&upgrade)).To(Succeed())
 				Expect(upgrade.Force).To(BeTrue())
 			})
 
 			It("should not force upgrades", func() {
 				upgrade.Force = true
-				Expect(a.UpgradeOption("false")(&upgrade)).To(Succeed())
+				Expect(a.UpgradeOption("false", ctrl.Log)(&upgrade)).To(Succeed())
 				Expect(upgrade.Force).To(BeFalse())
 			})
 
 			It("should default to not forcing upgrades", func() {
 				upgrade.Force = true
-				Expect(a.UpgradeOption("invalid")(&upgrade)).To(Succeed())
+				Expect(a.UpgradeOption("invalid", ctrl.Log)(&upgrade)).To(Succeed())
 				Expect(upgrade.Force).To(BeFalse())
 			})
 		})
@@ -186,7 +188,7 @@ var _ = Describe("Annotation", func() {
 			})
 
 			It("should set a description", func() {
-				Expect(a.UpgradeOption("test description")(&upgrade)).To(Succeed())
+				Expect(a.UpgradeOption("test description", ctrl.Log)(&upgrade)).To(Succeed())
 				Expect(upgrade.Description).To(Equal("test description"))
 			})
 		})
@@ -217,19 +219,19 @@ var _ = Describe("Annotation", func() {
 			})
 
 			It("should disable hooks", func() {
-				Expect(a.UninstallOption("true")(&uninstall)).To(Succeed())
+				Expect(a.UninstallOption("true", ctrl.Log)(&uninstall)).To(Succeed())
 				Expect(uninstall.DisableHooks).To(BeTrue())
 			})
 
 			It("should enable hooks", func() {
 				uninstall.DisableHooks = true
-				Expect(a.UninstallOption("false")(&uninstall)).To(Succeed())
+				Expect(a.UninstallOption("false", ctrl.Log)(&uninstall)).To(Succeed())
 				Expect(uninstall.DisableHooks).To(BeFalse())
 			})
 
 			It("should default to false with invalid value", func() {
 				uninstall.DisableHooks = true
-				Expect(a.UninstallOption("invalid")(&uninstall)).To(Succeed())
+				Expect(a.UninstallOption("invalid", ctrl.Log)(&uninstall)).To(Succeed())
 				Expect(uninstall.DisableHooks).To(BeFalse())
 			})
 		})
@@ -252,7 +254,7 @@ var _ = Describe("Annotation", func() {
 			})
 
 			It("should set a description", func() {
-				Expect(a.UninstallOption("test description")(&uninstall)).To(Succeed())
+				Expect(a.UninstallOption("test description", ctrl.Log)(&uninstall)).To(Succeed())
 				Expect(uninstall.Description).To(Equal("test description"))
 			})
 		})

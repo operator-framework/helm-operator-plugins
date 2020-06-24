@@ -49,6 +49,7 @@ import (
 	helmclient "github.com/joelanford/helm-operator/pkg/client"
 	"github.com/joelanford/helm-operator/pkg/hook"
 	"github.com/joelanford/helm-operator/pkg/internal/sdk/controllerutil"
+	"github.com/joelanford/helm-operator/pkg/internal/sdk/diffutil"
 	"github.com/joelanford/helm-operator/pkg/reconciler/internal/conditions"
 	internalhook "github.com/joelanford/helm-operator/pkg/reconciler/internal/hook"
 	"github.com/joelanford/helm-operator/pkg/reconciler/internal/updater"
@@ -157,6 +158,7 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 		"group", r.gvk.Group,
 		"version", r.gvk.Version,
 		"kind", r.gvk.Kind,
+		"reconcilePeriod", r.reconcilePeriod.String(),
 	)
 
 	return nil
@@ -423,6 +425,7 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 		return ctrl.Result{}, nil
 	}
 	if err != nil {
+		log.Info("Failed to lookup resource")
 		return ctrl.Result{}, err
 	}
 
@@ -454,6 +457,7 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 		// The decision made for now is to leave the finalizer in place, so that the user can intervene and try to
 		// resolve the issue, instead of the operator silently leaving some dangling resources hanging around after the
 		// CR is deleted.
+		log.Info("Failed to get release manager")
 		return ctrl.Result{}, err
 	}
 
@@ -473,6 +477,9 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 
 	if obj.GetDeletionTimestamp() != nil {
 		err := r.handleDeletion(ctx, actionClient, obj, log)
+		if err != nil {
+			log.Info("Failed to handle CR deletion")
+		}
 		return ctrl.Result{}, err
 	}
 
@@ -482,10 +489,11 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 			updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionTrue, conditions.ReasonErrorGettingValues, err)),
 			updater.EnsureConditionUnknown(conditions.TypeReleaseFailed),
 		)
+		log.Info("Failed to get CR values.")
 		return ctrl.Result{}, err
 	}
 
-	rel, state, err := r.getReleaseState(actionClient, obj, vals.AsMap())
+	rel, state, err := r.getReleaseState(actionClient, obj, vals.AsMap(), log)
 	if err != nil {
 		u.UpdateStatus(
 			updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionTrue, conditions.ReasonErrorGettingReleaseState, err)),
@@ -493,6 +501,7 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 			updater.EnsureConditionUnknown(conditions.TypeDeployed),
 			updater.EnsureDeployedRelease(nil),
 		)
+		log.Info("Failed to get Release state.")
 		return ctrl.Result{}, err
 	}
 	u.UpdateStatus(updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionFalse, "", "")))
@@ -507,17 +516,20 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 	case stateNeedsInstall:
 		rel, err = r.doInstall(actionClient, &u, obj, vals.AsMap(), log)
 		if err != nil {
+			log.Info("Failed to Install Release.")
 			return ctrl.Result{}, err
 		}
 
 	case stateNeedsUpgrade:
 		rel, err = r.doUpgrade(actionClient, &u, obj, vals.AsMap(), log)
 		if err != nil {
+			log.Info("Failed to Upgrade Release.")
 			return ctrl.Result{}, err
 		}
 
 	case stateUnchanged:
 		if err := r.doReconcile(actionClient, &u, rel, log); err != nil {
+			log.Info("Failed to Reconcile Release.")
 			return ctrl.Result{}, err
 		}
 	default:
@@ -610,12 +622,13 @@ func (r *Reconciler) handleDeletion(ctx context.Context, actionClient helmclient
 	// will see that the CR has been deleted and that there's
 	// nothing left to do.
 	if err := controllerutil.WaitForDeletion(ctx, r.client, obj); err != nil {
+		log.Info("Failed waiting for CR deletion")
 		return err
 	}
 	return nil
 }
 
-func (r *Reconciler) getReleaseState(client helmclient.ActionInterface, obj metav1.Object, vals map[string]interface{}) (*release.Release, helmReleaseState, error) {
+func (r *Reconciler) getReleaseState(client helmclient.ActionInterface, obj metav1.Object, vals map[string]interface{}, log logr.Logger) (*release.Release, helmReleaseState, error) {
 	deployedRelease, err := client.Get(obj.GetName())
 	if err != nil && !errors.Is(err, driver.ErrReleaseNotFound) {
 		return nil, stateError, err
@@ -628,18 +641,21 @@ func (r *Reconciler) getReleaseState(client helmclient.ActionInterface, obj meta
 	var opts []helmclient.UpgradeOption
 	for name, annot := range r.upgradeAnnotations {
 		if v, ok := obj.GetAnnotations()[name]; ok {
-			opts = append(opts, annot.UpgradeOption(v))
+			opts = append(opts, annot.UpgradeOption(v, log))
 		}
 	}
 	opts = append(opts, func(u *action.Upgrade) error {
 		u.DryRun = true
 		return nil
 	})
+
 	specRelease, err := client.Upgrade(obj.GetName(), obj.GetNamespace(), r.chrt, vals, opts...)
 	if err != nil {
+		log.Info("Unable to upgrade the release to get the state")
 		return deployedRelease, stateError, err
 	}
 	if specRelease.Manifest != deployedRelease.Manifest {
+		log.Info("Release needs to be upgrade")
 		return deployedRelease, stateNeedsUpgrade, nil
 	}
 	return deployedRelease, stateUnchanged, nil
@@ -649,9 +665,10 @@ func (r *Reconciler) doInstall(actionClient helmclient.ActionInterface, u *updat
 	var opts []helmclient.InstallOption
 	for name, annot := range r.installAnnotations {
 		if v, ok := obj.GetAnnotations()[name]; ok {
-			opts = append(opts, annot.InstallOption(v))
+			opts = append(opts, annot.InstallOption(v, log))
 		}
 	}
+
 	rel, err := actionClient.Install(obj.GetName(), obj.GetNamespace(), r.chrt, vals, opts...)
 	if err != nil {
 		u.UpdateStatus(
@@ -662,6 +679,10 @@ func (r *Reconciler) doInstall(actionClient helmclient.ActionInterface, u *updat
 	}
 	r.reportOverrideEvents(obj)
 
+	if log.V(1).Enabled() {
+		fmt.Println(diffutil.Diff("", rel.Manifest))
+	}
+
 	log.Info("Release installed", "name", rel.Name, "version", rel.Version)
 	return rel, nil
 }
@@ -670,7 +691,7 @@ func (r *Reconciler) doUpgrade(actionClient helmclient.ActionInterface, u *updat
 	var opts []helmclient.UpgradeOption
 	for name, annot := range r.upgradeAnnotations {
 		if v, ok := obj.GetAnnotations()[name]; ok {
-			opts = append(opts, annot.UpgradeOption(v))
+			opts = append(opts, annot.UpgradeOption(v, log))
 		}
 	}
 
@@ -683,6 +704,11 @@ func (r *Reconciler) doUpgrade(actionClient helmclient.ActionInterface, u *updat
 		return nil, err
 	}
 	r.reportOverrideEvents(obj)
+
+	// todo: the upgrade release no longer is returning the previous value for we diff
+	if log.V(1).Enabled() {
+		fmt.Println(diffutil.Diff("", rel.Manifest))
+	}
 
 	log.Info("Release upgraded", "name", rel.Name, "version", rel.Version)
 	return rel, nil
@@ -719,7 +745,7 @@ func (r *Reconciler) doUninstall(actionClient helmclient.ActionInterface, u *upd
 	var opts []helmclient.UninstallOption
 	for name, annot := range r.uninstallAnnotations {
 		if v, ok := obj.GetAnnotations()[name]; ok {
-			opts = append(opts, annot.UninstallOption(v))
+			opts = append(opts, annot.UninstallOption(v, log))
 		}
 	}
 
@@ -733,8 +759,12 @@ func (r *Reconciler) doUninstall(actionClient helmclient.ActionInterface, u *upd
 		)
 		return err
 	} else {
+		if log.V(1).Enabled() {
+			fmt.Println(diffutil.Diff(resp.Release.Manifest, ""))
+		}
 		log.Info("Release uninstalled", "name", resp.Release.Name, "version", resp.Release.Version)
 	}
+
 	u.Update(updater.RemoveFinalizer(uninstallFinalizer))
 	u.UpdateStatus(
 		updater.EnsureCondition(conditions.ReleaseFailed(corev1.ConditionFalse, "", "")),
@@ -806,6 +836,9 @@ func (r *Reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) err
 	}
 
 	if !r.skipDependentWatches {
+		if r.log.V(1).Enabled() {
+			r.log.Info("Watching dependent resources")
+		}
 		r.postHooks = append([]hook.PostHook{internalhook.NewDependentResourceWatcher(c, mgr.GetRESTMapper())}, r.postHooks...)
 	}
 	return nil
