@@ -1,0 +1,7 @@
+version: "2"
+domain: sdk.operatorframework.io
+repo: github.com/joelanford/nginx-operator
+resources:
+- group: apache
+  version: v1
+  kind: Tomcat
