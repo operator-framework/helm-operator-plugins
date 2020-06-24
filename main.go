@@ -73,11 +73,11 @@ func main() {
 
 	pflag.StringVar(&watchesFile, "watches-file", "./watches.yaml", "Path to watches.yaml file.")
 	pflag.DurationVar(&defaultReconcilePeriod, "reconcile-period", 0, "Default reconcile period for controllers (use 0 to disable periodic reconciliation)")
-	pflag.IntVar(&defaultMaxConcurrentReconciles, "max-concurrent-reconciles", 1, "Default maximum number of concurrent reconciles for controllers.")
+	pflag.IntVar(&defaultMaxConcurrentReconciles, "max-concurrent-reconciles", runtime.NumCPU(), "Default maximum number of concurrent reconciles for controllers.")
 
 	// Deprecated: --max-workers flag does not align well with the name of the option it configures on the controller
 	//   (MaxConcurrentReconciles). Flag `--max-concurrent-reconciles` should be used instead.
-	pflag.IntVar(&defaultMaxWorkers, "max-workers", 1, "Default maximum number of concurrent reconciles for controllers.")
+	pflag.IntVar(&defaultMaxWorkers, "max-workers", runtime.NumCPU(), "Default maximum number of concurrent reconciles for controllers.")
 	if err := pflag.CommandLine.MarkHidden("max-workers"); err != nil {
 		setupLog.Error(err, "failed to hide --max-workers flag")
 		os.Exit(1)
