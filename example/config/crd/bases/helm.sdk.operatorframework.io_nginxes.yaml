@@ -36,9 +36,11 @@ spec:
           spec:
             description: NginxSpec defines the desired state of Nginx
             type: object
+            x-kubernetes-preserve-unknown-fields: true
           status:
             description: NginxStatus defines the observed state of Nginx
             type: object
+            x-kubernetes-preserve-unknown-fields: true
         type: object
     served: true
     storage: true
