@@ -17,11 +17,14 @@ limitations under the License.
 package templates
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 	"text/template"
 
+	"helm.sh/helm/v3/pkg/chart"
 	"sigs.k8s.io/kubebuilder/pkg/model/file"
+	"sigs.k8s.io/yaml"
 )
 
 var _ file.Template = &CRDSample{}
@@ -32,7 +35,9 @@ type CRDSample struct {
 	file.TemplateMixin
 	file.ResourceMixin
 
-	Spec string
+	ChartPath string
+	Chart     chart.Chart
+	Spec      string
 }
 
 // SetTemplateDefaults implements input.Template
@@ -43,6 +48,14 @@ func (f *CRDSample) SetTemplateDefaults() error {
 	f.Path = f.Resource.Replacer().Replace(f.Path)
 
 	f.IfExistsAction = file.Error
+
+	if len(f.Spec) == 0 {
+		spec, err := yaml.Marshal(f.Chart.Values)
+		if err != nil {
+			return fmt.Errorf("failed to get chart values: %v", err)
+		}
+		f.Spec = fmt.Sprintf("# Default values copied from <project_dir>/%s/values.yaml\n%s\n", f.ChartPath, string(spec))
+	}
 
 	f.TemplateBody = crdSampleTemplate
 	return nil
@@ -65,10 +78,5 @@ kind: {{ .Resource.Kind }}
 metadata:
   name: {{ lower .Resource.Kind }}-sample
 spec:
-{{- with .Spec }}
-{{ . | indent 2 }}
-{{- else }}
-  # Add fields here
-  foo: bar
-{{- end}}
+{{ .Spec | indent 2 }}
 `
