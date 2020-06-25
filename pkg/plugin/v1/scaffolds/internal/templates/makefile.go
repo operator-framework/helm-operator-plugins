@@ -63,10 +63,9 @@ endif
 
 all: manager
 
-# TODO(joelanford): make this work for helm-operator
 # Run against the configured Kubernetes cluster in ~/.kube/config
-run:
-	go run ./main.go
+run: helm-operator
+	$(HELM_OPERATOR) run
 
 # Install CRDs into a cluster
 install: kustomize
@@ -94,8 +93,10 @@ docker-build:
 docker-push:
 	docker push ${IMG}
 
+# TODO(joelanford): need to download kustomize binary for user
+#    Can't rely on Go to download and build
 kustomize:
-ifeq (, $(shell which kustomize))
+ifeq (, $(shell which kustomize 2>/dev/null))
 	@{ \
 	set -e ;\
 	KUSTOMIZE_GEN_TMP_DIR=$$(mktemp -d) ;\
@@ -107,5 +108,17 @@ ifeq (, $(shell which kustomize))
 KUSTOMIZE=$(GOBIN)/kustomize
 else
 KUSTOMIZE=$(shell which kustomize)
+endif
+
+# TODO(joelanford): need to download helm-operator binary for user
+#    Can't rely on Go to download and build
+helm-operator:
+ifeq (, $(shell which helm-operator 2>/dev/null))
+	@{ \
+	echo "ERROR: You must download helm-operator binary and add it to your path!" ;\
+	exit 1 ;\
+	}
+else
+HELM_OPERATOR=$(shell which helm-operator)
 endif
 `
