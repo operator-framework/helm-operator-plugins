@@ -27,10 +27,8 @@ import (
 	crconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/kubebuilder/pkg/model"
 	"sigs.k8s.io/kubebuilder/pkg/model/config"
-	"sigs.k8s.io/kubebuilder/pkg/model/file"
 	"sigs.k8s.io/kubebuilder/pkg/model/resource"
 	"sigs.k8s.io/kubebuilder/pkg/plugin/scaffold"
-	"sigs.k8s.io/yaml"
 
 	"github.com/joelanford/helm-operator/pkg/internal/kubebuilder/machinery"
 	"github.com/joelanford/helm-operator/pkg/plugin/internal/chartutil"
@@ -92,32 +90,17 @@ func (s *apiScaffolder) scaffold() error {
 			"kubebuilder.io/migration/multi-group.html")
 	}
 
-	// TODO(joelanford): can this be encapsulated in the CR sample scaffold?
-	valuesPath := filepath.Join("<project_dir>", chartutil.HelmChartsDir, chrt.Name(), "values.yaml")
-	rawValues, err := yaml.Marshal(chrt.Values)
-	if err != nil {
-		return fmt.Errorf("failed to get raw chart values: %v", err)
-	}
-	crSpec := fmt.Sprintf("# Default values copied from %s\n\n%s", valuesPath, rawValues)
-
 	res := r.NewResource(s.config, true)
 	s.config.AddResource(res.GVK())
 
-	// TODO(joelanford): combine into a single scaffold that has a field for CRDVersion
-	var crdScaffold file.Template = &crd.V1{}
-	if s.opts.CRDVersion == "v1beta1" {
-		crdScaffold = &crd.V1Beta1{}
-	}
-
+	chartPath := filepath.Join(chartutil.HelmChartsDir, chrt.Metadata.Name)
 	if err := machinery.NewScaffold().Execute(
 		s.newUniverse(res),
-		&templates.CRDSample{Spec: crSpec},
+		&templates.CRDSample{ChartPath: chartPath, Chart: *chrt},
 		&templates.CRDEditorRole{},
 		&templates.CRDViewerRole{},
-		&templates.WatchesUpdater{
-			Chart: filepath.Join(chartutil.HelmChartsDir, chrt.Metadata.Name),
-		},
-		crdScaffold,
+		&templates.WatchesUpdater{ChartPath: chartPath},
+		&crd.CRD{CRDVersion: s.opts.CRDVersion},
 	); err != nil {
 		return fmt.Errorf("error scaffolding APIs: %v", err)
 	}

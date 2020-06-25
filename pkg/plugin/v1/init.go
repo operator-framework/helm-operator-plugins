@@ -162,6 +162,8 @@ func (p *initPlugin) GetScaffolder() (scaffold.Scaffolder, error) {
 }
 
 func (p *initPlugin) PostScaffold() error {
-	fmt.Printf("Next: define a resource with:\n$ %s create api\n", p.commandName)
+	if !p.doAPIScaffold {
+		fmt.Printf("Next: define a resource with:\n$ %s create api\n", p.commandName)
+	}
 	return nil
 }
