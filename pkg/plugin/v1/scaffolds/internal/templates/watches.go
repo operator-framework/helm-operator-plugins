@@ -49,7 +49,7 @@ type WatchesUpdater struct {
 	file.TemplateMixin
 	file.ResourceMixin
 
-	Chart string
+	ChartPath string
 }
 
 func (*WatchesUpdater) GetPath() string {
@@ -80,7 +80,7 @@ func (f *WatchesUpdater) GetCodeFragments() file.CodeFragmentsMap {
 
 	// Generate watch fragments
 	watches := make([]string, 0)
-	watches = append(watches, fmt.Sprintf(watchFragment, f.Resource.Domain, f.Resource.Version, f.Resource.Kind, f.Chart))
+	watches = append(watches, fmt.Sprintf(watchFragment, f.Resource.Domain, f.Resource.Version, f.Resource.Kind, f.ChartPath))
 
 	if len(watches) != 0 {
 		fragments[file.NewMarkerFor(defaultWatchesFile, watchMarker)] = watches

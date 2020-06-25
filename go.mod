@@ -11,6 +11,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20191027212112-611e8accdfc9 // indirect
 	github.com/hashicorp/golang-lru v0.5.3 // indirect
 	github.com/iancoleman/strcase v0.0.0-20191112232945-16388991a334
+	github.com/kr/text v0.1.0
 	github.com/mattn/go-colorable v0.1.2 // indirect
 	github.com/mattn/go-isatty v0.0.12 // indirect
 	github.com/mattn/go-runewidth v0.0.6 // indirect
