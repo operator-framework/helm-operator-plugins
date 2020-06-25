@@ -96,7 +96,7 @@ func (s *apiScaffolder) scaffold() error {
 	chartPath := filepath.Join(chartutil.HelmChartsDir, chrt.Metadata.Name)
 	if err := machinery.NewScaffold().Execute(
 		s.newUniverse(res),
-		&templates.CRDSample{ChartPath: chartPath, Chart: *chrt},
+		&templates.CRDSample{ChartPath: chartPath, Chart: chrt},
 		&templates.CRDEditorRole{},
 		&templates.CRDViewerRole{},
 		&templates.WatchesUpdater{ChartPath: chartPath},

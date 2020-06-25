@@ -36,7 +36,7 @@ type CRDSample struct {
 	file.ResourceMixin
 
 	ChartPath string
-	Chart     chart.Chart
+	Chart     *chart.Chart
 	Spec      string
 }
 
@@ -50,11 +50,18 @@ func (f *CRDSample) SetTemplateDefaults() error {
 	f.IfExistsAction = file.Error
 
 	if len(f.Spec) == 0 {
-		spec, err := yaml.Marshal(f.Chart.Values)
-		if err != nil {
-			return fmt.Errorf("failed to get chart values: %v", err)
+		f.Spec = defaultSpecTemplate
+		if f.Chart != nil {
+			spec, err := yaml.Marshal(f.Chart.Values)
+			if err != nil {
+				return fmt.Errorf("failed to get chart values: %v", err)
+			}
+			comment := ""
+			if len(f.ChartPath) != 0 {
+				comment = fmt.Sprintf("# Default values copied from <project_dir>/%s/values.yaml\n", f.ChartPath)
+			}
+			f.Spec = fmt.Sprintf("%s%s\n", comment, string(spec))
 		}
-		f.Spec = fmt.Sprintf("# Default values copied from <project_dir>/%s/values.yaml\n%s\n", f.ChartPath, string(spec))
 	}
 
 	f.TemplateBody = crdSampleTemplate
@@ -72,6 +79,9 @@ func (f *CRDSample) GetFuncMap() template.FuncMap {
 	fm["indent"] = indent
 	return fm
 }
+
+const defaultSpecTemplate = `foo: bar
+`
 
 const crdSampleTemplate = `apiVersion: {{ .Resource.Domain }}/{{ .Resource.Version }}
 kind: {{ .Resource.Kind }}
