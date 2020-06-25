@@ -18,7 +18,7 @@ test: fmt vet testbin
 
 # Build manager binary
 manager: fmt vet
-	go build -o bin/manager main.go
+	go build -o bin/helm-operator main.go
 
 # Run go fmt against code
 fmt:
@@ -62,3 +62,10 @@ testbin:
 	mkdir -p testbin
 	[[ -x testbin/etcd ]] || curl -L https://storage.googleapis.com/etcd/${ETCD_VER}/etcd-${ETCD_VER}-${OS}-${ARCH}.tar.gz | tar zx -C testbin --strip-components=1 etcd-${ETCD_VER}-${OS}-${ARCH}/etcd
 	[[ -x testbin/kube-apiserver && -x testbin/kubectl ]] || curl -L https://dl.k8s.io/${K8S_VER}/kubernetes-server-${OS}-${ARCH}.tar.gz | tar zx -C testbin --strip-components=3 kubernetes/server/bin/kube-apiserver kubernetes/server/bin/kubectl
+
+
+.PHONY: install
+install: ## Build and install the binary with the current source code. Use it to test your changes locally.
+	make manager
+	cp ./bin/helm-operator $(shell go env GOPATH)/bin/helm-operator
+
