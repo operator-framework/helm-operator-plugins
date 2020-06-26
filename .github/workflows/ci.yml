@@ -7,7 +7,6 @@ on:
     branches: [ master ]
 
 jobs:
-
   test:
     name: Test
     runs-on: ubuntu-latest
@@ -37,12 +36,6 @@ jobs:
     - name: Build
       run: make build
 
-    - name: Lint
-      uses: golangci/golangci-lint-action@v1
-      with:
-        # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
-        version: v1.27
-      
     - name: Test
       run: make test
 
@@ -50,9 +43,148 @@ jobs:
       with:
         path-to-profile: cover.out
 
+    - uses: actions/upload-artifact@v2
+      with:
+        name: helm-operator
+        path: bin/helm-operator
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v2
+
+    - name: Lint
+      uses: golangci/golangci-lint-action@v1
+      with:
+        version: v1.27
+
+  e2e:
+    name: End-to-end tests
+    needs: [ test ]
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v2
+
+    - uses: actions/download-artifact@v2
+      with:
+        name: helm-operator
+        path: bin
+    - run: chmod +x bin/helm-operator
+
+    - name: Setup kind cluster
+      uses: engineerd/setup-kind@v0.4.0 
+      with:
+       version: v0.8.1
+
+    - name: Print Cluster Info
+      run: |
+        kubectl version
+        kubectl cluster-info
+        kubectl get pods -n kube-system
+        echo "current-context:" $(kubectl config current-context)
+        echo "environment-kubeconfig:" ${KUBECONFIG}
+
+    - name: Create nginx-operator project
+      run: |
+        mkdir nginx-operator
+        cd nginx-operator
+        ../bin/helm-operator init --domain=example.com --group=webapps --version=v1 --kind=Nginx
+
+    - name: Build helm-operator image
+      uses: docker/build-push-action@v1
+      with:
+        repository: helm-operator
+        tags: e2e
+        push: false
+
+    - name: Use e2e helm-operator base image
+      run: (cd nginx-operator && sed -i 's|FROM quay.io/joelanford/helm-operator:.*|FROM helm-operator:e2e|g' Dockerfile)
+
+    - name: Build nginx-operator image
+      uses: docker/build-push-action@v1
+      with:
+        path: nginx-operator
+        repository: nginx-operator
+        tags: e2e
+        push: false
+
+    - name: Load nginx-operator image into kind cluster
+      run: |
+        kind load docker-image nginx-operator:e2e
+
+    - name: Run nginx-operator
+      run: |
+        set -e
+        cd nginx-operator
+
+        #sed -i '/image: controller:latest/a \        imagePullPolicy: Never' config/manager/manager.yaml
+        make deploy IMG=nginx-operator:e2e
+
+        if ! timeout 1m kubectl rollout status --namespace=nginx-operator-system deployment/nginx-operator-controller-manager; then
+          kubectl desribe --namespace=nginx-operator-system deployment/nginx-operator-controller-manager
+          kubectl logs --namespace=nginx-operator-system deployment/nginx-operator-controller-manager manager
+          exit 1
+        fi
+
+        kubectl create clusterrolebinding nginx-operator-system-metrics-reader --clusterrole=nginx-operator-metrics-reader --serviceaccount=nginx-operator-system:default
+
+        if ! kubectl run --attach --rm --restart=Never --namespace=nginx-operator-system test-metrics --image=fedora:latest -- /bin/bash -c 'curl -sfo /dev/null -v -s -k -H "Authorization: Bearer `cat /var/run/secrets/kubernetes.io/serviceaccount/token`" https://nginx-operator-controller-manager-metrics-service:8443/metrics'; then
+          kubectl logs --namespace=nginx-operator-system deployment/nginx-operator-controller-manager manager
+          exit 1
+        fi
+
+    - name: Create Nginx Custom Resource
+      run: |
+        set -e
+        cd nginx-operator
+
+        kubectl create -f ./config/samples/webapps_v1_nginx.yaml
+
+    - name: Test reconciliation
+      run: |
+        set -e
+        cd nginx-operator
+
+        if ! timeout 1m bash -c -- "until kubectl rollout status deployment/nginx-sample; do sleep 1; done"; then
+            kubectl describe pods -l "app.kubernetes.io/instance=nginx-sample"
+            kubectl describe deployments nginx-sample
+            kubectl logs --namespace=nginx-operator-system deployment/nginx-operator-controller-manager manager
+            exit 1
+        fi
+
+        kubectl get service nginx-sample
+
+        # scale deployment replicas to 2 and verify the
+        # deployment automatically scales back down to 1.
+        kubectl scale deployment/nginx-sample --replicas=2
+        if ! timeout 1m bash -c -- "until test \$(kubectl get deployment/nginx-sample -o jsonpath='{..spec.replicas}') -eq 1; do sleep 1; done"; then
+            kubectl describe pods -l "app.kubernetes.io/instance=nginx-sample"
+            kubectl describe deployments nginx-sample
+            kubectl logs --namespace=nginx-operator-system deployment/nginx-operator-controller-manager manager
+            exit 1
+        fi
+
+        # update CR to replicaCount=2 and verify the deployment
+        # automatically scales up to 2 replicas.
+        kubectl patch nginxes.webapps.example.com nginx-sample -p '[{"op":"replace","path":"/spec/replicaCount","value":2}]' --type=json
+        if ! timeout 1m bash -c -- "until test \$(kubectl get deployment/nginx-sample -o jsonpath='{..spec.replicas}') -eq 2; do sleep 1; done"; then
+            kubectl describe pods -l "app.kubernetes.io/instance=nginx-sample"
+            kubectl describe deployments nginx-sample
+            kubectl logs --namespace=nginx-operator-system deployment/nginx-operator-controller-manager manager
+            exit 1
+        fi
+
+        kubectl delete -f ./config/samples/webapps_v1_nginx.yaml --wait=true
+        kubectl logs --namespace=nginx-operator-system deployment/nginx-operator-controller-manager manager | grep "Release uninstalled" | grep "nginx-sample"
+
   deploy:
     name: Deploy
-    needs: test
+    needs: [ test, lint, e2e ]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:
