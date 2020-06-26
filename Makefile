@@ -17,8 +17,8 @@ test: fmt vet testbin
 	go test -race -covermode atomic -coverprofile cover.out ./...
 
 # Build manager binary
-manager: fmt vet
-	go build -o bin/manager main.go
+build: fmt vet
+	go build -o bin/helm-operator main.go
 
 # Run go fmt against code
 fmt:
