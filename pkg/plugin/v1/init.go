@@ -1,18 +1,16 @@
-/*
-Copyright 2020 The Kubernetes Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+// Copyright 2020 The Operator-SDK Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package v1
 
@@ -35,8 +33,8 @@ import (
 
 type initPlugin struct {
 	config        *config.Config
-	apiPlugin     createAPIPlugin
 	doAPIScaffold bool
+	apiPlugin     createAPIPlugin
 
 	// For help text.
 	commandName string
@@ -47,6 +45,7 @@ var (
 	_ cmdutil.RunOptions = &initPlugin{}
 )
 
+// UpdateContext define plugin context
 func (p *initPlugin) UpdateContext(ctx *plugin.Context) {
 	ctx.Description = `Initialize a new Helm-based operator project.
 
@@ -111,22 +110,28 @@ Writes the following files:
 	p.commandName = ctx.CommandName
 }
 
+// BindFlags bind all plugin flags
 func (p *initPlugin) BindFlags(fs *pflag.FlagSet) {
 	fs.SortFlags = false
-	fs.StringVar(&p.config.Domain, "domain", "my.domain", "domain for groups")
+	fs.StringVar(&p.config.Domain, "domain", "my.domain",
+		"Kubernetes domain for groups. (e.g example.com)")
 	p.apiPlugin.BindFlags(fs)
 }
 
+// InjectConfig will inject the PROJECT file/config in the plugin
 func (p *initPlugin) InjectConfig(c *config.Config) {
 	// v3 project configs get a 'layout' value.
 	c.Layout = plugin.KeyFor(Plugin{})
 	p.config = c
+	p.apiPlugin.config = p.config
 }
 
+// Run will call the plugin actions
 func (p *initPlugin) Run() error {
 	return cmdutil.Run(p)
 }
 
+// Validate will perform the required checks before to start to scaffold
 func (p *initPlugin) Validate() error {
 	// Check if the project name is a valid namespace according to k8s
 	dir, err := os.Getwd()
@@ -139,15 +144,22 @@ func (p *initPlugin) Validate() error {
 	}
 
 	defaultOpts := chartutil.CreateOptions{CRDVersion: "v1"}
-	if !p.apiPlugin.gvk.Empty() || p.apiPlugin.createOptions != defaultOpts {
+	if !p.apiPlugin.apiFlags.gvk.Empty() || p.apiPlugin.apiFlags.createOptions != defaultOpts {
 		p.doAPIScaffold = true
-		return p.apiPlugin.Validate()
+		// should not do the create api validation because it has specifics checks that
+		// are not valid for the init plugin E.g ensure that the PROJECT/config file is scaffolded
+		return p.apiPlugin.apiFlags.Validate()
+	}
+
+	// set the repo to provide the operator name
+	if p.config.Repo == "" {
+		p.config.Repo = projectName
 	}
 	return nil
 }
 
+// GetScaffolder will run the plugin scaffold
 func (p *initPlugin) GetScaffolder() (scaffold.Scaffolder, error) {
-	p.apiPlugin.config = p.config
 	var (
 		apiScaffolder scaffold.Scaffolder
 		err           error
@@ -161,6 +173,7 @@ func (p *initPlugin) GetScaffolder() (scaffold.Scaffolder, error) {
 	return scaffolds.NewInitScaffolder(p.config, apiScaffolder), nil
 }
 
+// PostScaffold will run the required actions after the default plugin scaffold
 func (p *initPlugin) PostScaffold() error {
 	if !p.doAPIScaffold {
 		fmt.Printf("Next: define a resource with:\n$ %s create api\n", p.commandName)
