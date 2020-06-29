@@ -72,7 +72,7 @@ func main() {
 		"Namespace in which to create the leader election configmap for holding the leader lock (required if running locally).")
 
 	pflag.StringVar(&watchesFile, "watches-file", "./watches.yaml", "Path to watches.yaml file.")
-	pflag.DurationVar(&defaultReconcilePeriod, "reconcile-period", 0, "Default reconcile period for controllers (use 0 to disable periodic reconciliation)")
+	pflag.DurationVar(&defaultReconcilePeriod, "reconcile-period", time.Minute, "Default reconcile period for controllers (use 0 to disable periodic reconciliation)")
 	pflag.IntVar(&defaultMaxConcurrentReconciles, "max-concurrent-reconciles", runtime.NumCPU(), "Default maximum number of concurrent reconciles for controllers.")
 
 	// Deprecated: --max-workers flag does not align well with the name of the option it configures on the controller
