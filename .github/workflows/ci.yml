@@ -122,7 +122,6 @@ jobs:
         set -e
         cd nginx-operator
 
-        #sed -i '/image: controller:latest/a \        imagePullPolicy: Never' config/manager/manager.yaml
         make deploy IMG=nginx-operator:e2e
 
         if ! timeout 1m kubectl rollout status --namespace=nginx-operator-system deployment/nginx-operator-controller-manager; then
