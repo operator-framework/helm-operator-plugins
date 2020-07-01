@@ -23,6 +23,8 @@ import (
 	"helm.sh/helm/v3/pkg/chartutil"
 	"helm.sh/helm/v3/pkg/strvals"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	"github.com/joelanford/helm-operator/pkg/values"
 )
 
 type Values struct {
@@ -65,14 +67,4 @@ func (v *Values) ApplyOverrides(in map[string]string) error {
 	return nil
 }
 
-type Mapper interface {
-	Map(chartutil.Values) chartutil.Values
-}
-
-type MapperFunc func(chartutil.Values) chartutil.Values
-
-var DefaultMapper = MapperFunc(func(v chartutil.Values) chartutil.Values { return v })
-
-func (m MapperFunc) Map(v chartutil.Values) chartutil.Values {
-	return m(v)
-}
+var DefaultMapper = values.MapperFunc(func(v chartutil.Values) chartutil.Values { return v })

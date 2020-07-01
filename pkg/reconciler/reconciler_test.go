@@ -58,7 +58,7 @@ import (
 	"github.com/joelanford/helm-operator/pkg/internal/testutil"
 	"github.com/joelanford/helm-operator/pkg/reconciler/internal/conditions"
 	helmfake "github.com/joelanford/helm-operator/pkg/reconciler/internal/fake"
-	"github.com/joelanford/helm-operator/pkg/reconciler/internal/values"
+	"github.com/joelanford/helm-operator/pkg/values"
 )
 
 var _ = Describe("Reconciler", func() {

@@ -52,7 +52,8 @@ import (
 	"github.com/joelanford/helm-operator/pkg/reconciler/internal/conditions"
 	internalhook "github.com/joelanford/helm-operator/pkg/reconciler/internal/hook"
 	"github.com/joelanford/helm-operator/pkg/reconciler/internal/updater"
-	"github.com/joelanford/helm-operator/pkg/reconciler/internal/values"
+	internalvalues "github.com/joelanford/helm-operator/pkg/reconciler/internal/values"
+	"github.com/joelanford/helm-operator/pkg/values"
 )
 
 const uninstallFinalizer = "uninstall-helm-release"
@@ -245,7 +246,7 @@ func WithOverrideValues(overrides map[string]string) Option {
 		// Validate that overrides can be parsed and applied
 		// so that we fail fast during operator setup rather
 		// than during the first reconciliation.
-		m := values.New(map[string]interface{}{})
+		m := internalvalues.New(map[string]interface{}{})
 		if err := m.ApplyOverrides(overrides); err != nil {
 			return err
 		}
@@ -549,7 +550,7 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
 }
 
 func (r *Reconciler) getValues(obj *unstructured.Unstructured) (chartutil.Values, error) {
-	crVals, err := values.FromUnstructured(obj)
+	crVals, err := internalvalues.FromUnstructured(obj)
 	if err != nil {
 		return chartutil.Values{}, err
 	}
@@ -768,7 +769,7 @@ func (r *Reconciler) addDefaults(mgr ctrl.Manager, controllerName string) {
 		r.eventRecorder = mgr.GetEventRecorderFor(controllerName)
 	}
 	if r.valueMapper == nil {
-		r.valueMapper = values.DefaultMapper
+		r.valueMapper = internalvalues.DefaultMapper
 	}
 }
 
