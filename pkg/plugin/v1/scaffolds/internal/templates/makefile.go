@@ -54,13 +54,6 @@ const makefileTemplate = `
 # Image URL to use all building/pushing image targets
 IMG ?= {{ .Image }}
 
-# Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
-ifeq (,$(shell go env GOBIN))
-GOBIN=$(shell go env GOPATH)/bin
-else
-GOBIN=$(shell go env GOBIN)
-endif
-
 all: manager
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
@@ -93,19 +86,19 @@ docker-build:
 docker-push:
 	docker push ${IMG}
 
-# TODO(joelanford): need to download kustomize binary for user
-#    Can't rely on Go to download and build
+PATH  := $(PATH):$(PWD)/bin
+SHELL := env PATH=$(PATH) /bin/sh
+OS    = $(shell uname -s | tr '[:upper:]' '[:lower:]')
+ARCH  = $(shell uname -m | sed 's/x86_64/amd64/')
+
 kustomize:
 ifeq (, $(shell which kustomize 2>/dev/null))
 	@{ \
 	set -e ;\
-	KUSTOMIZE_GEN_TMP_DIR=$$(mktemp -d) ;\
-	cd $$KUSTOMIZE_GEN_TMP_DIR ;\
-	go mod init tmp ;\
-	go get sigs.k8s.io/kustomize/kustomize/v3@{{ .KustomizeVersion }} ;\
-	rm -rf $$KUSTOMIZE_GEN_TMP_DIR ;\
+	mkdir -p bin ;\
+	curl -sSLo - https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/{{ .KustomizeVersion }}/kustomize_{{ .KustomizeVersion }}_${OS}_${ARCH}.tar.gz | tar xzf - -C bin/ ;\
 	}
-KUSTOMIZE=$(GOBIN)/kustomize
+KUSTOMIZE=./bin/kustomize
 else
 KUSTOMIZE=$(shell which kustomize)
 endif
