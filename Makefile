@@ -13,12 +13,12 @@ endif
 all: manager
 
 # Run tests
-test: generate fmt vet testbin
+test: fmt vet testbin
 	go test -race -covermode atomic -coverprofile cover.out ./...
 
 # Build manager binary
-manager: generate fmt vet
-	go build -o bin/manager main.go
+build: fmt vet
+	go build -o bin/helm-operator main.go
 
 # Run go fmt against code
 fmt:
@@ -30,10 +30,6 @@ vet:
 
 lint: golangci-lint
 	$(GOLANGCI_LINT) run
-
-# Generate code
-generate: controller-gen
-	$(CONTROLLER_GEN) object:headerFile=./hack/boilerplate.go.txt paths="./..."
 
 # Build the docker image
 docker-build: test
@@ -54,24 +50,6 @@ ifeq (, $(shell which golangci-lint))
 GOLANGCI_LINT=$(shell go env GOPATH)/bin/golangci-lint
 else
 GOLANGCI_LINT=$(shell which golangci-lint)
-endif
-
-
-# find or download controller-gen
-# download controller-gen if necessary
-controller-gen:
-ifeq (, $(shell which controller-gen))
-	@{ \
-	set -e ;\
-	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
-	cd $$CONTROLLER_GEN_TMP_DIR ;\
-	go mod init tmp ;\
-	go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.3.0 ;\
-	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
-	}
-CONTROLLER_GEN=$(shell go env GOPATH)/bin/controller-gen
-else
-CONTROLLER_GEN=$(shell which controller-gen)
 endif
 
 K8S_VER ?= v1.18.2

@@ -5,8 +5,6 @@ linters:
     # requires fixes
     # - dupl
     - errcheck
-    # requires fixes
-    # - goconst
     - gocyclo
     # requires fixes
     # - gofmt
@@ -33,6 +31,6 @@ linters:
     - unparam
     - unused
     - varcheck
-
+    - goconst
 run:
   deadline: 5m

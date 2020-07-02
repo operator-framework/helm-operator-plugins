@@ -6,11 +6,11 @@ require (
 	github.com/go-logr/logr v0.1.0
 	github.com/onsi/ginkgo v1.12.0
 	github.com/onsi/gomega v1.9.0
+	github.com/prometheus/client_golang v1.0.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.5.1
 	go.uber.org/zap v1.13.0
 	gomodules.xyz/jsonpatch/v2 v2.0.1
-	gopkg.in/yaml.v2 v2.2.8
 	helm.sh/helm/v3 v3.2.0
 	k8s.io/api v0.18.2
 	k8s.io/apiextensions-apiserver v0.18.2
