@@ -122,6 +122,7 @@ jobs:
         set -e
         cd nginx-operator
 
+        make kustomize
         make deploy IMG=nginx-operator:e2e
 
         if ! timeout 1m kubectl rollout status --namespace=nginx-operator-system deployment/nginx-operator-controller-manager; then
