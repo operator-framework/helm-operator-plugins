@@ -54,7 +54,7 @@ const makefileTemplate = `
 # Image URL to use all building/pushing image targets
 IMG ?= {{ .Image }}
 
-all: manager
+all: docker-build
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: helm-operator
@@ -75,7 +75,6 @@ deploy: kustomize
 
 # Undeploy controller in the configured Kubernetes cluster in ~/.kube/config
 undeploy: kustomize
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default | kubectl delete -f -
 
 # Build the docker image
