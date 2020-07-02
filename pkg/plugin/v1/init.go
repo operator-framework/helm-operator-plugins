@@ -23,12 +23,12 @@ import (
 	"strings"
 
 	"github.com/spf13/pflag"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"sigs.k8s.io/kubebuilder/pkg/model/config"
 	"sigs.k8s.io/kubebuilder/pkg/plugin"
 	"sigs.k8s.io/kubebuilder/pkg/plugin/scaffold"
 
 	"github.com/joelanford/helm-operator/pkg/internal/kubebuilder/cmdutil"
-	"github.com/joelanford/helm-operator/pkg/internal/kubebuilder/validation"
 	"github.com/joelanford/helm-operator/pkg/plugin/internal/chartutil"
 	"github.com/joelanford/helm-operator/pkg/plugin/v1/scaffolds"
 )
