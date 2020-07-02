@@ -63,7 +63,7 @@ func main() {
 		defaultMaxWorkers int
 	)
 
-	pflag.StringVar(&metricsAddr, "metrics-addr", "0.0.0.0:8383", "The address the metric endpoint binds to.")
+	pflag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	pflag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
 	pflag.StringVar(&leaderElectionID, "leader-election-id", "",
@@ -72,12 +72,12 @@ func main() {
 		"Namespace in which to create the leader election configmap for holding the leader lock (required if running locally).")
 
 	pflag.StringVar(&watchesFile, "watches-file", "./watches.yaml", "Path to watches.yaml file.")
-	pflag.DurationVar(&defaultReconcilePeriod, "reconcile-period", 0, "Default reconcile period for controllers (use 0 to disable periodic reconciliation)")
-	pflag.IntVar(&defaultMaxConcurrentReconciles, "max-concurrent-reconciles", 1, "Default maximum number of concurrent reconciles for controllers.")
+	pflag.DurationVar(&defaultReconcilePeriod, "reconcile-period", time.Minute, "Default reconcile period for controllers (use 0 to disable periodic reconciliation)")
+	pflag.IntVar(&defaultMaxConcurrentReconciles, "max-concurrent-reconciles", runtime.NumCPU(), "Default maximum number of concurrent reconciles for controllers.")
 
 	// Deprecated: --max-workers flag does not align well with the name of the option it configures on the controller
 	//   (MaxConcurrentReconciles). Flag `--max-concurrent-reconciles` should be used instead.
-	pflag.IntVar(&defaultMaxWorkers, "max-workers", 1, "Default maximum number of concurrent reconciles for controllers.")
+	pflag.IntVar(&defaultMaxWorkers, "max-workers", runtime.NumCPU(), "Default maximum number of concurrent reconciles for controllers.")
 	if err := pflag.CommandLine.MarkHidden("max-workers"); err != nil {
 		setupLog.Error(err, "failed to hide --max-workers flag")
 		os.Exit(1)
@@ -119,7 +119,7 @@ func main() {
 	}
 
 	options := ctrl.Options{
-		MetricsBindAddress:      "0.0.0.0:8383",
+		MetricsBindAddress:      metricsAddr,
 		LeaderElection:          enableLeaderElection,
 		LeaderElectionID:        leaderElectionID,
 		LeaderElectionNamespace: leaderElectionNamespace,
@@ -141,7 +141,7 @@ func main() {
 	for _, w := range ws {
 		reconcilePeriod := defaultReconcilePeriod
 		if w.ReconcilePeriod != nil {
-			reconcilePeriod = *w.ReconcilePeriod
+			reconcilePeriod = w.ReconcilePeriod.Duration
 		}
 
 		maxConcurrentReconciles := defaultMaxConcurrentReconciles
@@ -171,8 +171,6 @@ func main() {
 		}
 		setupLog.Info("configured watch", "gvk", w.GroupVersionKind, "chartPath", w.ChartPath, "maxConcurrentReconciles", maxConcurrentReconciles, "reconcilePeriod", reconcilePeriod)
 	}
-
-	// TODO(joelanford): kube-state-metrics?
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

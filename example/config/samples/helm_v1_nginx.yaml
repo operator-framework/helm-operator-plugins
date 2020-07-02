@@ -3,10 +3,10 @@ kind: Nginx
 metadata:
   name: nginx-sample
   annotations:
-    helm.sdk.operatorframework.io/upgrade-force: "true"
-    helm.sdk.operatorframework.io/install-disable-hooks: "true"
-    helm.sdk.operatorframework.io/upgrade-disable-hooks: "true"
-    helm.sdk.operatorframework.io/uninstall-disable-hooks: "true"
+    helm.operator-sdk/upgrade-force: "true"
+    helm.operator-sdk/install-disable-hooks: "true"
+    helm.operator-sdk/upgrade-disable-hooks: "true"
+    helm.operator-sdk/uninstall-disable-hooks: "true"
 spec:
   replicaCount: 1
   image:
