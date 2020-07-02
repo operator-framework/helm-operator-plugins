@@ -19,6 +19,8 @@ package validation
 import (
 	"errors"
 	"regexp"
+
+	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 // projectVersionFmt defines the project version format from a project config.
@@ -32,7 +34,7 @@ func ValidateProjectVersion(version string) error {
 		return errors.New("project version is empty")
 	}
 	if !projectVersionRe.MatchString(version) {
-		return errors.New(regexError("invalid value for project version", projectVersionFmt))
+		return errors.New(validation.RegexError("invalid value for project version", projectVersionFmt))
 	}
 	return nil
 }
