@@ -766,9 +766,11 @@ func (r *Reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) err
 		return err
 	}
 
-	// The Secret is created because Helm will create a release secret. So, we want to watch that and reconcile
-	// if it is deleted or changed. Sometimes that can cause an unrecoverable error, but by watching it,
-	// we can bubble that problem up to the CR status.
+	// In Helm 3, Secrets are now used as the default storage driver which has release information.
+	// In this way, we need to watch the release secret to re-trigger the reconcile when/if it is 
+	// deleted/changed. Sometimes that can cause an unrecoverable error, but by watching it, 	
+	// we can bubble that problem up to the CR status. More info: 
+	// https://helm.sh/docs/topics/advanced/#storage-backends
 	secret := &corev1.Secret{}
 	secret.SetGroupVersionKind(schema.GroupVersionKind{
 		Group:   "",
