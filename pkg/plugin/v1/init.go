@@ -121,6 +121,8 @@ func (p *initPlugin) InjectConfig(c *config.Config) {
 	// v3 project configs get a 'layout' value.
 	c.Layout = plugin.KeyFor(Plugin{})
 	p.config = c
+	// Set config in the API Plugin (used to scaffold resources)
+	p.apiPlugin.config = p.config
 }
 
 func (p *initPlugin) Run() error {
@@ -147,7 +149,7 @@ func (p *initPlugin) Validate() error {
 }
 
 func (p *initPlugin) GetScaffolder() (scaffold.Scaffolder, error) {
-	p.apiPlugin.config = p.config
+
 	var (
 		apiScaffolder scaffold.Scaffolder
 		err           error
