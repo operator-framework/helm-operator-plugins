@@ -23,6 +23,8 @@ import (
 	"helm.sh/helm/v3/pkg/chartutil"
 	"helm.sh/helm/v3/pkg/strvals"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	"github.com/joelanford/helm-operator/pkg/values"
 )
 
 // Values is the release/CR values which are the chart.values
@@ -70,17 +72,4 @@ func (v *Values) ApplyOverrides(in map[string]string) error {
 	return nil
 }
 
-// Mapper is the interface that that map the chart the values
-type Mapper interface {
-	Map(chartutil.Values) chartutil.Values
-}
-// MapperFunc a function that maps values from a custom resource spec to the values passed to Helm
-type MapperFunc func(chartutil.Values) chartutil.Values
-
-// DefaultMapper func used to map chart values will returns values untouched
-var DefaultMapper = MapperFunc(func(v chartutil.Values) chartutil.Values { return v })
-
-// Map return a values.Mapper of the chart values informed
-func (m MapperFunc) Map(v chartutil.Values) chartutil.Values {
-	return m(v)
-}
+var DefaultMapper = values.MapperFunc(func(v chartutil.Values) chartutil.Values { return v })
