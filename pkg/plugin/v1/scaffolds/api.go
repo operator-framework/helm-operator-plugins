@@ -56,7 +56,7 @@ func NewAPIScaffolder(config *config.Config, opts chartutil.CreateOptions) scaff
 // Scaffold implements Scaffolder
 func (s *apiScaffolder) Scaffold() error {
 	switch {
-	case s.config.IsV2(), s.config.IsV3():
+	case s.config.IsV3():
 		return s.scaffold()
 	default:
 		return fmt.Errorf("unknown project version %v", s.config.Version)
