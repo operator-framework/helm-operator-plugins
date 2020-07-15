@@ -139,7 +139,7 @@ func (p *initPlugin) Validate() error {
 	}
 
 	defaultOpts := chartutil.CreateOptions{CRDVersion: "v1"}
-	if !p.apiPlugin.gvk.Empty() || p.apiPlugin.createOptions != defaultOpts {
+	if !p.apiPlugin.createOptions.GVK.Empty() || p.apiPlugin.createOptions != defaultOpts {
 		p.doAPIScaffold = true
 		return p.apiPlugin.Validate()
 	}
@@ -164,6 +164,7 @@ func (p *initPlugin) GetScaffolder() (scaffold.Scaffolder, error) {
 func (p *initPlugin) PostScaffold() error {
 	if !p.doAPIScaffold {
 		fmt.Printf("Next: define a resource with:\n$ %s create api\n", p.commandName)
+		return nil
 	}
-	return nil
+	return p.apiPlugin.PostScaffold()
 }

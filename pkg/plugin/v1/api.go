@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	"github.com/spf13/pflag"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/kubebuilder/pkg/model/config"
 	"sigs.k8s.io/kubebuilder/pkg/model/resource"
 	"sigs.k8s.io/kubebuilder/pkg/plugin"
@@ -36,7 +35,6 @@ type createAPIPlugin struct {
 	config *config.Config
 
 	createOptions chartutil.CreateOptions
-	gvk           schema.GroupVersionKind
 }
 
 var (

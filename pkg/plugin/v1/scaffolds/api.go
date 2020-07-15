@@ -55,22 +55,6 @@ func NewAPIScaffolder(config *config.Config, opts chartutil.CreateOptions) scaff
 
 // Scaffold implements Scaffolder
 func (s *apiScaffolder) Scaffold() error {
-	switch {
-	case s.config.IsV2(), s.config.IsV3():
-		return s.scaffold()
-	default:
-		return fmt.Errorf("unknown project version %v", s.config.Version)
-	}
-}
-
-func (s *apiScaffolder) newUniverse(r *resource.Resource) *model.Universe {
-	return model.NewUniverse(
-		model.WithConfig(s.config),
-		model.WithResource(r),
-	)
-}
-
-func (s *apiScaffolder) scaffold() error {
 	projectDir, err := os.Getwd()
 	if err != nil {
 		return err
@@ -135,4 +119,11 @@ func (s *apiScaffolder) scaffold() error {
 	}
 
 	return nil
+}
+
+func (s *apiScaffolder) newUniverse(r *resource.Resource) *model.Universe {
+	return model.NewUniverse(
+		model.WithConfig(s.config),
+		model.WithResource(r),
+	)
 }
