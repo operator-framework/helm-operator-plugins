@@ -69,7 +69,7 @@ func main() {
 	pflag.StringVar(&leaderElectionID, "leader-election-id", "",
 		"Name of the configmap that is used for holding the leader lock.")
 	pflag.StringVar(&leaderElectionNamespace, "leader-election-namespace", "",
-		"Namespace in which to create the leader election configmap for holding the leader lock (required if running locally).")
+		"Namespace in which to create the leader election configmap for holding the leader lock (required if running locally with leader election enabled).")
 
 	pflag.StringVar(&watchesFile, "watches-file", "./watches.yaml", "Path to watches.yaml file.")
 	pflag.DurationVar(&defaultReconcilePeriod, "reconcile-period", time.Minute, "Default reconcile period for controllers (use 0 to disable periodic reconciliation)")
