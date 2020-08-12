@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 
+	sdkhandler "github.com/operator-framework/operator-lib/handler"
 	"gomodules.xyz/jsonpatch/v2"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
@@ -43,7 +44,6 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/joelanford/helm-operator/pkg/internal/sdk/controllerutil"
-	"github.com/joelanford/helm-operator/pkg/internal/sdk/handler"
 )
 
 type ActionClientGetter interface {
@@ -329,13 +329,9 @@ func (pr *ownerPostRenderer) Run(in *bytes.Buffer) (*bytes.Buffer, error) {
 			ownerRefs := append(u.GetOwnerReferences(), *ownerRef)
 			u.SetOwnerReferences(ownerRefs)
 		} else {
-			a := u.GetAnnotations()
-			if a == nil {
-				a = map[string]string{}
+			if err := sdkhandler.SetOwnerAnnotations(pr.owner, u); err != nil {
+				return err
 			}
-			a[handler.NamespacedNameAnnotation] = fmt.Sprintf("%s/%s", pr.owner.GetNamespace(), pr.owner.GetName())
-			a[handler.TypeAnnotation] = pr.owner.GetObjectKind().GroupVersionKind().GroupKind().String()
-			u.SetAnnotations(a)
 		}
 		outData, err := yaml.Marshal(u.Object)
 		if err != nil {
