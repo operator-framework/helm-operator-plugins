@@ -179,8 +179,8 @@ var _ = Describe("Reconciler", func() {
 				a2 := annotation.InstallDisableHooks{CustomName: "my.domain/custom-name2"}
 				Expect(WithInstallAnnotations(a1, a2)(r)).To(Succeed())
 				Expect(r.annotations).To(Equal(map[string]struct{}{
-					"my.domain/custom-name1": struct{}{},
-					"my.domain/custom-name2": struct{}{},
+					"my.domain/custom-name1": {},
+					"my.domain/custom-name2": {},
 				}))
 				Expect(r.installAnnotations).To(Equal(map[string]annotation.Install{
 					"my.domain/custom-name1": a1,
@@ -192,7 +192,7 @@ var _ = Describe("Reconciler", func() {
 				a2 := annotation.InstallDisableHooks{CustomName: "my.domain/custom-name1"}
 				Expect(WithInstallAnnotations(a1, a2)(r)).NotTo(Succeed())
 				Expect(r.annotations).To(Equal(map[string]struct{}{
-					"my.domain/custom-name1": struct{}{},
+					"my.domain/custom-name1": {},
 				}))
 				Expect(r.installAnnotations).To(Equal(map[string]annotation.Install{
 					"my.domain/custom-name1": a1,
@@ -204,7 +204,7 @@ var _ = Describe("Reconciler", func() {
 				Expect(WithInstallAnnotations(a1)(r)).To(Succeed())
 				Expect(WithUpgradeAnnotations(a2)(r)).To(HaveOccurred())
 				Expect(r.annotations).To(Equal(map[string]struct{}{
-					"my.domain/custom-name1": struct{}{},
+					"my.domain/custom-name1": {},
 				}))
 				Expect(r.installAnnotations).To(Equal(map[string]annotation.Install{
 					"my.domain/custom-name1": a1,
@@ -216,7 +216,7 @@ var _ = Describe("Reconciler", func() {
 				Expect(WithInstallAnnotations(a1)(r)).To(Succeed())
 				Expect(WithUninstallAnnotations(a2)(r)).To(HaveOccurred())
 				Expect(r.annotations).To(Equal(map[string]struct{}{
-					"my.domain/custom-name1": struct{}{},
+					"my.domain/custom-name1": {},
 				}))
 				Expect(r.installAnnotations).To(Equal(map[string]annotation.Install{
 					"my.domain/custom-name1": a1,
@@ -229,8 +229,8 @@ var _ = Describe("Reconciler", func() {
 				a2 := annotation.UpgradeDisableHooks{CustomName: "my.domain/custom-name2"}
 				Expect(WithUpgradeAnnotations(a1, a2)(r)).To(Succeed())
 				Expect(r.annotations).To(Equal(map[string]struct{}{
-					"my.domain/custom-name1": struct{}{},
-					"my.domain/custom-name2": struct{}{},
+					"my.domain/custom-name1": {},
+					"my.domain/custom-name2": {},
 				}))
 				Expect(r.upgradeAnnotations).To(Equal(map[string]annotation.Upgrade{
 					"my.domain/custom-name1": a1,
@@ -243,7 +243,7 @@ var _ = Describe("Reconciler", func() {
 				Expect(WithUpgradeAnnotations(a1)(r)).To(Succeed())
 				Expect(WithInstallAnnotations(a2)(r)).To(HaveOccurred())
 				Expect(r.annotations).To(Equal(map[string]struct{}{
-					"my.domain/custom-name1": struct{}{},
+					"my.domain/custom-name1": {},
 				}))
 				Expect(r.upgradeAnnotations).To(Equal(map[string]annotation.Upgrade{
 					"my.domain/custom-name1": a1,
@@ -254,7 +254,7 @@ var _ = Describe("Reconciler", func() {
 				a2 := annotation.UpgradeDisableHooks{CustomName: "my.domain/custom-name1"}
 				Expect(WithUpgradeAnnotations(a1, a2)(r)).NotTo(Succeed())
 				Expect(r.annotations).To(Equal(map[string]struct{}{
-					"my.domain/custom-name1": struct{}{},
+					"my.domain/custom-name1": {},
 				}))
 				Expect(r.upgradeAnnotations).To(Equal(map[string]annotation.Upgrade{
 					"my.domain/custom-name1": a1,
@@ -266,7 +266,7 @@ var _ = Describe("Reconciler", func() {
 				Expect(WithUpgradeAnnotations(a1)(r)).To(Succeed())
 				Expect(WithUninstallAnnotations(a2)(r)).To(HaveOccurred())
 				Expect(r.annotations).To(Equal(map[string]struct{}{
-					"my.domain/custom-name1": struct{}{},
+					"my.domain/custom-name1": {},
 				}))
 				Expect(r.upgradeAnnotations).To(Equal(map[string]annotation.Upgrade{
 					"my.domain/custom-name1": a1,
@@ -279,8 +279,8 @@ var _ = Describe("Reconciler", func() {
 				a2 := annotation.UninstallDisableHooks{CustomName: "my.domain/custom-name2"}
 				Expect(WithUninstallAnnotations(a1, a2)(r)).To(Succeed())
 				Expect(r.annotations).To(Equal(map[string]struct{}{
-					"my.domain/custom-name1": struct{}{},
-					"my.domain/custom-name2": struct{}{},
+					"my.domain/custom-name1": {},
+					"my.domain/custom-name2": {},
 				}))
 				Expect(r.uninstallAnnotations).To(Equal(map[string]annotation.Uninstall{
 					"my.domain/custom-name1": a1,
@@ -293,7 +293,7 @@ var _ = Describe("Reconciler", func() {
 				Expect(WithUninstallAnnotations(a1)(r)).To(Succeed())
 				Expect(WithInstallAnnotations(a2)(r)).To(HaveOccurred())
 				Expect(r.annotations).To(Equal(map[string]struct{}{
-					"my.domain/custom-name1": struct{}{},
+					"my.domain/custom-name1": {},
 				}))
 				Expect(r.uninstallAnnotations).To(Equal(map[string]annotation.Uninstall{
 					"my.domain/custom-name1": a1,
@@ -305,7 +305,7 @@ var _ = Describe("Reconciler", func() {
 				Expect(WithUninstallAnnotations(a1)(r)).To(Succeed())
 				Expect(WithUpgradeAnnotations(a2)(r)).To(HaveOccurred())
 				Expect(r.annotations).To(Equal(map[string]struct{}{
-					"my.domain/custom-name1": struct{}{},
+					"my.domain/custom-name1": {},
 				}))
 				Expect(r.uninstallAnnotations).To(Equal(map[string]annotation.Uninstall{
 					"my.domain/custom-name1": a1,
@@ -316,7 +316,7 @@ var _ = Describe("Reconciler", func() {
 				a2 := annotation.UninstallDisableHooks{CustomName: "my.domain/custom-name1"}
 				Expect(WithUninstallAnnotations(a1, a2)(r)).NotTo(Succeed())
 				Expect(r.annotations).To(Equal(map[string]struct{}{
-					"my.domain/custom-name1": struct{}{},
+					"my.domain/custom-name1": {},
 				}))
 				Expect(r.uninstallAnnotations).To(Equal(map[string]annotation.Uninstall{
 					"my.domain/custom-name1": a1,
