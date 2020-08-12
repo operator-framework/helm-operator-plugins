@@ -16,6 +16,27 @@ limitations under the License.
 
 package version
 
-const (
-	Version = "0.0.0+git"
+import (
+	"fmt"
+	"runtime"
+
+	"github.com/spf13/cobra"
+
+	"github.com/joelanford/helm-operator/internal/version"
 )
+
+func NewCmd() *cobra.Command {
+	versionCmd := &cobra.Command{
+		Use:   "version",
+		Short: "Prints the version of helm-operator",
+		Run: func(cmd *cobra.Command, args []string) {
+			run()
+		},
+	}
+	return versionCmd
+}
+
+func run() {
+	fmt.Printf("helm-operator version: %q, commit: %q, go version: %q, GOOS: %q, GOARCH: %q\n",
+		version.Version, version.GitCommit, runtime.Version(), runtime.GOOS, runtime.GOARCH)
+}

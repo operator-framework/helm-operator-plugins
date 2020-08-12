@@ -10,15 +10,30 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
+# GO_BUILD_ARGS should be set when running 'go build' or 'go install'.
+REPO = $(shell go list -m)
+VERSION = $(shell git describe --dirty --tags --always)
+GIT_COMMIT = $(shell git rev-parse HEAD)
+GO_BUILD_ARGS = \
+  -gcflags "all=-trimpath=$(shell dirname $(shell pwd))" \
+  -asmflags "all=-trimpath=$(shell dirname $(shell pwd))" \
+  -ldflags " \
+    -X '$(REPO)/internal/version.Version=$(VERSION)' \
+    -X '$(REPO)/internal/version.GitCommit=$(GIT_COMMIT)' \
+  " \
+
 all: manager
 
 # Run tests
-test: fmt vet testbin
-	go test -race -covermode atomic -coverprofile cover.out ./...
+ENVTEST_ASSETS_DIR=$(shell pwd)/testbin
+test: fmt vet
+	mkdir -p ${ENVTEST_ASSETS_DIR}
+	test -f ${ENVTEST_ASSETS_DIR}/setup-envtest.sh || curl -sSLo ${ENVTEST_ASSETS_DIR}/setup-envtest.sh https://raw.githubusercontent.com/kubernetes-sigs/controller-runtime/master/hack/setup-envtest.sh
+	source ${ENVTEST_ASSETS_DIR}/setup-envtest.sh; fetch_envtest_tools $(ENVTEST_ASSETS_DIR); setup_envtest_env $(ENVTEST_ASSETS_DIR); go test -race -covermode atomic -coverprofile cover.out ./...
 
 # Build manager binary
 build: fmt vet
-	go build -o bin/helm-operator main.go
+	go build $(GO_BUILD_ARGS) -o bin/helm-operator main.go
 
 # Run go fmt against code
 fmt:
@@ -32,7 +47,7 @@ lint: golangci-lint
 	$(GOLANGCI_LINT) run
 
 # Build the docker image
-docker-build: test
+docker-build:
 	docker build . -t ${IMG}
 
 # Push the docker image
@@ -51,14 +66,3 @@ GOLANGCI_LINT=$(shell go env GOPATH)/bin/golangci-lint
 else
 GOLANGCI_LINT=$(shell which golangci-lint)
 endif
-
-K8S_VER ?= v1.18.2
-ETCD_VER ?= v3.4.3
-OS=$(shell uname -s | tr '[:upper:]' '[:lower:]')
-ARCH=$(shell uname -m | sed 's/x86_64/amd64/')
-
-.PHONY: testbin
-testbin:
-	mkdir -p testbin
-	[[ -x testbin/etcd ]] || curl -L https://storage.googleapis.com/etcd/${ETCD_VER}/etcd-${ETCD_VER}-${OS}-${ARCH}.tar.gz | tar zx -C testbin --strip-components=1 etcd-${ETCD_VER}-${OS}-${ARCH}/etcd
-	[[ -x testbin/kube-apiserver && -x testbin/kubectl ]] || curl -L https://dl.k8s.io/${K8S_VER}/kubernetes-server-${OS}-${ARCH}.tar.gz | tar zx -C testbin --strip-components=3 kubernetes/server/bin/kube-apiserver kubernetes/server/bin/kubectl

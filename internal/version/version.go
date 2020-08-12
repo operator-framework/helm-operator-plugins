@@ -14,26 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package version
 
-import (
-	"log"
-
-	"github.com/spf13/cobra"
-
-	"github.com/joelanford/helm-operator/internal/cmd/run"
-	"github.com/joelanford/helm-operator/internal/cmd/version"
+var (
+	Version   = "unknown"
+	GitCommit = "unknown"
 )
-
-func main() {
-	root := cobra.Command{
-		Use: "helm-operator",
-	}
-
-	root.AddCommand(run.NewCmd())
-	root.AddCommand(version.NewCmd())
-
-	if err := root.Execute(); err != nil {
-		log.Fatal(err)
-	}
-}
