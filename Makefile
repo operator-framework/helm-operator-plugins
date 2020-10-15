@@ -1,64 +1,57 @@
-
-# Image URL to use all building/pushing image targets
-IMG ?= quay.io/joelanford/helm-operator
-
-SHELL=/bin/bash
-# Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
-ifeq (,$(shell go env GOBIN))
-GOBIN=$(shell go env GOPATH)/bin
-else
-GOBIN=$(shell go env GOBIN)
-endif
-
 # GO_BUILD_ARGS should be set when running 'go build' or 'go install'.
 VERSION_PKG = "$(shell go list -m)/internal/version"
 SCAFFOLD_VERSION = $(shell git describe --abbrev=0)
 GIT_VERSION = $(shell git describe --dirty --tags --always)
 GIT_COMMIT = $(shell git rev-parse HEAD)
+BUILD_DIR = $(PWD)/bin
 GO_BUILD_ARGS = \
   -gcflags "all=-trimpath=$(shell dirname $(shell pwd))" \
   -asmflags "all=-trimpath=$(shell dirname $(shell pwd))" \
   -ldflags " \
+    -s \
+    -w \
     -X '$(VERSION_PKG).ScaffoldVersion=$(SCAFFOLD_VERSION)' \
     -X '$(VERSION_PKG).GitVersion=$(GIT_VERSION)' \
     -X '$(VERSION_PKG).GitCommit=$(GIT_COMMIT)' \
   " \
 
+# Always use Go modules
 export GO111MODULE = on
 
+# Setup project-local paths and build settings
+SHELL=/bin/bash
+TOOLS_DIR=$(PWD)/tools
+TOOLS_BIN_DIR=$(TOOLS_DIR)/bin
+SCRIPTS_DIR=$(TOOLS_DIR)/scripts
+export PATH := $(BUILD_DIR):$(TOOLS_BIN_DIR):$(SCRIPTS_DIR):$(PATH)
+
+.PHONY: all
+all: test lint build
+
 # Run tests
-ENVTEST_ASSETS_DIR=$(shell pwd)/testbin
-test: fmt vet
-	mkdir -p ${ENVTEST_ASSETS_DIR}
-	test -f ${ENVTEST_ASSETS_DIR}/setup-envtest.sh || curl -sSLo ${ENVTEST_ASSETS_DIR}/setup-envtest.sh https://raw.githubusercontent.com/kubernetes-sigs/controller-runtime/master/hack/setup-envtest.sh
-	source ${ENVTEST_ASSETS_DIR}/setup-envtest.sh; fetch_envtest_tools $(ENVTEST_ASSETS_DIR); setup_envtest_env $(ENVTEST_ASSETS_DIR); go test -race -covermode atomic -coverprofile cover.out ./...
+.PHONY: test
+export KUBEBUILDER_ASSETS := $(TOOLS_BIN_DIR)
+CR_VERSION=$(shell go list -m sigs.k8s.io/controller-runtime | cut -d" " -f2 | sed 's/^v//')
+test:
+	fetch envtest $(CR_VERSION) && go test -race -covermode atomic -coverprofile cover.out ./...
 
 # Build manager binary
-build: fmt vet
-	CGO_ENABLED=0 go build $(GO_BUILD_ARGS) -o bin/helm-operator main.go
+.PHONY: build
+build:
+	CGO_ENABLED=0 mkdir -p $(BUILD_DIR) && go build $(GO_BUILD_ARGS) -o $(BUILD_DIR) ./
 
-# Run go fmt against code
-fmt:
+# Run go fmt and go mod tidy, and check for clean git tree
+.PHONY: fix
+fix:
+	go mod tidy
 	go fmt ./...
+	git diff --exit-code
 
-# Run go vet against code
-vet:
-	go vet ./...
+# Run various checks against code
+.PHONY: lint
+lint:
+	fetch golangci-lint 1.35.2 && golangci-lint run
 
-lint: golangci-lint
-	$(GOLANGCI_LINT) run
-lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
-	$(GOLANGCI_LINT) run --fix
-
-# find or download controller-gen
-# download controller-gen if necessary
-golangci-lint:
-ifeq (, $(shell which golangci-lint))
-	@{ \
-	set -e ;\
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v1.27.0 ;\
-	}
-GOLANGCI_LINT=$(shell go env GOPATH)/bin/golangci-lint
-else
-GOLANGCI_LINT=$(shell which golangci-lint)
-endif
+.PHONY: clean
+clean:
+	rm -rf $(TOOLS_BIN_DIR) $(BUILD_DIR)
