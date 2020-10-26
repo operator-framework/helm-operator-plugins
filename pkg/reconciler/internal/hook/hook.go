@@ -20,6 +20,7 @@ import (
 	"sync"
 
 	"github.com/go-logr/logr"
+	sdkhandler "github.com/operator-framework/operator-lib/handler"
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/releaseutil"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -32,7 +33,6 @@ import (
 
 	"github.com/joelanford/helm-operator/pkg/hook"
 	"github.com/joelanford/helm-operator/pkg/internal/sdk/controllerutil"
-	sdkhandler "github.com/joelanford/helm-operator/pkg/internal/sdk/handler"
 	"github.com/joelanford/helm-operator/pkg/internal/sdk/predicate"
 )
 
@@ -86,7 +86,7 @@ func (d *dependentResourceWatcher) Exec(owner *unstructured.Unstructured, rel re
 			}
 		} else {
 			if err := d.controller.Watch(&source.Kind{Type: &obj}, &sdkhandler.EnqueueRequestForAnnotation{
-				Type: owner.GetObjectKind().GroupVersionKind().GroupKind().String(),
+				Type: owner.GetObjectKind().GroupVersionKind().GroupKind(),
 			}, dependentPredicate); err != nil {
 				return err
 			}

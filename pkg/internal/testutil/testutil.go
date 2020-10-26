@@ -82,9 +82,9 @@ func BuildTestCR(gvk schema.GroupVersionKind) *unstructured.Unstructured {
 	obj.SetGroupVersionKind(gvk)
 	obj.SetUID("test-uid")
 	obj.SetAnnotations(map[string]string{
-		"helm.operator-sdk/install-description":   "test install description",
-		"helm.operator-sdk/upgrade-description":   "test upgrade description",
-		"helm.operator-sdk/uninstall-description": "test uninstall description",
+		"helm.sdk.operatorframework.io/install-description":   "test install description",
+		"helm.sdk.operatorframework.io/upgrade-description":   "test upgrade description",
+		"helm.sdk.operatorframework.io/uninstall-description": "test uninstall description",
 	})
 	return obj
 }

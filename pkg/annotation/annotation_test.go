@@ -14,14 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package annotation_test
+package annotation
 
 import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"helm.sh/helm/v3/pkg/action"
-
-	"github.com/joelanford/helm-operator/pkg/annotation"
 )
 
 var _ = Describe("Annotation", func() {
@@ -33,14 +31,14 @@ var _ = Describe("Annotation", func() {
 		})
 
 		Describe("DisableHooks", func() {
-			var a annotation.InstallDisableHooks
+			var a InstallDisableHooks
 
 			BeforeEach(func() {
-				a = annotation.InstallDisableHooks{}
+				a = InstallDisableHooks{}
 			})
 
 			It("should return a default name", func() {
-				Expect(a.Name()).To(Equal(annotation.DefaultInstallDisableHooksName))
+				Expect(a.Name()).To(Equal(defaultInstallDisableHooksName))
 			})
 
 			It("should return a custom name", func() {
@@ -68,14 +66,14 @@ var _ = Describe("Annotation", func() {
 		})
 
 		Describe("Description", func() {
-			var a annotation.InstallDescription
+			var a InstallDescription
 
 			BeforeEach(func() {
-				a = annotation.InstallDescription{}
+				a = InstallDescription{}
 			})
 
 			It("should return a default name", func() {
-				Expect(a.Name()).To(Equal(annotation.DefaultInstallDescriptionName))
+				Expect(a.Name()).To(Equal(defaultInstallDescriptionName))
 			})
 
 			It("should return a custom name", func() {
@@ -99,14 +97,14 @@ var _ = Describe("Annotation", func() {
 		})
 
 		Describe("DisableHooks", func() {
-			var a annotation.UpgradeDisableHooks
+			var a UpgradeDisableHooks
 
 			BeforeEach(func() {
-				a = annotation.UpgradeDisableHooks{}
+				a = UpgradeDisableHooks{}
 			})
 
 			It("should return a default name", func() {
-				Expect(a.Name()).To(Equal(annotation.DefaultUpgradeDisableHooksName))
+				Expect(a.Name()).To(Equal(defaultUpgradeDisableHooksName))
 			})
 
 			It("should return a custom name", func() {
@@ -134,14 +132,14 @@ var _ = Describe("Annotation", func() {
 		})
 
 		Describe("Force", func() {
-			var a annotation.UpgradeForce
+			var a UpgradeForce
 
 			BeforeEach(func() {
-				a = annotation.UpgradeForce{}
+				a = UpgradeForce{}
 			})
 
 			It("should return a default name", func() {
-				Expect(a.Name()).To(Equal(annotation.DefaultUpgradeForceName))
+				Expect(a.Name()).To(Equal(defaultUpgradeForceName))
 			})
 
 			It("should return a custom name", func() {
@@ -169,14 +167,14 @@ var _ = Describe("Annotation", func() {
 		})
 
 		Describe("Description", func() {
-			var a annotation.UpgradeDescription
+			var a UpgradeDescription
 
 			BeforeEach(func() {
-				a = annotation.UpgradeDescription{}
+				a = UpgradeDescription{}
 			})
 
 			It("should return a default name", func() {
-				Expect(a.Name()).To(Equal(annotation.DefaultUpgradeDescriptionName))
+				Expect(a.Name()).To(Equal(defaultUpgradeDescriptionName))
 			})
 
 			It("should return a custom name", func() {
@@ -200,14 +198,14 @@ var _ = Describe("Annotation", func() {
 		})
 
 		Describe("DisableHooks", func() {
-			var a annotation.UninstallDisableHooks
+			var a UninstallDisableHooks
 
 			BeforeEach(func() {
-				a = annotation.UninstallDisableHooks{}
+				a = UninstallDisableHooks{}
 			})
 
 			It("should return a default name", func() {
-				Expect(a.Name()).To(Equal(annotation.DefaultUninstallDisableHooksName))
+				Expect(a.Name()).To(Equal(defaultUninstallDisableHooksName))
 			})
 
 			It("should return a custom name", func() {
@@ -235,14 +233,14 @@ var _ = Describe("Annotation", func() {
 		})
 
 		Describe("Description", func() {
-			var a annotation.UninstallDescription
+			var a UninstallDescription
 
 			BeforeEach(func() {
-				a = annotation.UninstallDescription{}
+				a = UninstallDescription{}
 			})
 
 			It("should return a default name", func() {
-				Expect(a.Name()).To(Equal(annotation.DefaultUninstallDescriptionName))
+				Expect(a.Name()).To(Equal(defaultUninstallDescriptionName))
 			})
 
 			It("should return a custom name", func() {

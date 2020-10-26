@@ -22,6 +22,7 @@ import (
 	"github.com/go-logr/logr/testing"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	sdkhandler "github.com/operator-framework/operator-lib/handler"
 	"helm.sh/helm/v3/pkg/release"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -30,7 +31,6 @@ import (
 
 	"github.com/joelanford/helm-operator/pkg/hook"
 	"github.com/joelanford/helm-operator/pkg/internal/sdk/fake"
-	sdkhandler "github.com/joelanford/helm-operator/pkg/internal/sdk/handler"
 	internalhook "github.com/joelanford/helm-operator/pkg/reconciler/internal/hook"
 )
 
