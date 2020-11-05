@@ -12,7 +12,8 @@ endif
 
 # GO_BUILD_ARGS should be set when running 'go build' or 'go install'.
 REPO = $(shell go list -m)
-VERSION = $(shell git describe --dirty --tags --always)
+#TODO (anrastog): set version to repo build/tag after v1 plugin is available in master.
+VERSION = master
 GIT_COMMIT = $(shell git rev-parse HEAD)
 GO_BUILD_ARGS = \
   -gcflags "all=-trimpath=$(shell dirname $(shell pwd))" \
@@ -22,7 +23,7 @@ GO_BUILD_ARGS = \
     -X '$(REPO)/internal/version.GitCommit=$(GIT_COMMIT)' \
   " \
 
-all: manager
+#all: manager
 
 # Run tests
 ENVTEST_ASSETS_DIR=$(shell pwd)/testbin
@@ -45,14 +46,15 @@ vet:
 
 lint: golangci-lint
 	$(GOLANGCI_LINT) run
-
+lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
+	$(GOLANGCI_LINT) run --fix
 # Build the docker image
 docker-build:
-	docker build . -t ${IMG}
+	docker build . -t quay.io/joelanford/helm-operator:$(VERSION)
 
 # Push the docker image
 docker-push:
-	docker push ${IMG}
+	docker push quay.io/joelanford/helm-operator:$(VERSION)
 
 # find or download controller-gen
 # download controller-gen if necessary

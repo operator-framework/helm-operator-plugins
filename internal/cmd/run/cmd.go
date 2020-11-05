@@ -43,7 +43,7 @@ func NewCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "run",
-		Short: "Run the operator",
+		Short: "Run the helm operator controller",
 		Run: func(cmd *cobra.Command, _ []string) {
 			logf.SetLogger(zapl.New(zapl.UseFlagOptions(opts)))
 			r.run(cmd)
