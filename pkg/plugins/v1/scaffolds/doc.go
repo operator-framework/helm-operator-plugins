@@ -1,5 +1,5 @@
 /*
-Copyright 2020 The Operator-SDK Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,10 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package version
-
-var (
-	//TODO: Hardcode it to version string to support importing and usage in operator-sdk
-	Version   = "unknown"
-	GitCommit = "unknown"
-)
+// Package scaffolds contains libraries for scaffolding code to use with helm-operator
+package scaffolds
