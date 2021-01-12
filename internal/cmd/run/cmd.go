@@ -90,7 +90,7 @@ func printVersion() {
 		"Go Version", runtime.Version(),
 		"GOOS", runtime.GOOS,
 		"GOARCH", runtime.GOARCH,
-		"helm-operator", version.Version)
+		"helm-operator", version.GitVersion)
 }
 
 func (r *run) run(cmd *cobra.Command) {
