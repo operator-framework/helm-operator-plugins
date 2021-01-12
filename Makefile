@@ -50,7 +50,7 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 	$(GOLANGCI_LINT) run --fix
 # Build the docker image
 docker-build:
-	docker build . -t quay.io/joelanford/helm-operator:$(VERSION)
+	docker build -t quay.io/joelanford/helm-operator:$(VERSION) .
 
 # Push the docker image
 docker-push:
