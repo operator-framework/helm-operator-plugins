@@ -24,13 +24,13 @@ import (
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/repo/repotest"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"sigs.k8s.io/kubebuilder/pkg/model/resource"
+	"sigs.k8s.io/kubebuilder/v2/pkg/model/resource"
 
 	"github.com/joelanford/helm-operator/pkg/plugins/v1/chartutil"
 )
 
 func TestCreateChart(t *testing.T) {
-	srv, err := repotest.NewTempServer("testdata/*.tgz")
+	srv, err := repotest.NewTempServerWithCleanup(t, "testdata/*.tgz")
 	if err != nil {
 		t.Fatalf("Failed to create new temp server: %s", err)
 	}

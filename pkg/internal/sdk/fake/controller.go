@@ -17,6 +17,9 @@ limitations under the License.
 package fake
 
 import (
+	"context"
+
+	"github.com/go-logr/logr"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -42,12 +45,16 @@ func (c *Controller) Watch(s source.Source, h handler.EventHandler, ps ...predic
 	c.WatchCalls = append(c.WatchCalls, watchCall{s, h, ps})
 	return nil
 }
-func (c *Controller) Start(stop <-chan struct{}) error {
+func (c *Controller) Start(ctx context.Context) error {
 	c.Started = true
-	<-stop
-	return nil
+	<-ctx.Done()
+	return ctx.Err()
 }
-func (c *Controller) Reconcile(r reconcile.Request) (reconcile.Result, error) {
+func (c *Controller) Reconcile(_ context.Context, r reconcile.Request) (reconcile.Result, error) {
 	c.ReconcileRequests = append(c.ReconcileRequests, r)
 	return reconcile.Result{}, nil
+}
+
+func (c Controller) GetLogger() logr.Logger {
+	return nil
 }

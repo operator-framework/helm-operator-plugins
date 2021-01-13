@@ -23,16 +23,29 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
-func NewDelegatingClientFunc() manager.NewClientFunc {
-	return func(cache cache.Cache, config *rest.Config, options client.Options) (client.Client, error) {
-		c, err := client.New(config, options)
-		if err != nil {
-			return nil, err
-		}
-		return &client.DelegatingClient{
-			Reader:       cache,
-			Writer:       c,
-			StatusClient: c,
-		}, nil
+func NewCachingClientBuilder() manager.ClientBuilder {
+	return &cachingClientBuilder{}
+}
+
+type cachingClientBuilder struct {
+	uncached []client.Object
+}
+
+func (b *cachingClientBuilder) WithUncached(objs ...client.Object) manager.ClientBuilder {
+	b.uncached = append(b.uncached, objs...)
+	return b
+}
+
+func (b *cachingClientBuilder) Build(cache cache.Cache, config *rest.Config, options client.Options) (client.Client, error) {
+	c, err := client.New(config, options)
+	if err != nil {
+		return nil, err
 	}
+
+	return client.NewDelegatingClient(client.NewDelegatingClientInput{
+		CacheReader:       cache,
+		Client:            c,
+		UncachedObjects:   b.uncached,
+		CacheUnstructured: true,
+	})
 }

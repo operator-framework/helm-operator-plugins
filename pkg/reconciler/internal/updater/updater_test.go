@@ -26,7 +26,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -43,7 +42,7 @@ var _ = Describe("Updater", func() {
 	)
 
 	BeforeEach(func() {
-		client = fake.NewFakeClientWithScheme(scheme.Scheme)
+		client = fake.NewClientBuilder().Build()
 		u = New(client)
 		obj = &unstructured.Unstructured{Object: map[string]interface{}{
 			"apiVersion": "apps/v1",

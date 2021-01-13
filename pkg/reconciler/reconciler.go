@@ -395,9 +395,7 @@ func WithValueMapper(m values.Mapper) Option {
 //   - Deployed - a release for this CR is deployed (but not necessarily ready).
 //   - ReleaseFailed - an installation or upgrade failed.
 //   - Irreconcilable - an error occurred during reconciliation
-func (r *Reconciler) Reconcile(req ctrl.Request) (res ctrl.Result, err error) {
-	// todo:https://github.com/kubernetes-sigs/controller-runtime/issues/801
-	ctx := context.TODO()
+func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
 	log := r.log.WithValues(strings.ToLower(r.gvk.Kind), req.NamespacedName)
 
 	obj := &unstructured.Unstructured{}

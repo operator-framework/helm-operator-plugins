@@ -24,73 +24,123 @@ import (
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	. "github.com/joelanford/helm-operator/pkg/manager"
 )
 
-var _ = Describe("NewDelegatingClientFunc", func() {
-	var podNs *v1.Namespace
+var _ = Describe("NewCachingClientBuilder", func() {
+	var ns *unstructured.Unstructured
 	var pod *v1.Pod
+	var cfgMap *v1.ConfigMap
+	var builder manager.ClientBuilder
 
 	BeforeEach(func() {
-		podNs = &v1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "pod-ns",
-			},
-		}
+		ns = &unstructured.Unstructured{}
+		ns.SetGroupVersionKind(schema.GroupVersionKind{
+			Version: "v1",
+			Kind:    "Namespace",
+		})
+		ns.SetName("ns-" + rand.String(4))
 		pod = &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pod",
-				Namespace: "pod-ns",
+				Name:      "pod-" + rand.String(4),
+				Namespace: ns.GetName(),
 			},
 			Spec: v1.PodSpec{Containers: []v1.Container{
 				{Name: "test", Image: "test"},
 			}},
 		}
+		cfgMap = &v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "config-" + rand.String(4),
+				Namespace: ns.GetName(),
+			},
+			Data: map[string]string{"foo": "bar"},
+		}
+		builder = NewCachingClientBuilder().WithUncached(cfgMap)
+		Expect(builder).NotTo(BeNil())
 	})
 
-	It("should return a function that returns a working delegating client", func() {
-		clientFunc := NewDelegatingClientFunc()
-		Expect(clientFunc).NotTo(BeNil())
+	When("the ClientBuilder is valid", func() {
+		var (
+			c  cache.Cache
+			cl client.Client
+		)
 
-		c, err := cache.New(cfg, cache.Options{})
-		Expect(err).To(BeNil())
+		BeforeEach(func() {
+			var err error
+			c, err = cache.New(cfg, cache.Options{})
+			Expect(err).To(BeNil())
 
-		cl, err := clientFunc(c, cfg, client.Options{})
-		Expect(err).To(BeNil())
+			cl, err = builder.Build(c, cfg, client.Options{})
+			Expect(err).To(BeNil())
 
-		Expect(cl.Create(context.TODO(), podNs)).To(Succeed())
-		Expect(cl.Create(context.TODO(), pod)).To(Succeed())
-		Expect(cl.Get(context.TODO(), client.ObjectKey{Namespace: "pod-ns", Name: "pod"}, pod)).To(BeAssignableToTypeOf(&cache.ErrCacheNotStarted{}))
+			Expect(cl.Create(context.TODO(), ns)).To(Succeed())
+			Expect(cl.Create(context.TODO(), pod)).To(Succeed())
+			Expect(cl.Create(context.TODO(), cfgMap)).To(Succeed())
+		})
+		AfterEach(func() {
+			Eventually(func() error { return client.IgnoreNotFound(cl.Delete(context.TODO(), pod)) }).Should(BeNil())
+			Eventually(func() error { return client.IgnoreNotFound(cl.Delete(context.TODO(), cfgMap)) }).Should(BeNil())
+			Eventually(func() error { return client.IgnoreNotFound(cl.Delete(context.TODO(), ns)) }).Should(BeNil())
+		})
 
-		done := make(chan struct{})
-		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			Expect(c.Start(done)).To(Succeed())
-			wg.Done()
-		}()
-		Expect(c.WaitForCacheSync(done)).To(BeTrue())
+		When("caches are not started", func() {
+			It("should succeed on uncached objects", func() {
+				Expect(cl.Get(context.TODO(), client.ObjectKeyFromObject(cfgMap), cfgMap)).To(Succeed())
+			})
+			It("should error on cached unstructured objects (PENDING: https://github.com/kubernetes-sigs/controller-runtime/pull/1332)", func() {
+				Expect(cl.Get(context.TODO(), client.ObjectKeyFromObject(ns), ns)).To(BeAssignableToTypeOf(&cache.ErrCacheNotStarted{}))
+			})
+			It("should error on cached structured objects", func() {
+				Expect(cl.Get(context.TODO(), client.ObjectKeyFromObject(pod), pod)).To(BeAssignableToTypeOf(&cache.ErrCacheNotStarted{}))
+			})
+		})
 
-		Expect(cl.Get(context.TODO(), client.ObjectKey{Namespace: "pod-ns", Name: "pod"}, pod)).To(Succeed())
-		close(done)
-		wg.Wait()
+		When("caches are started", func() {
+			var (
+				ctx    context.Context
+				cancel context.CancelFunc
+				wg     *sync.WaitGroup
+			)
+
+			BeforeEach(func() {
+				ctx, cancel = context.WithCancel(context.Background())
+				wg = &sync.WaitGroup{}
+				wg.Add(1)
+				go func() {
+					Expect(c.Start(ctx)).To(Succeed())
+					wg.Done()
+				}()
+				Expect(c.WaitForCacheSync(ctx)).To(BeTrue())
+			})
+			AfterEach(func() {
+				cancel()
+				wg.Wait()
+			})
+			It("should return all objects", func() {
+				Expect(cl.Get(context.TODO(), client.ObjectKeyFromObject(ns), ns)).To(Succeed())
+				Expect(cl.Get(context.TODO(), client.ObjectKeyFromObject(pod), pod)).To(Succeed())
+				Expect(cl.Get(context.TODO(), client.ObjectKeyFromObject(cfgMap), cfgMap)).To(Succeed())
+			})
+		})
 	})
 
 	It("should fail with an invalid config", func() {
-		clientFunc := NewDelegatingClientFunc()
-		Expect(clientFunc).NotTo(BeNil())
-
 		c, err := cache.New(cfg, cache.Options{})
 		Expect(err).To(BeNil())
 
 		badConfig := rest.Config{
 			Host: "/path/to/foobar",
 		}
-		_, err = clientFunc(c, &badConfig, client.Options{})
+		_, err = builder.Build(c, &badConfig, client.Options{})
 		Expect(err).NotTo(BeNil())
 	})
 })

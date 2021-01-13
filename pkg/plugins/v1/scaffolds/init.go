@@ -21,11 +21,11 @@ import (
 	"os"
 	"strings"
 
-	"sigs.k8s.io/kubebuilder/pkg/model"
-	"sigs.k8s.io/kubebuilder/pkg/model/config"
-	"sigs.k8s.io/kubebuilder/pkg/plugin/scaffold"
+	"sigs.k8s.io/kubebuilder/v2/pkg/model"
+	"sigs.k8s.io/kubebuilder/v2/pkg/model/config"
 
 	"github.com/joelanford/helm-operator/internal/version"
+	"github.com/joelanford/helm-operator/pkg/plugins/internal/kubebuilder/cmdutil"
 	"github.com/joelanford/helm-operator/pkg/plugins/internal/kubebuilder/machinery"
 	"github.com/joelanford/helm-operator/pkg/plugins/v1/chartutil"
 	"github.com/joelanford/helm-operator/pkg/plugins/v1/scaffolds/internal/templates"
@@ -36,24 +36,24 @@ import (
 )
 
 const (
-	// KustomizeVersion is the kubernetes-sigs/kustomize version to be used in the project
-	KustomizeVersion = "v3.5.4"
+	// kustomizeVersion is the sigs.k8s.io/kustomize version to be used in the project
+	kustomizeVersion = "v3.5.4"
 
 	imageName = "controller:latest"
 )
 
-// HelmOperatorVersion is the version of the helm binary used in the Makefile
-var HelmOperatorVersion = strings.TrimSuffix(version.Version, "+git")
+// helmOperatorVersion is set to the version of helm-operator at compile-time.
+var helmOperatorVersion = strings.TrimSuffix(version.Version, "+git")
 
-var _ scaffold.Scaffolder = &initScaffolder{}
+var _ cmdutil.Scaffolder = &initScaffolder{}
 
 type initScaffolder struct {
 	config        *config.Config
-	apiScaffolder scaffold.Scaffolder
+	apiScaffolder cmdutil.Scaffolder
 }
 
 // NewInitScaffolder returns a new Scaffolder for project initialization operations
-func NewInitScaffolder(config *config.Config, apiScaffolder scaffold.Scaffolder) scaffold.Scaffolder {
+func NewInitScaffolder(config *config.Config, apiScaffolder cmdutil.Scaffolder) cmdutil.Scaffolder {
 	return &initScaffolder{
 		config:        config,
 		apiScaffolder: apiScaffolder,
@@ -84,13 +84,13 @@ func (s *initScaffolder) scaffold() error {
 	return machinery.NewScaffold().Execute(
 		s.newUniverse(),
 		&templates.Dockerfile{
-			HelmOperatorVersion: HelmOperatorVersion,
+			HelmOperatorVersion: helmOperatorVersion,
 		},
 		&templates.GitIgnore{},
 		&templates.Makefile{
 			Image:               imageName,
-			KustomizeVersion:    KustomizeVersion,
-			HelmOperatorVersion: HelmOperatorVersion,
+			KustomizeVersion:    kustomizeVersion,
+			HelmOperatorVersion: helmOperatorVersion,
 		},
 		&templates.Watches{},
 		&rbac.AuthProxyRole{},

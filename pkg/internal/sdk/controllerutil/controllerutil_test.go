@@ -25,11 +25,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -53,7 +51,9 @@ var _ = Describe("Controllerutil", func() {
 					Namespace: "testNamespace",
 				},
 			}
-			client = fake.NewFakeClientWithScheme(scheme.Scheme, pod)
+			client = fake.NewClientBuilder().
+				WithObjects(pod).
+				Build()
 		})
 
 		AfterEach(func() {
@@ -74,8 +74,8 @@ var _ = Describe("Controllerutil", func() {
 	Describe("SupportsOwnerReference", func() {
 		var (
 			rm              *meta.DefaultRESTMapper
-			owner           runtime.Object
-			dependent       runtime.Object
+			owner           client.Object
+			dependent       client.Object
 			clusterScoped   = schema.GroupVersionKind{Group: "example.com", Version: "v1", Kind: "ClusterScoped"}
 			namespaceScoped = schema.GroupVersionKind{Group: "example.com", Version: "v1", Kind: "NamespaceScoped"}
 		)
@@ -127,30 +127,6 @@ var _ = Describe("Controllerutil", func() {
 						Expect(supportsOwnerRef).To(BeFalse())
 						Expect(err).To(BeNil())
 					})
-				})
-			})
-			When("Objects do not have valid type metadata", func() {
-
-				var (
-					validOwner   = createObject(clusterScoped, types.NamespacedName{Namespace: "", Name: "owner"})
-					invalidOwner = &object{TypeMeta: metav1.TypeMeta{
-						APIVersion: clusterScoped.GroupVersion().String(),
-						Kind:       clusterScoped.Kind,
-					}}
-					invalidDepedent = &object{TypeMeta: metav1.TypeMeta{
-						APIVersion: namespaceScoped.GroupVersion().String(),
-						Kind:       namespaceScoped.Kind,
-					}}
-				)
-				It("should fail when owner is invalid", func() {
-					supportsOwnerRef, err := SupportsOwnerReference(rm, invalidOwner, invalidDepedent)
-					Expect(supportsOwnerRef).To(BeFalse())
-					Expect(err).NotTo(BeNil())
-				})
-				It("should fail when dependent is invalid", func() {
-					supportsOwnerRef, err := SupportsOwnerReference(rm, validOwner, invalidDepedent)
-					Expect(supportsOwnerRef).To(BeFalse())
-					Expect(err).NotTo(BeNil())
 				})
 			})
 		})
@@ -209,9 +185,3 @@ func createObject(gvk schema.GroupVersionKind, key types.NamespacedName) *unstru
 	u.SetNamespace(key.Namespace)
 	return u
 }
-
-type object struct {
-	metav1.TypeMeta
-}
-
-func (o *object) DeepCopyObject() runtime.Object { return nil }
