@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	sdkhandler "github.com/operator-framework/operator-lib/handler"
 	"gomodules.xyz/jsonpatch/v2"
@@ -325,7 +326,7 @@ func (pr *ownerPostRenderer) Run(in *bytes.Buffer) (*bytes.Buffer, error) {
 		if err != nil {
 			return err
 		}
-		if useOwnerRef {
+		if useOwnerRef && !containsResourcePolicyKeep(u.GetAnnotations()) {
 			ownerRef := metav1.NewControllerRef(pr.owner, pr.owner.GetObjectKind().GroupVersionKind())
 			ownerRefs := append(u.GetOwnerReferences(), *ownerRef)
 			u.SetOwnerReferences(ownerRefs)
@@ -347,4 +348,16 @@ func (pr *ownerPostRenderer) Run(in *bytes.Buffer) (*bytes.Buffer, error) {
 		return nil, err
 	}
 	return &out, nil
+}
+
+func containsResourcePolicyKeep(annotations map[string]string) bool {
+	if annotations == nil {
+		return false
+	}
+	resourcePolicyType, ok := annotations[kube.ResourcePolicyAnno]
+	if !ok {
+		return false
+	}
+	resourcePolicyType = strings.ToLower(strings.TrimSpace(resourcePolicyType))
+	return resourcePolicyType == kube.KeepPolicy
 }
