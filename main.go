@@ -17,29 +17,31 @@ limitations under the License.
 package main
 
 import (
+	"fmt"
 	"log"
+	"runtime"
 
 	"github.com/spf13/cobra"
-	"sigs.k8s.io/kubebuilder/pkg/cli"
+	"sigs.k8s.io/kubebuilder/v2/pkg/cli"
+	"sigs.k8s.io/kubebuilder/v2/pkg/model/config"
 
 	"github.com/joelanford/helm-operator/internal/cmd/run"
-	"github.com/joelanford/helm-operator/internal/cmd/version"
+	"github.com/joelanford/helm-operator/internal/version"
 	pluginv1 "github.com/joelanford/helm-operator/pkg/plugins/v1"
 )
 
 func main() {
 	commands := []*cobra.Command{
 		run.NewCmd(),
-		version.NewCmd(),
 	}
 	c, err := cli.New(
 		cli.WithCommandName("helm-operator"),
+		cli.WithVersion(getVersion()),
 		cli.WithPlugins(
 			&pluginv1.Plugin{},
 		),
-		cli.WithDefaultPlugins(
-			&pluginv1.Plugin{},
-		),
+		cli.WithDefaultProjectVersion(config.Version3Alpha),
+		cli.WithDefaultPlugins(config.Version3Alpha, &pluginv1.Plugin{}),
 		cli.WithExtraCommands(commands...),
 	)
 	if err != nil {
@@ -49,4 +51,10 @@ func main() {
 	if err := c.Run(); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func getVersion() string {
+	return fmt.Sprintf("helm-operator version: %q, commit: %q, go version: %q, GOOS: %q, GOARCH: %q\n",
+		version.Version, version.GitCommit, runtime.Version(), runtime.GOOS, runtime.GOARCH)
+
 }

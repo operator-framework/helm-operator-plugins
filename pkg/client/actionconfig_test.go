@@ -19,6 +19,7 @@ package client
 import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	"github.com/joelanford/helm-operator/pkg/internal/testutil"
@@ -32,7 +33,7 @@ var _ = Describe("ActionConfig", func() {
 	})
 
 	var _ = Describe("GetActionConfig", func() {
-		var obj Object
+		var obj client.Object
 		BeforeEach(func() {
 			obj = testutil.BuildTestCR(gvk)
 		})

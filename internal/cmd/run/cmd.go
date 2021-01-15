@@ -24,7 +24,9 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	zapl "sigs.k8s.io/controller-runtime/pkg/log/zap"
 
@@ -56,6 +58,7 @@ func NewCmd() *cobra.Command {
 
 type run struct {
 	metricsAddr             string
+	probeAddr               string
 	enableLeaderElection    bool
 	leaderElectionID        string
 	leaderElectionNamespace string
@@ -67,6 +70,7 @@ type run struct {
 
 func (r *run) bindFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&r.metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
+	fs.StringVar(&r.probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	fs.BoolVar(&r.enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
 	fs.StringVar(&r.leaderElectionID, "leader-election-id", "",
@@ -104,16 +108,27 @@ func (r *run) run(cmd *cobra.Command) {
 	}
 
 	options := ctrl.Options{
-		MetricsBindAddress:      r.metricsAddr,
-		LeaderElection:          r.enableLeaderElection,
-		LeaderElectionID:        r.leaderElectionID,
-		LeaderElectionNamespace: r.leaderElectionNamespace,
-		NewClient:               manager.NewDelegatingClientFunc(),
+		MetricsBindAddress:         r.metricsAddr,
+		HealthProbeBindAddress:     r.probeAddr,
+		LeaderElection:             r.enableLeaderElection,
+		LeaderElectionID:           r.leaderElectionID,
+		LeaderElectionNamespace:    r.leaderElectionNamespace,
+		LeaderElectionResourceLock: resourcelock.ConfigMapsResourceLock,
+		ClientBuilder:              manager.NewCachingClientBuilder(),
 	}
 	manager.ConfigureWatchNamespaces(&options, log)
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
 	if err != nil {
 		log.Error(err, "unable to start manager")
+		os.Exit(1)
+	}
+
+	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+		log.Error(err, "unable to setup health check")
+		os.Exit(1)
+	}
+	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+		log.Error(err, "unable to setup readiness check")
 		os.Exit(1)
 	}
 

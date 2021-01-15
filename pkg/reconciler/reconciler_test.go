@@ -41,7 +41,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -91,7 +90,7 @@ var _ = Describe("Reconciler", func() {
 		})
 		var _ = Describe("WithClient", func() {
 			It("should set the reconciler client", func() {
-				client := fake.NewFakeClientWithScheme(scheme.Scheme)
+				client := fake.NewClientBuilder().Build()
 				Expect(WithClient(client)(r)).To(Succeed())
 				Expect(r.client).To(Equal(client))
 			})
@@ -367,8 +366,9 @@ var _ = Describe("Reconciler", func() {
 			objKey types.NamespacedName
 			req    reconcile.Request
 
-			mgr  manager.Manager
-			done chan struct{}
+			mgr    manager.Manager
+			ctx    context.Context
+			cancel context.CancelFunc
 
 			r  *Reconciler
 			ac helmclient.ActionInterface
@@ -376,9 +376,9 @@ var _ = Describe("Reconciler", func() {
 
 		BeforeEach(func() {
 			mgr = getManagerOrFail()
-			done = make(chan struct{})
-			go func() { Expect(mgr.GetCache().Start(done)) }()
-			Expect(mgr.GetCache().WaitForCacheSync(done)).To(BeTrue())
+			ctx, cancel = context.WithCancel(context.Background())
+			go func() { Expect(mgr.GetCache().Start(ctx)) }()
+			Expect(mgr.GetCache().WaitForCacheSync(ctx)).To(BeTrue())
 
 			obj = testutil.BuildTestCR(gvk)
 			objKey = types.NamespacedName{Namespace: obj.GetNamespace(), Name: obj.GetName()}
@@ -414,25 +414,25 @@ var _ = Describe("Reconciler", func() {
 			})
 
 			By("ensuring the CR is deleted", func() {
-				err := mgr.GetAPIReader().Get(context.TODO(), objKey, obj)
+				err := mgr.GetAPIReader().Get(ctx, objKey, obj)
 				if apierrors.IsNotFound(err) {
 					return
 				}
 				Expect(err).To(BeNil())
 				obj.SetFinalizers([]string{})
-				Expect(mgr.GetClient().Update(context.TODO(), obj)).To(Succeed())
-				err = mgr.GetClient().Delete(context.TODO(), obj)
+				Expect(mgr.GetClient().Update(ctx, obj)).To(Succeed())
+				err = mgr.GetClient().Delete(ctx, obj)
 				if apierrors.IsNotFound(err) {
 					return
 				}
 				Expect(err).To(BeNil())
 			})
-			close(done)
+			cancel()
 		})
 
 		When("requested CR is not found", func() {
 			It("returns successfully with no action", func() {
-				res, err := r.Reconcile(req)
+				res, err := r.Reconcile(ctx, req)
 				Expect(res).To(Equal(reconcile.Result{}))
 				Expect(err).To(BeNil())
 
@@ -440,14 +440,14 @@ var _ = Describe("Reconciler", func() {
 				Expect(err).To(Equal(driver.ErrReleaseNotFound))
 				Expect(rel).To(BeNil())
 
-				err = mgr.GetAPIReader().Get(context.TODO(), objKey, obj)
+				err = mgr.GetAPIReader().Get(ctx, objKey, obj)
 				Expect(apierrors.IsNotFound(err)).To(BeTrue())
 			})
 		})
 
 		When("requested CR is found", func() {
 			BeforeEach(func() {
-				Expect(mgr.GetClient().Create(context.TODO(), obj)).To(Succeed())
+				Expect(mgr.GetClient().Create(ctx, obj)).To(Succeed())
 			})
 
 			When("requested CR release is not installed", func() {
@@ -456,19 +456,19 @@ var _ = Describe("Reconciler", func() {
 						acgErr := errors.New("broken action client getter: error getting action client")
 
 						By("creating a reconciler with a broken action client getter", func() {
-							r.actionClientGetter = helmclient.ActionClientGetterFunc(func(helmclient.Object) (helmclient.ActionInterface, error) {
+							r.actionClientGetter = helmclient.ActionClientGetterFunc(func(client.Object) (helmclient.ActionInterface, error) {
 								return nil, acgErr
 							})
 						})
 
 						By("reconciling unsuccessfully", func() {
-							res, err := r.Reconcile(req)
+							res, err := r.Reconcile(ctx, req)
 							Expect(res).To(Equal(reconcile.Result{}))
 							Expect(err).To(MatchError(acgErr))
 						})
 
 						By("getting the CR", func() {
-							Expect(mgr.GetAPIReader().Get(context.TODO(), objKey, obj)).To(Succeed())
+							Expect(mgr.GetAPIReader().Get(ctx, objKey, obj)).To(Succeed())
 						})
 
 						By("verifying the CR status", func() {
@@ -492,20 +492,20 @@ var _ = Describe("Reconciler", func() {
 					})
 					It("returns an error getting the release", func() {
 						By("creating a reconciler with a broken action client getter", func() {
-							r.actionClientGetter = helmclient.ActionClientGetterFunc(func(helmclient.Object) (helmclient.ActionInterface, error) {
+							r.actionClientGetter = helmclient.ActionClientGetterFunc(func(client.Object) (helmclient.ActionInterface, error) {
 								cl := helmfake.NewActionClient()
 								return &cl, nil
 							})
 						})
 
 						By("reconciling unsuccessfully", func() {
-							res, err := r.Reconcile(req)
+							res, err := r.Reconcile(ctx, req)
 							Expect(res).To(Equal(reconcile.Result{}))
 							Expect(err).To(MatchError("get not implemented"))
 						})
 
 						By("getting the CR", func() {
-							Expect(mgr.GetAPIReader().Get(context.TODO(), objKey, obj)).To(Succeed())
+							Expect(mgr.GetAPIReader().Get(ctx, objKey, obj)).To(Succeed())
 						})
 
 						By("verifying the CR status", func() {
@@ -534,13 +534,13 @@ var _ = Describe("Reconciler", func() {
 					})
 					It("returns an error", func() {
 						By("reconciling unsuccessfully", func() {
-							res, err := r.Reconcile(req)
+							res, err := r.Reconcile(ctx, req)
 							Expect(res).To(Equal(reconcile.Result{}))
 							Expect(err.Error()).To(ContainSubstring("error parsing index"))
 						})
 
 						By("getting the CR", func() {
-							Expect(mgr.GetAPIReader().Get(context.TODO(), objKey, obj)).To(Succeed())
+							Expect(mgr.GetAPIReader().Get(ctx, objKey, obj)).To(Succeed())
 						})
 
 						By("verifying the CR status", func() {
@@ -567,18 +567,18 @@ var _ = Describe("Reconciler", func() {
 					It("removes the finalizer", func() {
 						By("adding the uninstall finalizer and deleting the CR", func() {
 							obj.SetFinalizers([]string{uninstallFinalizer})
-							Expect(mgr.GetClient().Update(context.TODO(), obj)).To(Succeed())
-							Expect(mgr.GetClient().Delete(context.TODO(), obj)).To(Succeed())
+							Expect(mgr.GetClient().Update(ctx, obj)).To(Succeed())
+							Expect(mgr.GetClient().Delete(ctx, obj)).To(Succeed())
 						})
 
 						By("successfully reconciling a request", func() {
-							res, err := r.Reconcile(req)
+							res, err := r.Reconcile(ctx, req)
 							Expect(res).To(Equal(reconcile.Result{}))
 							Expect(err).To(BeNil())
 						})
 
 						By("ensuring the finalizer is removed and the CR is deleted", func() {
-							err := mgr.GetAPIReader().Get(context.TODO(), objKey, obj)
+							err := mgr.GetAPIReader().Get(ctx, objKey, obj)
 							Expect(apierrors.IsNotFound(err)).To(BeTrue())
 						})
 					})
@@ -597,13 +597,13 @@ var _ = Describe("Reconciler", func() {
 						})
 						It("handles the installation error", func() {
 							By("returning an error", func() {
-								res, err := r.Reconcile(req)
+								res, err := r.Reconcile(ctx, req)
 								Expect(res).To(Equal(reconcile.Result{}))
 								Expect(err).To(HaveOccurred())
 							})
 
 							By("getting the CR", func() {
-								Expect(mgr.GetAPIReader().Get(context.TODO(), objKey, obj)).To(Succeed())
+								Expect(mgr.GetAPIReader().Get(ctx, objKey, obj)).To(Succeed())
 							})
 
 							By("ensuring the correct conditions are set on the CR", func() {
@@ -637,7 +637,7 @@ var _ = Describe("Reconciler", func() {
 								err error
 							)
 							By("successfully reconciling a request", func() {
-								res, err := r.Reconcile(req)
+								res, err := r.Reconcile(ctx, req)
 								Expect(err).To(BeNil())
 								Expect(res).To(Equal(reconcile.Result{}))
 							})
@@ -646,16 +646,16 @@ var _ = Describe("Reconciler", func() {
 								rel, err = ac.Get(obj.GetName())
 								Expect(err).To(BeNil())
 								Expect(rel).NotTo(BeNil())
-								Expect(mgr.GetAPIReader().Get(context.TODO(), objKey, obj)).To(Succeed())
+								Expect(mgr.GetAPIReader().Get(ctx, objKey, obj)).To(Succeed())
 							})
 
 							By("verifying the release", func() {
 								Expect(rel.Version).To(Equal(1))
-								verifyRelease(mgr.GetClient(), obj.GetNamespace(), rel)
+								verifyRelease(ctx, mgr.GetClient(), obj.GetNamespace(), rel)
 							})
 
 							By("verifying override event", func() {
-								verifyEvent(mgr.GetAPIReader(), obj,
+								verifyEvent(ctx, mgr.GetAPIReader(), obj,
 									"Warning",
 									"ValueOverridden",
 									`Chart value "image.repository" overridden to "custom-nginx" by operator`)
@@ -677,7 +677,7 @@ var _ = Describe("Reconciler", func() {
 							})
 						})
 						It("calls pre and post hooks", func() {
-							verifyHooksCalled(r, req)
+							verifyHooksCalled(ctx, r, req)
 						})
 					})
 				})
@@ -689,7 +689,7 @@ var _ = Describe("Reconciler", func() {
 				BeforeEach(func() {
 					// Reconcile once to get the release installed and finalizers added
 					var err error
-					res, err := r.Reconcile(req)
+					res, err := r.Reconcile(ctx, req)
 					Expect(res).To(Equal(reconcile.Result{}))
 					Expect(err).To(BeNil())
 
@@ -701,19 +701,19 @@ var _ = Describe("Reconciler", func() {
 						acgErr := errors.New("broken action client getter: error getting action client")
 
 						By("creating a reconciler with a broken action client getter", func() {
-							r.actionClientGetter = helmclient.ActionClientGetterFunc(func(helmclient.Object) (helmclient.ActionInterface, error) {
+							r.actionClientGetter = helmclient.ActionClientGetterFunc(func(client.Object) (helmclient.ActionInterface, error) {
 								return nil, acgErr
 							})
 						})
 
 						By("reconciling unsuccessfully", func() {
-							res, err := r.Reconcile(req)
+							res, err := r.Reconcile(ctx, req)
 							Expect(res).To(Equal(reconcile.Result{}))
 							Expect(err).To(MatchError(acgErr))
 						})
 
 						By("getting the CR", func() {
-							Expect(mgr.GetAPIReader().Get(context.TODO(), objKey, obj)).To(Succeed())
+							Expect(mgr.GetAPIReader().Get(ctx, objKey, obj)).To(Succeed())
 						})
 
 						By("verifying the CR status", func() {
@@ -737,20 +737,20 @@ var _ = Describe("Reconciler", func() {
 					})
 					It("returns an error getting the release", func() {
 						By("creating a reconciler with a broken action client getter", func() {
-							r.actionClientGetter = helmclient.ActionClientGetterFunc(func(helmclient.Object) (helmclient.ActionInterface, error) {
+							r.actionClientGetter = helmclient.ActionClientGetterFunc(func(client.Object) (helmclient.ActionInterface, error) {
 								cl := helmfake.NewActionClient()
 								return &cl, nil
 							})
 						})
 
 						By("reconciling unsuccessfully", func() {
-							res, err := r.Reconcile(req)
+							res, err := r.Reconcile(ctx, req)
 							Expect(res).To(Equal(reconcile.Result{}))
 							Expect(err).To(MatchError("get not implemented"))
 						})
 
 						By("getting the CR", func() {
-							Expect(mgr.GetAPIReader().Get(context.TODO(), objKey, obj)).To(Succeed())
+							Expect(mgr.GetAPIReader().Get(ctx, objKey, obj)).To(Succeed())
 						})
 
 						By("verifying the CR status", func() {
@@ -779,13 +779,13 @@ var _ = Describe("Reconciler", func() {
 					})
 					It("returns an error", func() {
 						By("reconciling unsuccessfully", func() {
-							res, err := r.Reconcile(req)
+							res, err := r.Reconcile(ctx, req)
 							Expect(res).To(Equal(reconcile.Result{}))
 							Expect(err.Error()).To(ContainSubstring("error parsing index"))
 						})
 
 						By("getting the CR", func() {
-							Expect(mgr.GetAPIReader().Get(context.TODO(), objKey, obj)).To(Succeed())
+							Expect(mgr.GetAPIReader().Get(ctx, objKey, obj)).To(Succeed())
 						})
 
 						By("verifying the CR status", func() {
@@ -829,13 +829,13 @@ var _ = Describe("Reconciler", func() {
 						})
 						It("handles the upgrade error", func() {
 							By("returning an error", func() {
-								res, err := r.Reconcile(req)
+								res, err := r.Reconcile(ctx, req)
 								Expect(res).To(Equal(reconcile.Result{}))
 								Expect(err).To(HaveOccurred())
 							})
 
 							By("getting the CR", func() {
-								Expect(mgr.GetAPIReader().Get(context.TODO(), objKey, obj)).To(Succeed())
+								Expect(mgr.GetAPIReader().Get(ctx, objKey, obj)).To(Succeed())
 							})
 
 							By("ensuring the correct conditions are set on the CR", func() {
@@ -871,13 +871,13 @@ var _ = Describe("Reconciler", func() {
 								err error
 							)
 							By("changing the CR", func() {
-								Expect(mgr.GetClient().Get(context.TODO(), objKey, obj)).To(Succeed())
+								Expect(mgr.GetClient().Get(ctx, objKey, obj)).To(Succeed())
 								obj.Object["spec"] = map[string]interface{}{"replicaCount": "2"}
-								Expect(mgr.GetClient().Update(context.TODO(), obj)).To(Succeed())
+								Expect(mgr.GetClient().Update(ctx, obj)).To(Succeed())
 							})
 
 							By("successfully reconciling a request", func() {
-								res, err := r.Reconcile(req)
+								res, err := r.Reconcile(ctx, req)
 								Expect(res).To(Equal(reconcile.Result{}))
 								Expect(err).To(BeNil())
 							})
@@ -886,16 +886,16 @@ var _ = Describe("Reconciler", func() {
 								rel, err = ac.Get(obj.GetName())
 								Expect(err).To(BeNil())
 								Expect(rel).NotTo(BeNil())
-								Expect(mgr.GetAPIReader().Get(context.TODO(), objKey, obj)).To(Succeed())
+								Expect(mgr.GetAPIReader().Get(ctx, objKey, obj)).To(Succeed())
 							})
 
 							By("verifying the release", func() {
 								Expect(rel.Version).To(Equal(2))
-								verifyRelease(mgr.GetAPIReader(), obj.GetNamespace(), rel)
+								verifyRelease(ctx, mgr.GetAPIReader(), obj.GetNamespace(), rel)
 							})
 
 							By("verifying override event", func() {
-								verifyEvent(mgr.GetAPIReader(), obj,
+								verifyEvent(ctx, mgr.GetAPIReader(), obj,
 									"Warning",
 									"ValueOverridden",
 									`Chart value "image.repository" overridden to "custom-nginx" by operator`)
@@ -933,13 +933,13 @@ var _ = Describe("Reconciler", func() {
 						})
 						It("handles the reconciliation error", func() {
 							By("returning an error", func() {
-								res, err := r.Reconcile(req)
+								res, err := r.Reconcile(ctx, req)
 								Expect(res).To(Equal(reconcile.Result{}))
 								Expect(err).To(HaveOccurred())
 							})
 
 							By("getting the CR", func() {
-								Expect(mgr.GetAPIReader().Get(context.TODO(), objKey, obj)).To(Succeed())
+								Expect(mgr.GetAPIReader().Get(ctx, objKey, obj)).To(Succeed())
 							})
 
 							By("ensuring the correct conditions are set on the CR", func() {
@@ -971,25 +971,24 @@ var _ = Describe("Reconciler", func() {
 							)
 							By("changing the release resources", func() {
 								for _, resource := range manifestToObjects(installedRelease.Manifest) {
-									key, err := client.ObjectKeyFromObject(resource)
-									Expect(err).To(BeNil())
+									key := client.ObjectKeyFromObject(resource)
 
 									u := &unstructured.Unstructured{}
 									u.SetGroupVersionKind(resource.GetObjectKind().GroupVersionKind())
-									err = mgr.GetAPIReader().Get(context.TODO(), key, u)
+									err = mgr.GetAPIReader().Get(ctx, key, u)
 									Expect(err).To(BeNil())
 
 									labels := u.GetLabels()
 									labels["app.kubernetes.io/managed-by"] = "Unmanaged"
 									u.SetLabels(labels)
 
-									err = mgr.GetClient().Update(context.TODO(), u)
+									err = mgr.GetClient().Update(ctx, u)
 									Expect(err).To(BeNil())
 								}
 							})
 
 							By("successfully reconciling a request", func() {
-								res, err := r.Reconcile(req)
+								res, err := r.Reconcile(ctx, req)
 								Expect(res).To(Equal(reconcile.Result{}))
 								Expect(err).To(BeNil())
 							})
@@ -998,16 +997,16 @@ var _ = Describe("Reconciler", func() {
 								rel, err = ac.Get(obj.GetName())
 								Expect(err).To(BeNil())
 								Expect(rel).NotTo(BeNil())
-								Expect(mgr.GetAPIReader().Get(context.TODO(), objKey, obj)).To(Succeed())
+								Expect(mgr.GetAPIReader().Get(ctx, objKey, obj)).To(Succeed())
 							})
 
 							By("verifying the release", func() {
 								Expect(rel.Version).To(Equal(1))
-								verifyRelease(mgr.GetAPIReader(), obj.GetNamespace(), rel)
+								verifyRelease(ctx, mgr.GetAPIReader(), obj.GetNamespace(), rel)
 							})
 
 							By("verifying override event", func() {
-								verifyEvent(mgr.GetAPIReader(), obj,
+								verifyEvent(ctx, mgr.GetAPIReader(), obj,
 									"Warning",
 									"ValueOverridden",
 									`Chart value "image.repository" overridden to "custom-nginx" by operator`)
@@ -1042,17 +1041,17 @@ var _ = Describe("Reconciler", func() {
 						})
 						It("handles the uninstall error", func() {
 							By("deleting the CR", func() {
-								Expect(mgr.GetClient().Delete(context.TODO(), obj)).To(Succeed())
+								Expect(mgr.GetClient().Delete(ctx, obj)).To(Succeed())
 							})
 
 							By("returning an error", func() {
-								res, err := r.Reconcile(req)
+								res, err := r.Reconcile(ctx, req)
 								Expect(res).To(Equal(reconcile.Result{}))
 								Expect(err).To(HaveOccurred())
 							})
 
 							By("getting the CR", func() {
-								Expect(mgr.GetAPIReader().Get(context.TODO(), objKey, obj)).To(Succeed())
+								Expect(mgr.GetAPIReader().Get(ctx, objKey, obj)).To(Succeed())
 							})
 
 							By("ensuring the correct conditions are set on the CR", func() {
@@ -1084,21 +1083,21 @@ var _ = Describe("Reconciler", func() {
 					When("uninstall succeeds", func() {
 						It("uninstalls the release and removes the finalizer", func() {
 							By("deleting the CR", func() {
-								Expect(mgr.GetClient().Delete(context.TODO(), obj)).To(Succeed())
+								Expect(mgr.GetClient().Delete(ctx, obj)).To(Succeed())
 							})
 
 							By("successfully reconciling a request", func() {
-								res, err := r.Reconcile(req)
+								res, err := r.Reconcile(ctx, req)
 								Expect(res).To(Equal(reconcile.Result{}))
 								Expect(err).To(BeNil())
 							})
 
 							By("verifying the release is uninstalled", func() {
-								verifyNoRelease(mgr.GetClient(), obj.GetNamespace(), obj.GetName(), installedRelease)
+								verifyNoRelease(ctx, mgr.GetClient(), obj.GetNamespace(), obj.GetName(), installedRelease)
 							})
 
 							By("ensuring the finalizer is removed and the CR is deleted", func() {
-								err := mgr.GetAPIReader().Get(context.TODO(), objKey, obj)
+								err := mgr.GetAPIReader().Get(ctx, objKey, obj)
 								Expect(apierrors.IsNotFound(err)).To(BeTrue())
 							})
 						})
@@ -1127,8 +1126,8 @@ type objStatus struct {
 	} `json:"status"`
 }
 
-func manifestToObjects(manifest string) []runtime.Object {
-	objs := []runtime.Object{}
+func manifestToObjects(manifest string) []client.Object {
+	objs := []client.Object{}
 	for _, m := range releaseutil.SplitManifests(manifest) {
 		u := &unstructured.Unstructured{}
 		err := yaml.Unmarshal([]byte(m), u)
@@ -1138,10 +1137,10 @@ func manifestToObjects(manifest string) []runtime.Object {
 	return objs
 }
 
-func verifyRelease(cl client.Reader, ns string, rel *release.Release) {
+func verifyRelease(ctx context.Context, cl client.Reader, ns string, rel *release.Release) {
 	By("verifying release secret exists at release version", func() {
 		releaseSecrets := &v1.SecretList{}
-		err := cl.List(context.TODO(), releaseSecrets, client.InNamespace(ns), client.MatchingLabels{"owner": "helm", "name": rel.Name})
+		err := cl.List(ctx, releaseSecrets, client.InNamespace(ns), client.MatchingLabels{"owner": "helm", "name": rel.Name})
 		Expect(err).To(BeNil())
 		Expect(releaseSecrets.Items).To(HaveLen(rel.Version))
 		Expect(releaseSecrets.Items[rel.Version-1].Type).To(Equal(v1.SecretType("helm.sh/release.v1")))
@@ -1160,19 +1159,17 @@ func verifyRelease(cl client.Reader, ns string, rel *release.Release) {
 	By("verifying the release resources exist", func() {
 		objs := manifestToObjects(rel.Manifest)
 		for _, obj := range objs {
-			key, err := client.ObjectKeyFromObject(obj)
-			Expect(err).To(BeNil())
-
-			err = cl.Get(context.TODO(), key, obj)
+			key := client.ObjectKeyFromObject(obj)
+			err := cl.Get(ctx, key, obj)
 			Expect(err).To(BeNil())
 		}
 	})
 }
 
-func verifyNoRelease(cl client.Client, ns string, name string, rel *release.Release) {
+func verifyNoRelease(ctx context.Context, cl client.Client, ns string, name string, rel *release.Release) {
 	By("verifying all release secrets are removed", func() {
 		releaseSecrets := &v1.SecretList{}
-		err := cl.List(context.TODO(), releaseSecrets, client.InNamespace(ns), client.MatchingLabels{"owner": "helm", "name": name})
+		err := cl.List(ctx, releaseSecrets, client.InNamespace(ns), client.MatchingLabels{"owner": "helm", "name": name})
 		Expect(err).To(BeNil())
 		Expect(releaseSecrets.Items).To(HaveLen(0))
 	})
@@ -1183,17 +1180,15 @@ func verifyNoRelease(cl client.Client, ns string, name string, rel *release.Rele
 				err := yaml.Unmarshal([]byte(r), u)
 				Expect(err).To(BeNil())
 
-				key, err := client.ObjectKeyFromObject(u)
-				Expect(err).To(BeNil())
-
-				err = cl.Get(context.TODO(), key, u)
+				key := client.ObjectKeyFromObject(u)
+				err = cl.Get(ctx, key, u)
 				Expect(apierrors.IsNotFound(err)).To(BeTrue())
 			}
 		}
 	})
 }
 
-func verifyHooksCalled(r *Reconciler, req reconcile.Request) {
+func verifyHooksCalled(ctx context.Context, r *Reconciler, req reconcile.Request) {
 	buf := &bytes.Buffer{}
 	By("setting up a pre and post hook", func() {
 		preHook := hook.PreHookFunc(func(*unstructured.Unstructured, chartutil.Values, logr.Logger) error {
@@ -1207,7 +1202,7 @@ func verifyHooksCalled(r *Reconciler, req reconcile.Request) {
 		r.postHooks = append(r.postHooks, postHook)
 	})
 	By("successfully reconciling a request", func() {
-		res, err := r.Reconcile(req)
+		res, err := r.Reconcile(ctx, req)
 		Expect(err).To(BeNil())
 		Expect(res).To(Equal(reconcile.Result{}))
 	})
@@ -1219,9 +1214,9 @@ func verifyHooksCalled(r *Reconciler, req reconcile.Request) {
 	})
 }
 
-func verifyEvent(cl client.Reader, obj metav1.Object, eventType, reason, message string) {
+func verifyEvent(ctx context.Context, cl client.Reader, obj metav1.Object, eventType, reason, message string) {
 	events := &v1.EventList{}
-	Expect(cl.List(context.TODO(), events, client.InNamespace(obj.GetNamespace()))).To(Succeed())
+	Expect(cl.List(ctx, events, client.InNamespace(obj.GetNamespace()))).To(Succeed())
 	for _, e := range events.Items {
 		if e.Type == eventType && e.Reason == reason && e.Message == message {
 			return

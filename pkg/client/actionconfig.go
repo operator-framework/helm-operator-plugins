@@ -28,19 +28,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type Object interface {
-	runtime.Object
-	metav1.Object
-}
-
 type ActionConfigGetter interface {
-	ActionConfigFor(obj Object) (*action.Configuration, error)
+	ActionConfigFor(obj client.Object) (*action.Configuration, error)
 }
 
 func NewActionConfigGetter(cfg *rest.Config, rm meta.RESTMapper, log logr.Logger) ActionConfigGetter {
@@ -59,7 +54,7 @@ type actionConfigGetter struct {
 	log        logr.Logger
 }
 
-func (acg *actionConfigGetter) ActionConfigFor(obj Object) (*action.Configuration, error) {
+func (acg *actionConfigGetter) ActionConfigFor(obj client.Object) (*action.Configuration, error) {
 	// Create a RESTClientGetter
 	rcg := newRESTClientGetter(acg.cfg, acg.restMapper, obj.GetNamespace())
 

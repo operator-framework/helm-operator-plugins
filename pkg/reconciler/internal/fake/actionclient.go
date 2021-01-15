@@ -21,6 +21,7 @@ import (
 
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/release"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/joelanford/helm-operator/pkg/client"
 )
@@ -39,7 +40,7 @@ type fakeActionClientGetter struct {
 
 var _ client.ActionClientGetter = &fakeActionClientGetter{}
 
-func (hcg *fakeActionClientGetter) ActionClientFor(obj client.Object) (client.ActionInterface, error) {
+func (hcg *fakeActionClientGetter) ActionClientFor(_ crclient.Object) (client.ActionInterface, error) {
 	if hcg.returnErr != nil {
 		return nil, hcg.returnErr
 	}

@@ -36,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -70,8 +69,8 @@ var _ = Describe("ActionClient", func() {
 			gvk := schema.GroupVersionKind{Group: "test", Version: "v1alpha1", Kind: "Test"}
 			expectedObj := &unstructured.Unstructured{}
 			expectedObj.SetGroupVersionKind(gvk)
-			var actualObj Object
-			f := ActionClientGetterFunc(func(obj Object) (ActionInterface, error) {
+			var actualObj client.Object
+			f := ActionClientGetterFunc(func(obj client.Object) (ActionInterface, error) {
 				actualObj = obj
 				return nil, nil
 			})
@@ -81,7 +80,7 @@ var _ = Describe("ActionClient", func() {
 	})
 
 	var _ = Describe("ActionClientFor", func() {
-		var obj Object
+		var obj client.Object
 		BeforeEach(func() {
 			obj = testutil.BuildTestCR(gvk)
 		})
@@ -95,7 +94,7 @@ var _ = Describe("ActionClient", func() {
 
 	var _ = Describe("ActionClient methods", func() {
 		var (
-			obj  Object
+			obj  client.Object
 			cl   client.Client
 			ac   ActionInterface
 			vals = chartutil.Values{"service": map[string]interface{}{"type": "NodePort"}}
@@ -325,12 +324,11 @@ var _ = Describe("ActionClient", func() {
 					By("changing manifest resources", func() {
 						objs := manifestToObjects(installedRelease.Manifest)
 						for _, obj := range objs {
-							key, err := client.ObjectKeyFromObject(obj)
-							Expect(err).To(BeNil())
+							key := client.ObjectKeyFromObject(obj)
 
 							u := &unstructured.Unstructured{}
 							u.SetGroupVersionKind(obj.GetObjectKind().GroupVersionKind())
-							err = cl.Get(context.TODO(), key, u)
+							err := cl.Get(context.TODO(), key, u)
 							Expect(err).To(BeNil())
 
 							labels := u.GetLabels()
@@ -521,7 +519,7 @@ var _ = Describe("ActionClient", func() {
 	var _ = Describe("ownerPostRenderer", func() {
 		var (
 			pr    ownerPostRenderer
-			owner Object
+			owner client.Object
 		)
 
 		BeforeEach(func() {
@@ -547,8 +545,8 @@ var _ = Describe("ActionClient", func() {
 	})
 })
 
-func manifestToObjects(manifest string) []runtime.Object {
-	objs := []runtime.Object{}
+func manifestToObjects(manifest string) []client.Object {
+	objs := []client.Object{}
 	for _, m := range releaseutil.SplitManifests(manifest) {
 		u := &unstructured.Unstructured{}
 		err := yaml.Unmarshal([]byte(m), u)
@@ -576,10 +574,8 @@ func verifyRelease(cl client.Client, ns string, rel *release.Release) {
 	By("verifying the release resources exist", func() {
 		objs := manifestToObjects(rel.Manifest)
 		for _, obj := range objs {
-			key, err := client.ObjectKeyFromObject(obj)
-			Expect(err).To(BeNil())
-
-			err = cl.Get(context.TODO(), key, obj)
+			key := client.ObjectKeyFromObject(obj)
+			err := cl.Get(context.TODO(), key, obj)
 			Expect(err).To(BeNil())
 		}
 	})
@@ -604,9 +600,7 @@ func verifyNoRelease(cl client.Client, ns string, name string, rel *release.Rele
 				err := yaml.Unmarshal([]byte(r), u)
 				Expect(err).To(BeNil())
 
-				key, err := client.ObjectKeyFromObject(u)
-				Expect(err).To(BeNil())
-
+				key := client.ObjectKeyFromObject(u)
 				err = cl.Get(context.TODO(), key, u)
 				Expect(apierrors.IsNotFound(err)).To(BeTrue())
 			}

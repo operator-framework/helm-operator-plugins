@@ -17,21 +17,15 @@ package machinery
 import (
 	"bytes"
 	"errors"
-	"testing"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
-	"sigs.k8s.io/kubebuilder/pkg/model"
-	"sigs.k8s.io/kubebuilder/pkg/model/file"
+	"sigs.k8s.io/kubebuilder/v2/pkg/model"
+	"sigs.k8s.io/kubebuilder/v2/pkg/model/file"
 
 	"github.com/joelanford/helm-operator/pkg/plugins/internal/kubebuilder/filesystem"
 )
-
-func TestScaffold(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Scaffold suite")
-}
 
 var _ = Describe("Scaffold", func() {
 	Describe("NewScaffold", func() {
@@ -41,61 +35,27 @@ var _ = Describe("Scaffold", func() {
 			ok bool
 		)
 
-		Context("when using no plugins", func() {
-			BeforeEach(func() {
-				si = NewScaffold()
-				s, ok = si.(*scaffold)
-			})
+		It("should create a valid scaffold", func() {
+			By("passing no plugins")
+			si = NewScaffold()
+			s, ok = si.(*scaffold)
+			Expect(ok).To(BeTrue())
+			Expect(s.fs).NotTo(BeNil())
+			Expect(len(s.plugins)).To(Equal(0))
 
-			It("should be a scaffold instance", func() {
-				Expect(ok).To(BeTrue())
-			})
+			By("passing one plugin")
+			si = NewScaffold(fakePlugin{})
+			s, ok = si.(*scaffold)
+			Expect(ok).To(BeTrue())
+			Expect(s.fs).NotTo(BeNil())
+			Expect(len(s.plugins)).To(Equal(1))
 
-			It("should not have a nil fs", func() {
-				Expect(s.fs).NotTo(BeNil())
-			})
-
-			It("should not have any plugin", func() {
-				Expect(len(s.plugins)).To(Equal(0))
-			})
-		})
-
-		Context("when using one plugin", func() {
-			BeforeEach(func() {
-				si = NewScaffold(fakePlugin{})
-				s, ok = si.(*scaffold)
-			})
-
-			It("should be a scaffold instance", func() {
-				Expect(ok).To(BeTrue())
-			})
-
-			It("should not have a nil fs", func() {
-				Expect(s.fs).NotTo(BeNil())
-			})
-
-			It("should have one plugin", func() {
-				Expect(len(s.plugins)).To(Equal(1))
-			})
-		})
-
-		Context("when using several plugins", func() {
-			BeforeEach(func() {
-				si = NewScaffold(fakePlugin{}, fakePlugin{}, fakePlugin{})
-				s, ok = si.(*scaffold)
-			})
-
-			It("should be a scaffold instance", func() {
-				Expect(ok).To(BeTrue())
-			})
-
-			It("should not have a nil fs", func() {
-				Expect(s.fs).NotTo(BeNil())
-			})
-
-			It("should have several plugins", func() {
-				Expect(len(s.plugins)).To(Equal(3))
-			})
+			By("passing multiple plugins")
+			si = NewScaffold(fakePlugin{}, fakePlugin{}, fakePlugin{})
+			s, ok = si.(*scaffold)
+			Expect(ok).To(BeTrue())
+			Expect(s.fs).NotTo(BeNil())
+			Expect(len(s.plugins)).To(Equal(3))
 		})
 	})
 

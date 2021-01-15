@@ -89,31 +89,27 @@ var _ = Describe("ConfigureWatchNamespaces", func() {
 		Expect(err).To(BeNil())
 
 		By("starting the cache and waiting for it to sync")
-		done := make(chan struct{})
+		ctx, cancel := context.WithCancel(context.Background())
 		var wg sync.WaitGroup
 		wg.Add(1)
 		go func() {
-			Expect(c.Start(done)).To(Succeed())
+			Expect(c.Start(ctx)).To(Succeed())
 			wg.Done()
 		}()
-		Expect(c.WaitForCacheSync(done)).To(BeTrue())
+		Expect(c.WaitForCacheSync(ctx)).To(BeTrue())
 
 		By("successfully getting the watched pods")
 		for _, p := range watchedPods {
-			key, err := client.ObjectKeyFromObject(&p)
-			Expect(err).To(BeNil())
-
+			key := client.ObjectKeyFromObject(&p)
 			Expect(c.Get(context.TODO(), key, &p)).To(Succeed())
 		}
 
 		By("failing to get the unwatched pods")
 		for _, p := range unwatchedPods {
-			key, err := client.ObjectKeyFromObject(&p)
-			Expect(err).To(BeNil())
-
+			key := client.ObjectKeyFromObject(&p)
 			Expect(c.Get(context.TODO(), key, &p)).NotTo(Succeed())
 		}
-		close(done)
+		cancel()
 		wg.Wait()
 	})
 })

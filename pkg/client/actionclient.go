@@ -41,18 +41,19 @@ import (
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/cli-runtime/pkg/resource"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 
 	"github.com/joelanford/helm-operator/pkg/internal/sdk/controllerutil"
 )
 
 type ActionClientGetter interface {
-	ActionClientFor(obj Object) (ActionInterface, error)
+	ActionClientFor(obj client.Object) (ActionInterface, error)
 }
 
-type ActionClientGetterFunc func(obj Object) (ActionInterface, error)
+type ActionClientGetterFunc func(obj client.Object) (ActionInterface, error)
 
-func (acgf ActionClientGetterFunc) ActionClientFor(obj Object) (ActionInterface, error) {
+func (acgf ActionClientGetterFunc) ActionClientFor(obj client.Object) (ActionInterface, error) {
 	return acgf(obj)
 }
 
@@ -79,7 +80,7 @@ type actionClientGetter struct {
 
 var _ ActionClientGetter = &actionClientGetter{}
 
-func (hcg *actionClientGetter) ActionClientFor(obj Object) (ActionInterface, error) {
+func (hcg *actionClientGetter) ActionClientFor(obj client.Object) (ActionInterface, error) {
 	actionConfig, err := hcg.acg.ActionConfigFor(obj)
 	if err != nil {
 		return nil, err
@@ -199,7 +200,7 @@ func (c *actionClient) Reconcile(rel *release.Release) error {
 
 		helper := resource.NewHelper(expected.Client, expected.Mapping)
 
-		existing, err := helper.Get(expected.Namespace, expected.Name, expected.Export)
+		existing, err := helper.Get(expected.Namespace, expected.Name)
 		if apierrors.IsNotFound(err) {
 			if _, err := helper.Create(expected.Namespace, true, expected.Object); err != nil {
 				return fmt.Errorf("create error: %w", err)
@@ -294,14 +295,14 @@ func createJSONMergePatch(existingJSON, expectedJSON []byte) ([]byte, error) {
 	return json.Marshal(patchOps)
 }
 
-func createPostRenderer(rm meta.RESTMapper, kubeClient kube.Interface, owner Object) postrender.PostRenderer {
+func createPostRenderer(rm meta.RESTMapper, kubeClient kube.Interface, owner client.Object) postrender.PostRenderer {
 	return &ownerPostRenderer{rm, kubeClient, owner}
 }
 
 type ownerPostRenderer struct {
 	rm         meta.RESTMapper
 	kubeClient kube.Interface
-	owner      Object
+	owner      client.Object
 }
 
 func (pr *ownerPostRenderer) Run(in *bytes.Buffer) (*bytes.Buffer, error) {
