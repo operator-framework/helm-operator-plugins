@@ -24,7 +24,7 @@ GO_BUILD_ARGS = \
     -X '$(VERSION_PKG).GitCommit=$(GIT_COMMIT)' \
   " \
 
-#all: manager
+export GO111MODULE = on
 
 # Run tests
 ENVTEST_ASSETS_DIR=$(shell pwd)/testbin
@@ -35,7 +35,7 @@ test: fmt vet
 
 # Build manager binary
 build: fmt vet
-	go build $(GO_BUILD_ARGS) -o bin/helm-operator main.go
+	CGO_ENABLED=0 go build $(GO_BUILD_ARGS) -o bin/helm-operator main.go
 
 # Run go fmt against code
 fmt:
@@ -49,13 +49,6 @@ lint: golangci-lint
 	$(GOLANGCI_LINT) run
 lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 	$(GOLANGCI_LINT) run --fix
-# Build the docker image
-docker-build:
-	docker build -t quay.io/joelanford/helm-operator:$(VERSION) .
-
-# Push the docker image
-docker-push:
-	docker push quay.io/joelanford/helm-operator:$(VERSION)
 
 # find or download controller-gen
 # download controller-gen if necessary
