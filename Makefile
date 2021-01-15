@@ -11,16 +11,17 @@ GOBIN=$(shell go env GOBIN)
 endif
 
 # GO_BUILD_ARGS should be set when running 'go build' or 'go install'.
-REPO = $(shell go list -m)
-#TODO (anrastog): set version to repo build/tag after v1 plugin is available in master.
-VERSION = master
+VERSION_PKG = "$(shell go list -m)/internal/version"
+SCAFFOLD_VERSION = $(shell git describe --abbrev=0)
+GIT_VERSION = $(shell git describe --dirty --tags --always)
 GIT_COMMIT = $(shell git rev-parse HEAD)
 GO_BUILD_ARGS = \
   -gcflags "all=-trimpath=$(shell dirname $(shell pwd))" \
   -asmflags "all=-trimpath=$(shell dirname $(shell pwd))" \
   -ldflags " \
-    -X '$(REPO)/internal/version.Version=$(VERSION)' \
-    -X '$(REPO)/internal/version.GitCommit=$(GIT_COMMIT)' \
+    -X '$(VERSION_PKG).ScaffoldVersion=$(SCAFFOLD_VERSION)' \
+    -X '$(VERSION_PKG).GitVersion=$(GIT_VERSION)' \
+    -X '$(VERSION_PKG).GitCommit=$(GIT_COMMIT)' \
   " \
 
 #all: manager

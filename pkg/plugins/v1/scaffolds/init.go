@@ -19,7 +19,6 @@ package scaffolds
 
 import (
 	"os"
-	"strings"
 
 	"sigs.k8s.io/kubebuilder/v2/pkg/model"
 	"sigs.k8s.io/kubebuilder/v2/pkg/model/config"
@@ -43,8 +42,7 @@ const (
 )
 
 // helmOperatorVersion is set to the version of helm-operator at compile-time.
-var helmOperatorVersion = strings.TrimSuffix(version.Version, "+git")
-
+var helmOperatorVersion = mustGetScaffoldVersion()
 var _ cmdutil.Scaffolder = &initScaffolder{}
 
 type initScaffolder struct {
@@ -109,4 +107,11 @@ func (s *initScaffolder) scaffold() error {
 		&kdefault.AuthProxyPatch{},
 		&kdefault.Kustomization{},
 	)
+}
+
+func mustGetScaffoldVersion() string {
+	if version.ScaffoldVersion == "" || version.ScaffoldVersion == version.Unknown {
+		panic("helm-operator scaffold version is unknown; it must be set during build or by importing this plugin via go modules")
+	}
+	return version.ScaffoldVersion
 }
