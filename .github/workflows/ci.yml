@@ -1,8 +1,7 @@
 name: CI
 
 on:
-  push:
-    branches: [ master ]
+  push: {}
   pull_request:
     branches: [ master ]
 
@@ -59,29 +58,55 @@ jobs:
 
   deploy:
     name: Deploy
-    needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    needs:
+    - test
+    - lint
     runs-on: ubuntu-latest
     steps:
 
     - name: Check out code into the Go module directory
       uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
 
-    - name: Push helm-operator image to Quay
-      uses: docker/build-push-action@v1
+    - name: Prepare
+      id: prep
+      run: |
+        TAG=ci
+        if [[ $GITHUB_REF == refs/tags/* ]]; then
+          TAG=${GITHUB_REF#refs/tags/}
+        elif [[ $GITHUB_REF == refs/heads/* ]]; then
+          TAG=$(echo ${GITHUB_REF#refs/heads/} | sed -r 's#/+#-#g')
+        elif [[ $GITHUB_REF == refs/pull/* ]]; then
+          TAG=pr-${{ github.event.number }}
+        fi
+
+        echo ::set-output name=tag::${TAG}
+        echo ::set-output name=platforms::linux/amd64,linux/arm64,linux/ppc64le,linux/s390x
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v1
+
+    - name: Login to Quay
+      if: github.event_name != 'pull_request'
+      uses: docker/login-action@v1
       with:
         username: ${{ secrets.QUAY_USERNAME }}
         password: ${{ secrets.QUAY_PASSWORD }}
         registry: quay.io
-        repository: joelanford/helm-operator
-        tags: master
 
-    - name: Push example nginx-operator image to Quay
-      uses: docker/build-push-action@v1
+    - name: Build helm-operator image
+      uses: docker/build-push-action@v2
       with:
-        path: example/
-        username: ${{ secrets.QUAY_USERNAME }}
-        password: ${{ secrets.QUAY_PASSWORD }}
-        registry: quay.io
-        repository: joelanford/nginx-operator
-        tags: latest
+        context: .
+        platforms: ${{ steps.prep.outputs.platforms }}
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: quay.io/joelanford/helm-operator:${{ steps.prep.outputs.tag }}
+
+    - name: Build example nginx-operator image
+      uses: docker/build-push-action@v2
+      with:
+        context: ./example
+        platforms: ${{ steps.prep.outputs.platforms }}
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: quay.io/joelanford/nginx-operator:${{ steps.prep.outputs.tag }}

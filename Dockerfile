@@ -1,5 +1,7 @@
 # Build the manager binary
-FROM golang:1.15 as builder
+FROM --platform=$BUILDPLATFORM golang:1.15 as builder
+ARG TARGETOS
+ARG TARGETARCH
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -10,18 +12,16 @@ COPY go.sum go.sum
 RUN go mod download
 
 # Copy the go source
-COPY main.go main.go
-COPY pkg/ pkg/
-COPY internal/ internal/
+COPY . .
 
 # Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o helm-operator main.go
+RUN GOOS=$TARGETOS GOARCH=$TARGETARCH make build
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM gcr.io/distroless/static:nonroot
 WORKDIR /
-COPY --from=builder /workspace/helm-operator .
+COPY --from=builder /workspace/bin/helm-operator .
 USER nonroot:nonroot
 
 ENTRYPOINT ["/helm-operator", "run"]
