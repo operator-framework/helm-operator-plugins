@@ -33,8 +33,8 @@ jobs:
     - name: Get dependencies
       run: go mod download
 
-    - name: Build
-      run: make build
+    - name: check
+      run: make fix
 
     - name: Test
       run: make test
@@ -54,7 +54,7 @@ jobs:
     - name: Lint
       uses: golangci/golangci-lint-action@v2
       with:
-        version: v1.29
+        version: v1.35.2
 
   deploy:
     name: Deploy

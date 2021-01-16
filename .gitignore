@@ -1,25 +1,46 @@
+# Binaries for programs and plugins
+/bin
+/tools/bin
 
+# Other IDE files
+.idea
+
+# Created by https://www.toptal.com/developers/gitignore/api/go,vim
+# Edit at https://www.toptal.com/developers/gitignore?templates=go,vim
+
+### Go ###
 # Binaries for programs and plugins
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
-bin
-testbin
 
-# Test binary, build with `go test -c`
+# Test binary, built with `go test -c`
 *.test
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
-# Kubernetes Generated files - skip generated files, except for vendored files
+### Vim ###
+# Swap
+[._]*.s[a-v][a-z]
+!*.svg  # comment out if you don't need vector files
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
 
-!vendor/**/zz_generated.*
+# Session
+Session.vim
+Sessionx.vim
 
-# editor and IDE paraphernalia
-.idea
-*.swp
-*.swo
+# Temporary
+.netrwhist
 *~
+# Auto-generated tag files
+tags
+# Persistent undo
+[._]*.un~
+
+# End of https://www.toptal.com/developers/gitignore/api/go,vim
