@@ -29,6 +29,9 @@ jobs:
           SNAPSHOT=""
         fi
         GORELEASER_ARGS="--rm-dist ${SNAPSHOT}" make release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
   docker:
     name: Docker
