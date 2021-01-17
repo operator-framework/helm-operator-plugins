@@ -1,0 +1,74 @@
+name: Deploy
+
+on:
+  push:
+    tags:
+      - v*
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  goreleaser:
+    name: GoReleaser
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+
+    - name: Install Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.15
+
+    - name: Create release
+      run: |
+        SNAPSHOT="--snapshot"
+        if [[ $GITHUB_REF == refs/tags/* ]]; then
+          SNAPSHOT=""
+        fi
+        GORELEASER_ARGS="--rm-dist ${SNAPSHOT}" make release
+
+  docker:
+    name: Docker
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+
+    - name: Prepare
+      id: prep
+      run: |
+        IMG=quay.io/joelanford/helm-operator
+        if [[ $GITHUB_REF == refs/tags/* ]]; then
+          TAG=${GITHUB_REF#refs/tags/}
+          MAJOR_MINOR=${TAG%.*}
+          echo ::set-output name=tags::${IMG}:${TAG},${IMG}:${MAJOR_MINOR}
+
+        elif [[ $GITHUB_REF == refs/pull/* ]]; then
+          TAG=pr-${{ github.event.number }}
+          echo ::set-output name=tags::${IMG}:${TAG}
+        fi
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v1
+
+    - name: Login to Quay
+      if: github.event_name != 'pull_request'
+      uses: docker/login-action@v1
+      with:
+        username: ${{ secrets.QUAY_USERNAME }}
+        password: ${{ secrets.QUAY_PASSWORD }}
+        registry: quay.io
+
+    - name: Build helm-operator image
+      uses: docker/build-push-action@v2
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64,linux/ppc64le,linux/s390x
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: ${{ steps.prep.outputs.tags }}
