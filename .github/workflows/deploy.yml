@@ -2,8 +2,10 @@ name: Deploy
 
 on:
   push:
+    branches:
+      - '**'
     tags:
-      - v*
+      - 'v*'
   pull_request:
     branches: [ main ]
 
@@ -17,6 +19,13 @@ jobs:
       with:
         fetch-depth: 0
 
+    - name: Import GPG Key
+      id: import_gpg
+      uses: crazy-max/ghaction-import-gpg@v3
+      with:
+        gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+        passphrase: ${{ secrets.GPG_PASSPHRASE }}
+
     - name: Install Go
       uses: actions/setup-go@v2
       with:
@@ -24,14 +33,13 @@ jobs:
 
     - name: Create release
       run: |
-        SNAPSHOT="--snapshot"
         if [[ $GITHUB_REF == refs/tags/* ]]; then
-          SNAPSHOT=""
+          export GORELEASER_ARGS="--rm-dist"
         fi
-        GORELEASER_ARGS="--rm-dist ${SNAPSHOT}" make release
+        make release
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+        GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
 
   docker:
     name: Docker
@@ -51,6 +59,13 @@ jobs:
           TAG=${GITHUB_REF#refs/tags/}
           MAJOR_MINOR=${TAG%.*}
           echo ::set-output name=tags::${IMG}:${TAG},${IMG}:${MAJOR_MINOR}
+
+        elif [[ $GITHUB_REF == refs/heads/* ]]; then
+          TAG=$(echo ${GITHUB_REF#refs/heads/} | sed -r 's#/+#-#g')
+          if [ "${{ github.event.repository.default_branch }}" = "$TAG" ]; then
+            TAG=edge
+          fi
+          echo ::set-output name=tags::${IMG}:${TAG}
 
         elif [[ $GITHUB_REF == refs/pull/* ]]; then
           TAG=pr-${{ github.event.number }}
@@ -73,5 +88,5 @@ jobs:
       with:
         context: .
         platforms: linux/amd64,linux/arm64,linux/ppc64le,linux/s390x
-        push: ${{ github.event_name != 'pull_request' }}
+        push: ${{ (github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/')) }}
         tags: ${{ steps.prep.outputs.tags }}
