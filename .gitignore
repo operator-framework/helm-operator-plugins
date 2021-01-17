@@ -1,6 +1,7 @@
 # Binaries for programs and plugins
 /bin
 /tools/bin
+/dist
 
 # Other IDE files
 .idea

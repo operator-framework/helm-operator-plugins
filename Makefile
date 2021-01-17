@@ -1,8 +1,8 @@
 # GO_BUILD_ARGS should be set when running 'go build' or 'go install'.
 VERSION_PKG = "$(shell go list -m)/internal/version"
-SCAFFOLD_VERSION = $(shell git describe --abbrev=0)
-GIT_VERSION = $(shell git describe --dirty --tags --always)
-GIT_COMMIT = $(shell git rev-parse HEAD)
+export SCAFFOLD_VERSION = $(shell git describe --abbrev=0)
+export GIT_VERSION = $(shell git describe --dirty --tags --always)
+export GIT_COMMIT = $(shell git rev-parse HEAD)
 BUILD_DIR = $(PWD)/bin
 GO_BUILD_ARGS = \
   -gcflags "all=-trimpath=$(shell dirname $(shell pwd))" \
@@ -51,6 +51,11 @@ fix:
 .PHONY: lint
 lint:
 	fetch golangci-lint 1.35.2 && golangci-lint run
+
+.PHONY: release
+release: GORELEASER_ARGS ?= --snapshot --rm-dist
+release:
+	fetch goreleaser 0.155.0 && goreleaser $(GORELEASER_ARGS)
 
 .PHONY: clean
 clean:
