@@ -26,7 +26,7 @@ require (
 	k8s.io/client-go v0.20.2
 	k8s.io/kubectl v0.20.2
 	rsc.io/letsencrypt v0.0.3 // indirect
-	sigs.k8s.io/controller-runtime v0.8.0
+	sigs.k8s.io/controller-runtime v0.8.1
 	sigs.k8s.io/kubebuilder/v2 v2.3.2-0.20201214213149-0a807f4e9428
 	sigs.k8s.io/yaml v1.2.0
 )
