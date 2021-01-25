@@ -28,6 +28,7 @@ import (
 	"github.com/go-logr/logr/testing"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chartutil"
 	"helm.sh/helm/v3/pkg/release"
@@ -450,7 +451,7 @@ var _ = Describe("Reconciler", func() {
 				Expect(mgr.GetClient().Create(ctx, obj)).To(Succeed())
 			})
 
-			When("requested CR release is not installed", func() {
+			When("requested CR release is not present", func() {
 				When("action client getter is not working", func() {
 					It("returns an error getting the action client", func() {
 						acgErr := errors.New("broken action client getter: error getting action client")
@@ -682,9 +683,9 @@ var _ = Describe("Reconciler", func() {
 					})
 				})
 			})
-			When("requested CR release is installed", func() {
+			When("requested CR release is present", func() {
 				var (
-					installedRelease *release.Release
+					currentRelease *release.Release
 				)
 				BeforeEach(func() {
 					// Reconcile once to get the release installed and finalizers added
@@ -693,7 +694,7 @@ var _ = Describe("Reconciler", func() {
 					Expect(res).To(Equal(reconcile.Result{}))
 					Expect(err).To(BeNil())
 
-					installedRelease, err = ac.Get(obj.GetName())
+					currentRelease, err = ac.Get(obj.GetName())
 					Expect(err).To(BeNil())
 				})
 				When("action client getter is not working", func() {
@@ -801,8 +802,8 @@ var _ = Describe("Reconciler", func() {
 							Expect(c.Reason).To(Equal(conditions.ReasonErrorGettingValues))
 							Expect(c.Message).To(ContainSubstring("error parsing index"))
 
-							Expect(objStat.Status.DeployedRelease.Name).To(Equal(installedRelease.Name))
-							Expect(objStat.Status.DeployedRelease.Manifest).To(Equal(installedRelease.Manifest))
+							Expect(objStat.Status.DeployedRelease.Name).To(Equal(currentRelease.Name))
+							Expect(objStat.Status.DeployedRelease.Manifest).To(Equal(currentRelease.Manifest))
 						})
 
 						By("verifying the uninstall finalizer is not present on the CR", func() {
@@ -810,18 +811,69 @@ var _ = Describe("Reconciler", func() {
 						})
 					})
 				})
-				When("all preconditions are met", func() {
+				When("requested CR release is not deployed", func() {
+					var actionConf *action.Configuration
+					BeforeEach(func() {
+						By("getting the current release and config", func() {
+							var err error
+							acg := helmclient.NewActionConfigGetter(mgr.GetConfig(), mgr.GetRESTMapper(), nil)
+							actionConf, err = acg.ActionConfigFor(obj)
+							Expect(err).To(BeNil())
+						})
+					})
+					When("state is Failed", func() {
+						BeforeEach(func() {
+							currentRelease.Info.Status = release.StatusFailed
+							Expect(actionConf.Releases.Update(currentRelease)).To(Succeed())
+						})
+						It("upgrades the release", func() {
+							By("successfully reconciling a request", func() {
+								res, err := r.Reconcile(ctx, req)
+								Expect(res).To(Equal(reconcile.Result{}))
+								Expect(err).To(BeNil())
+							})
+							By("verifying the release", func() {
+								rel, err := ac.Get(obj.GetName())
+								Expect(err).To(BeNil())
+								Expect(rel).NotTo(BeNil())
+								Expect(rel.Version).To(Equal(2))
+								verifyRelease(ctx, mgr.GetAPIReader(), obj.GetNamespace(), rel)
+							})
+						})
+					})
+					When("state is Superseded", func() {
+						BeforeEach(func() {
+							currentRelease.Info.Status = release.StatusSuperseded
+							Expect(actionConf.Releases.Update(currentRelease)).To(Succeed())
+						})
+						It("upgrades the release", func() {
+							By("successfully reconciling a request", func() {
+								res, err := r.Reconcile(ctx, req)
+								Expect(res).To(Equal(reconcile.Result{}))
+								Expect(err).To(BeNil())
+							})
+							By("verifying the release", func() {
+								rel, err := ac.Get(obj.GetName())
+								Expect(err).To(BeNil())
+								Expect(rel).NotTo(BeNil())
+								Expect(rel.Version).To(Equal(2))
+								verifyRelease(ctx, mgr.GetAPIReader(), obj.GetNamespace(), rel)
+							})
+						})
+					})
+				})
+				When("state is Deployed", func() {
 					When("upgrade fails", func() {
 						BeforeEach(func() {
 							ac := helmfake.NewActionClient()
 							ac.HandleGet = func() (*release.Release, error) {
-								return &release.Release{Name: "test", Version: 1, Manifest: "version: 1"}, nil
+								return &release.Release{Name: "test", Version: 1, Manifest: "manifest: 1"}, nil
 							}
 							firstRun := true
 							ac.HandleUpgrade = func() (*release.Release, error) {
 								if firstRun {
 									firstRun = false
-									return &release.Release{Name: "test", Version: 1, Manifest: "version: 2"}, nil
+									return &release.Release{Name: "test", Version: 1, Manifest: "manifest: 2"}, nil
 								}
 								return nil, errors.New("upgrade failed: foobar")
 							}
@@ -846,7 +898,7 @@ var _ = Describe("Reconciler", func() {
 								Expect(objStat.Status.Conditions.IsTrueFor(conditions.TypeDeployed)).To(BeTrue())
 								Expect(objStat.Status.Conditions.IsTrueFor(conditions.TypeReleaseFailed)).To(BeTrue())
 								Expect(objStat.Status.DeployedRelease.Name).To(Equal("test"))
-								Expect(objStat.Status.DeployedRelease.Manifest).To(Equal("version: 1"))
+								Expect(objStat.Status.DeployedRelease.Manifest).To(Equal("manifest: 1"))
 
 								c := objStat.Status.Conditions.GetCondition(conditions.TypeReleaseFailed)
 								Expect(c).NotTo(BeNil())
@@ -921,10 +973,10 @@ var _ = Describe("Reconciler", func() {
 						BeforeEach(func() {
 							ac := helmfake.NewActionClient()
 							ac.HandleGet = func() (*release.Release, error) {
-								return &release.Release{Name: "test", Version: 1, Manifest: "version: 1"}, nil
+								return &release.Release{Name: "test", Version: 1, Manifest: "manifest: 1", Info: &release.Info{Status: release.StatusDeployed}}, nil
 							}
 							ac.HandleUpgrade = func() (*release.Release, error) {
-								return &release.Release{Name: "test", Version: 1, Manifest: "version: 1"}, nil
+								return &release.Release{Name: "test", Version: 2, Manifest: "manifest: 1", Info: &release.Info{Status: release.StatusDeployed}}, nil
 							}
 							ac.HandleReconcile = func() error {
 								return errors.New("reconciliation failed: foobar")
@@ -950,7 +1002,7 @@ var _ = Describe("Reconciler", func() {
 								Expect(objStat.Status.Conditions.IsTrueFor(conditions.TypeDeployed)).To(BeTrue())
 								Expect(objStat.Status.Conditions.IsFalseFor(conditions.TypeReleaseFailed)).To(BeTrue())
 								Expect(objStat.Status.DeployedRelease.Name).To(Equal("test"))
-								Expect(objStat.Status.DeployedRelease.Manifest).To(Equal("version: 1"))
+								Expect(objStat.Status.DeployedRelease.Manifest).To(Equal("manifest: 1"))
 
 								c := objStat.Status.Conditions.GetCondition(conditions.TypeIrreconcilable)
 								Expect(c).NotTo(BeNil())
@@ -970,7 +1022,7 @@ var _ = Describe("Reconciler", func() {
 								err error
 							)
 							By("changing the release resources", func() {
-								for _, resource := range manifestToObjects(installedRelease.Manifest) {
+								for _, resource := range manifestToObjects(currentRelease.Manifest) {
 									key := client.ObjectKeyFromObject(resource)
 
 									u := &unstructured.Unstructured{}
@@ -1032,7 +1084,7 @@ var _ = Describe("Reconciler", func() {
 						BeforeEach(func() {
 							ac := helmfake.NewActionClient()
 							ac.HandleGet = func() (*release.Release, error) {
-								return &release.Release{Name: "test", Version: 1, Manifest: "version: 1"}, nil
+								return &release.Release{Name: "test", Version: 1, Manifest: "manifest: 1"}, nil
 							}
 							ac.HandleUninstall = func() (*release.UninstallReleaseResponse, error) {
 								return nil, errors.New("uninstall failed: foobar")
@@ -1062,7 +1114,7 @@ var _ = Describe("Reconciler", func() {
 								Expect(objStat.Status.Conditions.IsTrueFor(conditions.TypeDeployed)).To(BeTrue())
 								Expect(objStat.Status.Conditions.IsTrueFor(conditions.TypeReleaseFailed)).To(BeTrue())
 								Expect(objStat.Status.DeployedRelease.Name).To(Equal("test"))
-								Expect(objStat.Status.DeployedRelease.Manifest).To(Equal("version: 1"))
+								Expect(objStat.Status.DeployedRelease.Manifest).To(Equal("manifest: 1"))
 
 								c := objStat.Status.Conditions.GetCondition(conditions.TypeReleaseFailed)
 								Expect(c).NotTo(BeNil())
@@ -1093,7 +1145,7 @@ var _ = Describe("Reconciler", func() {
 							})
 
 							By("verifying the release is uninstalled", func() {
-								verifyNoRelease(ctx, mgr.GetClient(), obj.GetNamespace(), obj.GetName(), installedRelease)
+								verifyNoRelease(ctx, mgr.GetClient(), obj.GetNamespace(), obj.GetName(), currentRelease)
 							})
 
 							By("ensuring the finalizer is removed and the CR is deleted", func() {
