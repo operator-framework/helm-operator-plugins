@@ -582,7 +582,7 @@ func (r *Reconciler) handleDeletion(ctx context.Context, actionClient helmclient
 }
 
 func (r *Reconciler) getReleaseState(client helmclient.ActionInterface, obj metav1.Object, vals map[string]interface{}) (*release.Release, helmReleaseState, error) {
-	deployedRelease, err := client.Get(obj.GetName())
+	currentRelease, err := client.Get(obj.GetName())
 	if err != nil && !errors.Is(err, driver.ErrReleaseNotFound) {
 		return nil, stateError, err
 	}
@@ -603,12 +603,14 @@ func (r *Reconciler) getReleaseState(client helmclient.ActionInterface, obj meta
 	})
 	specRelease, err := client.Upgrade(obj.GetName(), obj.GetNamespace(), r.chrt, vals, opts...)
 	if err != nil {
-		return deployedRelease, stateError, err
+		return currentRelease, stateError, err
 	}
-	if specRelease.Manifest != deployedRelease.Manifest {
-		return deployedRelease, stateNeedsUpgrade, nil
+	if specRelease.Manifest != currentRelease.Manifest ||
+		currentRelease.Info.Status == release.StatusFailed ||
+		currentRelease.Info.Status == release.StatusSuperseded {
+		return currentRelease, stateNeedsUpgrade, nil
 	}
-	return deployedRelease, stateUnchanged, nil
+	return currentRelease, stateUnchanged, nil
 }
 
 func (r *Reconciler) doInstall(actionClient helmclient.ActionInterface, u *updater.Updater, obj *unstructured.Unstructured, vals map[string]interface{}, log logr.Logger) (*release.Release, error) {
