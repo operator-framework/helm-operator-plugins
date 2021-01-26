@@ -347,6 +347,36 @@ var _ = Describe("ActionClient", func() {
 				})
 			})
 		})
+
+		var _ = Describe("getUninstallAction", func() {
+			It("defaults to KeepHistory=true", func() {
+				ac := actionClient{}
+				uninstall, set, err := ac.getUninstallAction()
+				Expect(err).To(BeNil())
+				Expect(set).To(BeFalse())
+				Expect(uninstall.KeepHistory).To(BeTrue())
+			})
+			It("reports if KeepHistory was explicitly set to true", func() {
+				ac := actionClient{}
+				uninstall, set, err := ac.getUninstallAction(func(u *action.Uninstall) error {
+					u.KeepHistory = true
+					return nil
+				})
+				Expect(err).To(BeNil())
+				Expect(set).To(BeTrue())
+				Expect(uninstall.KeepHistory).To(BeTrue())
+			})
+			It("reports if KeepHistory was explicitly set to false", func() {
+				ac := actionClient{}
+				uninstall, set, err := ac.getUninstallAction(func(u *action.Uninstall) error {
+					u.KeepHistory = false
+					return nil
+				})
+				Expect(err).To(BeNil())
+				Expect(set).To(BeTrue())
+				Expect(uninstall.KeepHistory).To(BeFalse())
+			})
+		})
 	})
 
 	var _ = Describe("createPatch", func() {

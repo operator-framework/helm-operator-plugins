@@ -180,13 +180,50 @@ func (c *actionClient) Upgrade(name, namespace string, chrt *chart.Chart, vals m
 }
 
 func (c *actionClient) Uninstall(name string, opts ...UninstallOption) (*release.UninstallReleaseResponse, error) {
-	uninstall := action.NewUninstall(c.conf)
+	uninstall, explicitKeepHistory, err := c.getUninstallAction(opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := uninstall.Run(name)
+	if err != nil {
+		// If there was an uninstall error, we kept the history, and the response contains a release,
+		// set the release to Uninstalling, and then return the response and error.
+		//
+		// This way, we can retry the uninstall during the next reconciliation. Without KeepHistory,
+		// the release secrets will be purged, and the helm-operator will interpret that to mean that
+		// the release was successfully uninstalled and thus remove the finalizer despite there being
+		// uninstall errors.
+		if uninstall.KeepHistory && resp != nil && resp.Release != nil && resp.Release.Info != nil {
+			resp.Release.Info.Status = release.StatusUninstalling
+			if updateErr := c.conf.Releases.Update(resp.Release); updateErr != nil {
+				return resp, fmt.Errorf("failed to set release status to uninstalling: %v; uninstall error: %w", updateErr, err)
+			}
+		}
+	} else if !explicitKeepHistory {
+		uninstall.KeepHistory = false
+		resp, err = uninstall.Run(name)
+	}
+	return resp, err
+}
+
+func (c *actionClient) getUninstallAction(opts ...UninstallOption) (*action.Uninstall, bool, error) {
+	u1 := action.NewUninstall(c.conf)
+	u1.KeepHistory = true
 	for _, o := range opts {
-		if err := o(uninstall); err != nil {
-			return nil, err
+		if err := o(u1); err != nil {
+			return nil, false, err
 		}
 	}
-	return uninstall.Run(name)
+	u2 := action.NewUninstall(c.conf)
+	u2.KeepHistory = false
+	for _, o := range opts {
+		if err := o(u2); err != nil {
+			return nil, false, err
+		}
+	}
+
+	return u1, !u1.KeepHistory || u2.KeepHistory, nil
 }
 
 func (c *actionClient) Reconcile(rel *release.Release) error {

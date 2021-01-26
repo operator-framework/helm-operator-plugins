@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -1081,15 +1082,27 @@ var _ = Describe("Reconciler", func() {
 						})
 					})
 					When("uninstall fails", func() {
+						var (
+							deployedManifest string
+							actionConf       *action.Configuration
+						)
 						BeforeEach(func() {
-							ac := helmfake.NewActionClient()
-							ac.HandleGet = func() (*release.Release, error) {
-								return &release.Release{Name: "test", Version: 1, Manifest: "manifest: 1"}, nil
-							}
-							ac.HandleUninstall = func() (*release.UninstallReleaseResponse, error) {
-								return nil, errors.New("uninstall failed: foobar")
-							}
-							r.actionClientGetter = helmfake.NewActionClientGetter(&ac, nil)
+							By("adding an invalid resource to the release manifest", func() {
+								var err error
+								acg := helmclient.NewActionConfigGetter(mgr.GetConfig(), mgr.GetRESTMapper(), nil)
+								actionConf, err = acg.ActionConfigFor(obj)
+								Expect(err).To(BeNil())
+
+								deployedManifest = currentRelease.Manifest
+								currentRelease.Manifest = fmt.Sprintf("%s\n---\n%s", currentRelease.Manifest, nonExistentConfigMap(obj.GetNamespace()))
+								Expect(actionConf.Releases.Update(currentRelease)).To(Succeed())
+							})
+						})
+						AfterEach(func() {
+							By("removing the invalid resource from the release manifest", func() {
+								currentRelease.Manifest = deployedManifest
+								Expect(actionConf.Releases.Update(currentRelease)).To(Succeed())
+							})
 						})
 						It("handles the uninstall error", func() {
 							By("deleting the CR", func() {
@@ -1114,17 +1127,23 @@ var _ = Describe("Reconciler", func() {
 								Expect(objStat.Status.Conditions.IsTrueFor(conditions.TypeDeployed)).To(BeTrue())
 								Expect(objStat.Status.Conditions.IsTrueFor(conditions.TypeReleaseFailed)).To(BeTrue())
 								Expect(objStat.Status.DeployedRelease.Name).To(Equal("test"))
-								Expect(objStat.Status.DeployedRelease.Manifest).To(Equal("manifest: 1"))
+								Expect(objStat.Status.DeployedRelease.Manifest).To(Equal(currentRelease.Manifest))
 
 								c := objStat.Status.Conditions.GetCondition(conditions.TypeReleaseFailed)
 								Expect(c).NotTo(BeNil())
 								Expect(c.Reason).To(Equal(conditions.ReasonUninstallError))
-								Expect(c.Message).To(ContainSubstring("uninstall failed: foobar"))
+								Expect(c.Message).To(ContainSubstring("uninstallation completed with 1 error(s)"))
 
 								c = objStat.Status.Conditions.GetCondition(conditions.TypeIrreconcilable)
 								Expect(c).NotTo(BeNil())
 								Expect(c.Reason).To(Equal(conditions.ReasonReconcileError))
-								Expect(c.Message).To(ContainSubstring("uninstall failed: foobar"))
+								Expect(c.Message).To(ContainSubstring("uninstallation completed with 1 error(s)"))
+							})
+
+							By("ensuring the CR release is present and status is Uninstalling", func() {
+								rel, err := ac.Get(obj.GetName())
+								Expect(err).To(BeNil())
+								Expect(rel.Info.Status).To(Equal(release.StatusUninstalling))
 							})
 
 							By("ensuring the uninstall finalizer is present on the CR", func() {
@@ -1278,4 +1297,15 @@ func verifyEvent(ctx context.Context, cl client.Reader, obj metav1.Object, event
 	Type: %q
 	Reason: %q
 	Message: %q`, eventType, reason, message))
+}
+
+func nonExistentConfigMap(ns string) string {
+	return fmt.Sprintf(`apiVersion: v1
+kind: FakeConfigMap
+metadata:
+  name: non-existent-%s
+  namespace: %s
+data:
+  hello: world
+`, rand.String(4), ns)
 }
