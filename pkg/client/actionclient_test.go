@@ -21,7 +21,6 @@ import (
 	"context"
 	"errors"
 	"strconv"
-	"strings"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -542,33 +541,6 @@ var _ = Describe("ActionClient", func() {
 		It("fails on invalid input", func() {
 			_, err := pr.Run(bytes.NewBufferString("test"))
 			Expect(err).NotTo(BeNil())
-		})
-	})
-
-	var _ = Describe("containsResourcePolicyKeep", func() {
-		It("returns true on base case", func() {
-			annotations := map[string]string{kube.ResourcePolicyAnno: kube.KeepPolicy}
-			Expect(containsResourcePolicyKeep(annotations)).To(BeTrue())
-		})
-		It("returns false when annotation key is not found", func() {
-			annotations := map[string]string{"not-" + kube.ResourcePolicyAnno: kube.KeepPolicy}
-			Expect(containsResourcePolicyKeep(annotations)).To(BeFalse())
-		})
-		It("returns false when annotation value is not 'keep'", func() {
-			annotations := map[string]string{"not-" + kube.ResourcePolicyAnno: "not-" + kube.KeepPolicy}
-			Expect(containsResourcePolicyKeep(annotations)).To(BeFalse())
-		})
-		It("returns true when annotation is uppercase", func() {
-			annotations := map[string]string{kube.ResourcePolicyAnno: strings.ToUpper(kube.KeepPolicy)}
-			Expect(containsResourcePolicyKeep(annotations)).To(BeTrue())
-		})
-		It("returns true when annotation is has whitespace prefix and/or suffix", func() {
-			annotations := map[string]string{kube.ResourcePolicyAnno: " " + kube.KeepPolicy + "  "}
-			Expect(containsResourcePolicyKeep(annotations)).To(BeTrue())
-		})
-		It("returns true when annotation is uppercase and has whitespace prefix and/or suffix", func() {
-			annotations := map[string]string{kube.ResourcePolicyAnno: " " + strings.ToUpper(kube.KeepPolicy) + "  "}
-			Expect(containsResourcePolicyKeep(annotations)).To(BeTrue())
 		})
 	})
 })

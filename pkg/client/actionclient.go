@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 
 	sdkhandler "github.com/operator-framework/operator-lib/handler"
 	"gomodules.xyz/jsonpatch/v2"
@@ -46,6 +45,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/joelanford/helm-operator/pkg/internal/sdk/controllerutil"
+	"github.com/joelanford/helm-operator/pkg/manifestutil"
 )
 
 type ActionClientGetter interface {
@@ -326,7 +326,7 @@ func (pr *ownerPostRenderer) Run(in *bytes.Buffer) (*bytes.Buffer, error) {
 		if err != nil {
 			return err
 		}
-		if useOwnerRef && !containsResourcePolicyKeep(u.GetAnnotations()) {
+		if useOwnerRef && !manifestutil.HasResourcePolicyKeep(u.GetAnnotations()) {
 			ownerRef := metav1.NewControllerRef(pr.owner, pr.owner.GetObjectKind().GroupVersionKind())
 			ownerRefs := append(u.GetOwnerReferences(), *ownerRef)
 			u.SetOwnerReferences(ownerRefs)
@@ -348,16 +348,4 @@ func (pr *ownerPostRenderer) Run(in *bytes.Buffer) (*bytes.Buffer, error) {
 		return nil, err
 	}
 	return &out, nil
-}
-
-func containsResourcePolicyKeep(annotations map[string]string) bool {
-	if annotations == nil {
-		return false
-	}
-	resourcePolicyType, ok := annotations[kube.ResourcePolicyAnno]
-	if !ok {
-		return false
-	}
-	resourcePolicyType = strings.ToLower(strings.TrimSpace(resourcePolicyType))
-	return resourcePolicyType == kube.KeepPolicy
 }

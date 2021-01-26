@@ -34,6 +34,7 @@ import (
 	"github.com/joelanford/helm-operator/pkg/hook"
 	"github.com/joelanford/helm-operator/pkg/internal/sdk/controllerutil"
 	"github.com/joelanford/helm-operator/pkg/internal/sdk/predicate"
+	"github.com/joelanford/helm-operator/pkg/manifestutil"
 )
 
 func NewDependentResourceWatcher(c controller.Controller, rm meta.RESTMapper) hook.PostHook {
@@ -77,7 +78,7 @@ func (d *dependentResourceWatcher) Exec(owner *unstructured.Unstructured, rel re
 			return err
 		}
 
-		if useOwnerRef {
+		if useOwnerRef && !manifestutil.HasResourcePolicyKeep(obj.GetAnnotations()) {
 			if err := d.controller.Watch(&source.Kind{Type: &obj}, &handler.EnqueueRequestForOwner{
 				OwnerType:    owner,
 				IsController: true,

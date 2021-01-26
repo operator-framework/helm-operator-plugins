@@ -150,6 +150,18 @@ var _ = Describe("Hook", func() {
 					Expect(c.WatchCalls[0].Handler).To(BeAssignableToTypeOf(&handler.EnqueueRequestForOwner{}))
 					Expect(c.WatchCalls[1].Handler).To(BeAssignableToTypeOf(&handler.EnqueueRequestForOwner{}))
 				})
+				It("should watch resource policy keep resources with annotation handler", func() {
+					rel = &release.Release{
+						Manifest: strings.Join([]string{rsOwnerNamespaceWithKeep, ssOtherNamespaceWithKeep, clusterRoleWithKeep, clusterRoleBindingWithKeep}, "---\n"),
+					}
+					drw = internalhook.NewDependentResourceWatcher(c, rm)
+					Expect(drw.Exec(owner, *rel, log)).To(Succeed())
+					Expect(c.WatchCalls).To(HaveLen(4))
+					Expect(c.WatchCalls[0].Handler).To(BeAssignableToTypeOf(&sdkhandler.EnqueueRequestForAnnotation{}))
+					Expect(c.WatchCalls[1].Handler).To(BeAssignableToTypeOf(&sdkhandler.EnqueueRequestForAnnotation{}))
+					Expect(c.WatchCalls[2].Handler).To(BeAssignableToTypeOf(&sdkhandler.EnqueueRequestForAnnotation{}))
+					Expect(c.WatchCalls[3].Handler).To(BeAssignableToTypeOf(&sdkhandler.EnqueueRequestForAnnotation{}))
+				})
 			})
 
 			Context("when the owner is namespace-scoped", func() {
@@ -165,7 +177,6 @@ var _ = Describe("Hook", func() {
 						},
 					}
 				})
-
 				It("should watch namespace-scoped dependent resources in the same namespace with ownerRef handler", func() {
 					rel = &release.Release{
 						Manifest: strings.Join([]string{rsOwnerNamespace}, "---\n"),
@@ -175,7 +186,6 @@ var _ = Describe("Hook", func() {
 					Expect(c.WatchCalls).To(HaveLen(1))
 					Expect(c.WatchCalls[0].Handler).To(BeAssignableToTypeOf(&handler.EnqueueRequestForOwner{}))
 				})
-
 				It("should watch cluster-scoped resources with annotation handler", func() {
 					rel = &release.Release{
 						Manifest: strings.Join([]string{clusterRole}, "---\n"),
@@ -185,7 +195,6 @@ var _ = Describe("Hook", func() {
 					Expect(c.WatchCalls).To(HaveLen(1))
 					Expect(c.WatchCalls[0].Handler).To(BeAssignableToTypeOf(&sdkhandler.EnqueueRequestForAnnotation{}))
 				})
-
 				It("should watch namespace-scoped resources in a different namespace with annotation handler", func() {
 					rel = &release.Release{
 						Manifest: strings.Join([]string{ssOtherNamespace}, "---\n"),
@@ -194,6 +203,17 @@ var _ = Describe("Hook", func() {
 					Expect(drw.Exec(owner, *rel, log)).To(Succeed())
 					Expect(c.WatchCalls).To(HaveLen(1))
 					Expect(c.WatchCalls[0].Handler).To(BeAssignableToTypeOf(&sdkhandler.EnqueueRequestForAnnotation{}))
+				})
+				It("should watch resource policy keep resources with annotation handler", func() {
+					rel = &release.Release{
+						Manifest: strings.Join([]string{rsOwnerNamespaceWithKeep, ssOtherNamespaceWithKeep, clusterRoleWithKeep}, "---\n"),
+					}
+					drw = internalhook.NewDependentResourceWatcher(c, rm)
+					Expect(drw.Exec(owner, *rel, log)).To(Succeed())
+					Expect(c.WatchCalls).To(HaveLen(3))
+					Expect(c.WatchCalls[0].Handler).To(BeAssignableToTypeOf(&sdkhandler.EnqueueRequestForAnnotation{}))
+					Expect(c.WatchCalls[1].Handler).To(BeAssignableToTypeOf(&sdkhandler.EnqueueRequestForAnnotation{}))
+					Expect(c.WatchCalls[2].Handler).To(BeAssignableToTypeOf(&sdkhandler.EnqueueRequestForAnnotation{}))
 				})
 			})
 		})
@@ -208,6 +228,15 @@ metadata:
   name: testReplicaSet
   namespace: ownerNamespace
 `
+	rsOwnerNamespaceWithKeep = `
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: testReplicaSet
+  namespace: ownerNamespace
+  annotations:
+    helm.sh/resource-policy: keep
+`
 	ssOtherNamespace = `
 apiVersion: apps/v1
 kind: StatefulSet
@@ -215,16 +244,41 @@ metadata:
   name: otherTestStatefulSet
   namespace: otherNamespace
 `
+	ssOtherNamespaceWithKeep = `
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: otherTestStatefulSet
+  namespace: otherNamespace
+  annotations:
+    helm.sh/resource-policy: keep
+`
 	clusterRole = `
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: testClusterRole
 `
+	clusterRoleWithKeep = `
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: testClusterRole
+  annotations:
+    helm.sh/resource-policy: keep
+`
 	clusterRoleBinding = `
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: testClusterRoleBinding
+`
+	clusterRoleBindingWithKeep = `
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: testClusterRoleBinding
+  annotations:
+    helm.sh/resource-policy: keep
 `
 )
