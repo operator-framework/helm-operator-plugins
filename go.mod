@@ -4,6 +4,7 @@ go 1.16
 
 require (
 	github.com/blang/semver/v4 v4.0.0
+	github.com/containerd/containerd v1.4.3 // indirect
 	github.com/go-logr/logr v0.3.0
 	github.com/iancoleman/strcase v0.1.2
 	github.com/kr/text v0.1.0
