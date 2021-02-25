@@ -17,15 +17,21 @@ package machinery
 import (
 	"bytes"
 	"errors"
+	"testing"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
-	"sigs.k8s.io/kubebuilder/v2/pkg/model"
-	"sigs.k8s.io/kubebuilder/v2/pkg/model/file"
+	"sigs.k8s.io/kubebuilder/v3/pkg/model"
+	"sigs.k8s.io/kubebuilder/v3/pkg/model/file"
 
 	"github.com/joelanford/helm-operator/pkg/plugins/internal/kubebuilder/filesystem"
 )
+
+func TestScaffold(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Scaffold suite")
+}
 
 var _ = Describe("Scaffold", func() {
 	Describe("NewScaffold", func() {
@@ -35,27 +41,61 @@ var _ = Describe("Scaffold", func() {
 			ok bool
 		)
 
-		It("should create a valid scaffold", func() {
-			By("passing no plugins")
-			si = NewScaffold()
-			s, ok = si.(*scaffold)
-			Expect(ok).To(BeTrue())
-			Expect(s.fs).NotTo(BeNil())
-			Expect(len(s.plugins)).To(Equal(0))
+		Context("when using no plugins", func() {
+			BeforeEach(func() {
+				si = NewScaffold()
+				s, ok = si.(*scaffold)
+			})
 
-			By("passing one plugin")
-			si = NewScaffold(fakePlugin{})
-			s, ok = si.(*scaffold)
-			Expect(ok).To(BeTrue())
-			Expect(s.fs).NotTo(BeNil())
-			Expect(len(s.plugins)).To(Equal(1))
+			It("should be a scaffold instance", func() {
+				Expect(ok).To(BeTrue())
+			})
 
-			By("passing multiple plugins")
-			si = NewScaffold(fakePlugin{}, fakePlugin{}, fakePlugin{})
-			s, ok = si.(*scaffold)
-			Expect(ok).To(BeTrue())
-			Expect(s.fs).NotTo(BeNil())
-			Expect(len(s.plugins)).To(Equal(3))
+			It("should not have a nil fs", func() {
+				Expect(s.fs).NotTo(BeNil())
+			})
+
+			It("should not have any plugin", func() {
+				Expect(len(s.plugins)).To(Equal(0))
+			})
+		})
+
+		Context("when using one plugin", func() {
+			BeforeEach(func() {
+				si = NewScaffold(fakePlugin{})
+				s, ok = si.(*scaffold)
+			})
+
+			It("should be a scaffold instance", func() {
+				Expect(ok).To(BeTrue())
+			})
+
+			It("should not have a nil fs", func() {
+				Expect(s.fs).NotTo(BeNil())
+			})
+
+			It("should have one plugin", func() {
+				Expect(len(s.plugins)).To(Equal(1))
+			})
+		})
+
+		Context("when using several plugins", func() {
+			BeforeEach(func() {
+				si = NewScaffold(fakePlugin{}, fakePlugin{}, fakePlugin{})
+				s, ok = si.(*scaffold)
+			})
+
+			It("should be a scaffold instance", func() {
+				Expect(ok).To(BeTrue())
+			})
+
+			It("should not have a nil fs", func() {
+				Expect(s.fs).NotTo(BeNil())
+			})
+
+			It("should have several plugins", func() {
+				Expect(len(s.plugins)).To(Equal(3))
+			})
 		})
 	})
 
@@ -166,12 +206,12 @@ var _ = Describe("Scaffold", func() {
 			},
 			Entry("should insert lines for go files",
 				`
-// +kubebuilder:scaffold:-
+//+kubebuilder:scaffold:-
 `,
 				`
 1
 2
-// +kubebuilder:scaffold:-
+//+kubebuilder:scaffold:-
 `,
 				fakeInserter{codeFragments: file.CodeFragmentsMap{
 					file.NewMarkerFor("file.go", "-"): {"1\n", "2\n"}},
@@ -179,12 +219,12 @@ var _ = Describe("Scaffold", func() {
 			),
 			Entry("should insert lines for yaml files",
 				`
-# +kubebuilder:scaffold:-
+#+kubebuilder:scaffold:-
 `,
 				`
 1
 2
-# +kubebuilder:scaffold:-
+#+kubebuilder:scaffold:-
 `,
 				fakeInserter{codeFragments: file.CodeFragmentsMap{
 					file.NewMarkerFor("file.yaml", "-"): {"1\n", "2\n"}},
@@ -195,10 +235,10 @@ var _ = Describe("Scaffold", func() {
 				`
 1
 2
-// +kubebuilder:scaffold:-
+//+kubebuilder:scaffold:-
 `,
 				fakeTemplate{fakeBuilder: fakeBuilder{ifExistsAction: file.Overwrite}, body: `
-// +kubebuilder:scaffold:-
+//+kubebuilder:scaffold:-
 `},
 				fakeInserter{codeFragments: file.CodeFragmentsMap{
 					file.NewMarkerFor("file.go", "-"): {"1\n", "2\n"}},
@@ -209,10 +249,10 @@ var _ = Describe("Scaffold", func() {
 				`
 1
 2
-// +kubebuilder:scaffold:-
+//+kubebuilder:scaffold:-
 `,
 				fakeTemplate{fakeBuilder: fakeBuilder{ifExistsAction: file.Overwrite}, body: `
-// +kubebuilder:scaffold:-
+//+kubebuilder:scaffold:-
 `},
 				fakeInserter{codeFragments: file.CodeFragmentsMap{
 					file.NewMarkerFor("file.go", "-"): {"1\n", "2\n"}},
@@ -220,12 +260,12 @@ var _ = Describe("Scaffold", func() {
 			),
 			Entry("should use files over optional models",
 				`
-// +kubebuilder:scaffold:-
+//+kubebuilder:scaffold:-
 `,
 				`
 1
 2
-// +kubebuilder:scaffold:-
+//+kubebuilder:scaffold:-
 `,
 				fakeTemplate{body: fileContent},
 				fakeInserter{
@@ -236,14 +276,14 @@ var _ = Describe("Scaffold", func() {
 			),
 			Entry("should filter invalid markers",
 				`
-// +kubebuilder:scaffold:-
-// +kubebuilder:scaffold:*
+//+kubebuilder:scaffold:-
+//+kubebuilder:scaffold:*
 `,
 				`
 1
 2
-// +kubebuilder:scaffold:-
-// +kubebuilder:scaffold:*
+//+kubebuilder:scaffold:-
+//+kubebuilder:scaffold:*
 `,
 				fakeInserter{
 					markers: []file.Marker{file.NewMarkerFor("file.go", "-")},
@@ -256,18 +296,18 @@ var _ = Describe("Scaffold", func() {
 			Entry("should filter already existing one-line code fragments",
 				`
 1
-// +kubebuilder:scaffold:-
+//+kubebuilder:scaffold:-
 3
 4
-// +kubebuilder:scaffold:*
+//+kubebuilder:scaffold:*
 `,
 				`
 1
 2
-// +kubebuilder:scaffold:-
+//+kubebuilder:scaffold:-
 3
 4
-// +kubebuilder:scaffold:*
+//+kubebuilder:scaffold:*
 `,
 				fakeInserter{
 					codeFragments: file.CodeFragmentsMap{
@@ -279,10 +319,10 @@ var _ = Describe("Scaffold", func() {
 			Entry("should not insert anything if no code fragment",
 				"", // input is provided through a template as mock fs doesn't copy it to the output buffer if no-op
 				`
-// +kubebuilder:scaffold:-
+//+kubebuilder:scaffold:-
 `,
 				fakeTemplate{body: `
-// +kubebuilder:scaffold:-
+//+kubebuilder:scaffold:-
 `},
 				fakeInserter{
 					codeFragments: file.CodeFragmentsMap{

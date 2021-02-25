@@ -26,8 +26,8 @@ import (
 	"text/template"
 
 	"golang.org/x/tools/imports"
-	"sigs.k8s.io/kubebuilder/v2/pkg/model"
-	"sigs.k8s.io/kubebuilder/v2/pkg/model/file"
+	"sigs.k8s.io/kubebuilder/v3/pkg/model"
+	"sigs.k8s.io/kubebuilder/v3/pkg/model/file"
 
 	"github.com/joelanford/helm-operator/pkg/plugins/internal/kubebuilder/filesystem"
 )
@@ -69,7 +69,7 @@ func (s *scaffold) Execute(universe *model.Universe, files ...file.Builder) erro
 
 	// Set the repo as the local prefix so that it knows how to group imports
 	if universe.Config != nil {
-		imports.LocalPrefix = universe.Config.Repo
+		imports.LocalPrefix = universe.Config.GetRepository()
 	}
 
 	for _, f := range files {
@@ -343,7 +343,7 @@ func insertStrings(content string, codeFragmentsMap file.CodeFragmentsMap) ([]by
 		line := scanner.Text()
 
 		for marker, codeFragments := range codeFragmentsMap {
-			if strings.TrimSpace(line) == strings.TrimSpace(marker.String()) {
+			if marker.EqualsLine(line) {
 				for _, codeFragment := range codeFragments {
 					_, _ = out.WriteString(codeFragment) // bytes.Buffer.WriteString always returns nil errors
 				}

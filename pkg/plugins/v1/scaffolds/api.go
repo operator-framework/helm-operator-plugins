@@ -23,9 +23,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"sigs.k8s.io/kubebuilder/v2/pkg/model"
-	"sigs.k8s.io/kubebuilder/v2/pkg/model/config"
-	"sigs.k8s.io/kubebuilder/v2/pkg/model/resource"
+	"sigs.k8s.io/kubebuilder/v3/pkg/config"
+	"sigs.k8s.io/kubebuilder/v3/pkg/model"
+	"sigs.k8s.io/kubebuilder/v3/pkg/model/resource"
 
 	"github.com/joelanford/helm-operator/pkg/plugins/internal/kubebuilder/cmdutil"
 	"github.com/joelanford/helm-operator/pkg/plugins/internal/kubebuilder/machinery"
@@ -41,12 +41,12 @@ var _ cmdutil.Scaffolder = &apiScaffolder{}
 // apiScaffolder contains configuration for generating scaffolding for Go type
 // representing the API and controller that implements the behavior for the API.
 type apiScaffolder struct {
-	config *config.Config
+	config config.Config
 	opts   chartutil.CreateOptions
 }
 
 // NewAPIScaffolder returns a new Scaffolder for API/controller creation operations
-func NewAPIScaffolder(config *config.Config, opts chartutil.CreateOptions) cmdutil.Scaffolder {
+func NewAPIScaffolder(config config.Config, opts chartutil.CreateOptions) cmdutil.Scaffolder {
 	return &apiScaffolder{
 		config: config,
 		opts:   opts,
@@ -74,22 +74,24 @@ func (s *apiScaffolder) scaffold() error {
 	if err != nil {
 		return err
 	}
+	r.Domain = s.config.GetDomain()
 
 	// Check that resource doesn't exist
-	if s.config.HasResource(r.GVK()) {
+	if s.config.HasResource(r.GVK) {
 		return errors.New("the API resource already exists")
 	}
 	// Check that the provided group can be added to the project
-	if !s.config.MultiGroup && len(s.config.Resources) != 0 && !s.config.HasGroup(r.Group) {
+	if !s.config.IsMultiGroup() && s.config.ResourcesLength() != 0 && !s.config.HasGroup(r.Group) {
 		return errors.New("multiple groups are not allowed by default, to enable multi-group set 'multigroup: true' in your PROJECT file")
 	}
 
-	res := r.NewResource(s.config, true)
-	s.config.UpdateResources(res.GVK())
+	if err := s.config.UpdateResource(*r); err != nil {
+		return fmt.Errorf("error updating resource in PROJECT file: %v", err)
+	}
 
 	chartPath := filepath.Join(chartutil.HelmChartsDir, chrt.Metadata.Name)
 	if err := machinery.NewScaffold().Execute(
-		s.newUniverse(res),
+		s.newUniverse(r),
 		&templates.WatchesUpdater{ChartPath: chartPath},
 		&crd.CRD{CRDVersion: s.opts.CRDVersion},
 		&crd.Kustomization{},

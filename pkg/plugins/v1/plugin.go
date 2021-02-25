@@ -15,17 +15,18 @@
 package v1
 
 import (
-	"sigs.k8s.io/kubebuilder/v2/pkg/model/config"
-	"sigs.k8s.io/kubebuilder/v2/pkg/plugin"
+	"sigs.k8s.io/kubebuilder/v3/pkg/config"
+	cfgv3 "sigs.k8s.io/kubebuilder/v3/pkg/config/v3"
+	"sigs.k8s.io/kubebuilder/v3/pkg/plugin"
 )
 
-// DefaultNameQualifier is the Operator SDK plugin name suffix. Appending
-// this suffix to a short name, ex. "go", makes it fully qualified.
-const DefaultNameQualifier = ".sdk.operatorframework.io"
-const pluginName = "helm" + DefaultNameQualifier
+// defaultNameQualifier is the Operator SDK plugin name suffix. Appending
+// this suffix to a short name, ex. "helm", makes it fully qualified.
+const defaultNameQualifier = ".sdk.operatorframework.io"
+const pluginName = "helm" + defaultNameQualifier
 
 var (
-	supportedProjectVersions = []string{config.Version3Alpha}
+	supportedProjectVersions = []config.Version{cfgv3.Version}
 	pluginVersion            = plugin.Version{Number: 1}
 	pluginKey                = plugin.KeyFor(Plugin{})
 )
@@ -43,6 +44,6 @@ type Plugin struct {
 
 func (Plugin) Name() string                                         { return pluginName }
 func (Plugin) Version() plugin.Version                              { return pluginVersion }
-func (Plugin) SupportedProjectVersions() []string                   { return supportedProjectVersions }
+func (Plugin) SupportedProjectVersions() []config.Version           { return supportedProjectVersions }
 func (p Plugin) GetInitSubcommand() plugin.InitSubcommand           { return &p.initSubcommand }
 func (p Plugin) GetCreateAPISubcommand() plugin.CreateAPISubcommand { return &p.createAPISubcommand }
