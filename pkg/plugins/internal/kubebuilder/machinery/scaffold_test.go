@@ -17,7 +17,6 @@ package machinery
 import (
 	"bytes"
 	"errors"
-	"testing"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
@@ -27,11 +26,6 @@ import (
 
 	"github.com/joelanford/helm-operator/pkg/plugins/internal/kubebuilder/filesystem"
 )
-
-func TestScaffold(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Scaffold suite")
-}
 
 var _ = Describe("Scaffold", func() {
 	Describe("NewScaffold", func() {
