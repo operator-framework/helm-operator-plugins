@@ -24,7 +24,7 @@ import (
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/repo/repotest"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"sigs.k8s.io/kubebuilder/v2/pkg/model/resource"
+	"sigs.k8s.io/kubebuilder/v3/pkg/model/resource"
 
 	"github.com/joelanford/helm-operator/pkg/plugins/v1/chartutil"
 )
@@ -82,35 +82,40 @@ func TestCreateChart(t *testing.T) {
 			group:              customGroup,
 			version:            customVersion,
 			kind:               customKind,
-			expectResource:     mustNewResource(customGroup, customVersion, customKind),
+			crdVersion:         "v1beta1",
+			expectResource:     mustNewResource(customGroup, customVersion, customKind, "v1beta1"),
 			expectChartName:    customExpectName,
 			expectChartVersion: "0.1.0",
 		},
 		{
 			name:               "from directory",
 			helmChart:          filepath.Join(".", "testdata", chartName),
-			expectResource:     mustNewResource(chartutil.DefaultGroup, chartutil.DefaultVersion, expectDerivedKind),
+			crdVersion:         "v1beta1",
+			expectResource:     mustNewResource(chartutil.DefaultGroup, chartutil.DefaultVersion, expectDerivedKind, "v1beta1"),
 			expectChartName:    chartName,
 			expectChartVersion: latestVersion,
 		},
 		{
 			name:               "from archive",
 			helmChart:          filepath.Join(".", "testdata", fmt.Sprintf("%s-%s.tgz", chartName, latestVersion)),
-			expectResource:     mustNewResource(chartutil.DefaultGroup, chartutil.DefaultVersion, expectDerivedKind),
+			crdVersion:         "v1beta1",
+			expectResource:     mustNewResource(chartutil.DefaultGroup, chartutil.DefaultVersion, expectDerivedKind, "v1beta1"),
 			expectChartName:    chartName,
 			expectChartVersion: latestVersion,
 		},
 		{
 			name:               "from url",
 			helmChart:          fmt.Sprintf("%s/%s-%s.tgz", srv.URL(), chartName, latestVersion),
-			expectResource:     mustNewResource(chartutil.DefaultGroup, chartutil.DefaultVersion, expectDerivedKind),
+			crdVersion:         "v1beta1",
+			expectResource:     mustNewResource(chartutil.DefaultGroup, chartutil.DefaultVersion, expectDerivedKind, "v1beta1"),
 			expectChartName:    chartName,
 			expectChartVersion: latestVersion,
 		},
 		{
 			name:               "from repo and name implicit latest",
 			helmChart:          "test/" + chartName,
-			expectResource:     mustNewResource(chartutil.DefaultGroup, chartutil.DefaultVersion, expectDerivedKind),
+			crdVersion:         "v1beta1",
+			expectResource:     mustNewResource(chartutil.DefaultGroup, chartutil.DefaultVersion, expectDerivedKind, "v1beta1"),
 			expectChartName:    chartName,
 			expectChartVersion: latestVersion,
 		},
@@ -119,7 +124,8 @@ func TestCreateChart(t *testing.T) {
 			helmChart:          "test/" + chartName,
 			group:              customGroup,
 			version:            customVersion,
-			expectResource:     mustNewResource(customGroup, customVersion, expectDerivedKind),
+			crdVersion:         "v1beta1",
+			expectResource:     mustNewResource(customGroup, customVersion, expectDerivedKind, "v1beta1"),
 			expectChartName:    chartName,
 			expectChartVersion: latestVersion,
 		},
@@ -127,7 +133,8 @@ func TestCreateChart(t *testing.T) {
 			name:               "from repo and name implicit latest with kind",
 			helmChart:          "test/" + chartName,
 			kind:               customKind,
-			expectResource:     mustNewResource(chartutil.DefaultGroup, chartutil.DefaultVersion, customKind),
+			crdVersion:         "v1",
+			expectResource:     mustNewResource(chartutil.DefaultGroup, chartutil.DefaultVersion, customKind, "v1"),
 			expectChartName:    chartName,
 			expectChartVersion: latestVersion,
 		},
@@ -137,7 +144,8 @@ func TestCreateChart(t *testing.T) {
 			group:              customGroup,
 			version:            customVersion,
 			kind:               customKind,
-			expectResource:     mustNewResource(customGroup, customVersion, customKind),
+			crdVersion:         "v1",
+			expectResource:     mustNewResource(customGroup, customVersion, customKind, "v1"),
 			expectChartName:    chartName,
 			expectChartVersion: latestVersion,
 		},
@@ -145,7 +153,8 @@ func TestCreateChart(t *testing.T) {
 			name:               "from repo and name explicit latest",
 			helmChart:          "test/" + chartName,
 			helmChartVersion:   latestVersion,
-			expectResource:     mustNewResource(chartutil.DefaultGroup, chartutil.DefaultVersion, expectDerivedKind),
+			crdVersion:         "v1",
+			expectResource:     mustNewResource(chartutil.DefaultGroup, chartutil.DefaultVersion, expectDerivedKind, "v1"),
 			expectChartName:    chartName,
 			expectChartVersion: latestVersion,
 		},
@@ -153,7 +162,8 @@ func TestCreateChart(t *testing.T) {
 			name:               "from repo and name explicit previous",
 			helmChart:          "test/" + chartName,
 			helmChartVersion:   previousVersion,
-			expectResource:     mustNewResource(chartutil.DefaultGroup, chartutil.DefaultVersion, expectDerivedKind),
+			crdVersion:         "v1",
+			expectResource:     mustNewResource(chartutil.DefaultGroup, chartutil.DefaultVersion, expectDerivedKind, "v1"),
 			expectChartName:    chartName,
 			expectChartVersion: previousVersion,
 		},
@@ -161,7 +171,8 @@ func TestCreateChart(t *testing.T) {
 			name:               "from name and repo url implicit latest",
 			helmChart:          chartName,
 			helmChartRepo:      srv.URL(),
-			expectResource:     mustNewResource(chartutil.DefaultGroup, chartutil.DefaultVersion, expectDerivedKind),
+			crdVersion:         "v1",
+			expectResource:     mustNewResource(chartutil.DefaultGroup, chartutil.DefaultVersion, expectDerivedKind, "v1"),
 			expectChartName:    chartName,
 			expectChartVersion: latestVersion,
 		},
@@ -170,7 +181,8 @@ func TestCreateChart(t *testing.T) {
 			helmChart:          chartName,
 			helmChartRepo:      srv.URL(),
 			helmChartVersion:   latestVersion,
-			expectResource:     mustNewResource(chartutil.DefaultGroup, chartutil.DefaultVersion, expectDerivedKind),
+			crdVersion:         "v1",
+			expectResource:     mustNewResource(chartutil.DefaultGroup, chartutil.DefaultVersion, expectDerivedKind, "v1"),
 			expectChartName:    chartName,
 			expectChartVersion: latestVersion,
 		},
@@ -179,7 +191,8 @@ func TestCreateChart(t *testing.T) {
 			helmChart:          chartName,
 			helmChartRepo:      srv.URL(),
 			helmChartVersion:   previousVersion,
-			expectResource:     mustNewResource(chartutil.DefaultGroup, chartutil.DefaultVersion, expectDerivedKind),
+			crdVersion:         "v1",
+			expectResource:     mustNewResource(chartutil.DefaultGroup, chartutil.DefaultVersion, expectDerivedKind, "v1"),
 			expectChartName:    chartName,
 			expectChartVersion: previousVersion,
 		},
@@ -198,22 +211,29 @@ type createChartTestCase struct {
 	group            string
 	version          string
 	kind             string
+	crdVersion       string
 	helmChart        string
 	helmChartVersion string
 	helmChartRepo    string
 
-	expectResource     *resource.Options
+	expectResource     *resource.Resource
 	expectChartName    string
 	expectChartVersion string
 	expectErr          bool
 }
 
-func mustNewResource(group, version, kind string) *resource.Options {
-	r := &resource.Options{
-		Namespaced: true,
-		Group:      group,
-		Version:    version,
-		Kind:       kind,
+func mustNewResource(group, version, kind string, crdVersion string) *resource.Resource {
+	r := &resource.Resource{
+		API: &resource.API{
+			Namespaced: true,
+			CRDVersion: crdVersion,
+		},
+		GVK: resource.GVK{
+			Group:   group,
+			Version: version,
+			Kind:    kind,
+		},
+		Plural: resource.RegularPlural(kind),
 	}
 	return r
 }
@@ -238,9 +258,10 @@ func runTestCase(t *testing.T, testDir string, tc createChartTestCase) {
 			Version: tc.version,
 			Kind:    tc.kind,
 		},
-		Chart:   tc.helmChart,
-		Version: tc.helmChartVersion,
-		Repo:    tc.helmChartRepo,
+		CRDVersion: tc.crdVersion,
+		Chart:      tc.helmChart,
+		Version:    tc.helmChartVersion,
+		Repo:       tc.helmChartRepo,
 	}
 	resource, chrt, err := chartutil.CreateChart(outputDir, opts)
 	if tc.expectErr {

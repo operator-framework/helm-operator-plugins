@@ -22,8 +22,8 @@ import (
 
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/validation"
-	"sigs.k8s.io/kubebuilder/v2/pkg/model/config"
-	"sigs.k8s.io/kubebuilder/v2/pkg/plugin"
+	"sigs.k8s.io/kubebuilder/v3/pkg/config"
+	"sigs.k8s.io/kubebuilder/v3/pkg/plugin"
 
 	"github.com/joelanford/helm-operator/pkg/plugins/internal/kubebuilder/cmdutil"
 	"github.com/joelanford/helm-operator/pkg/plugins/v1/chartutil"
@@ -31,8 +31,11 @@ import (
 )
 
 type initSubcommand struct {
-	config    *config.Config
+	config    config.Config
 	apiPlugin createAPISubcommand
+
+	domain      string
+	projectName string
 
 	// If true, run the `create api` plugin.
 	doCreateAPI bool
@@ -116,15 +119,15 @@ Writes the following files:
 // BindFlags will set the flags for the plugin
 func (p *initSubcommand) BindFlags(fs *pflag.FlagSet) {
 	fs.SortFlags = false
-	fs.StringVar(&p.config.Domain, "domain", "my.domain", "domain for groups")
-	fs.StringVar(&p.config.ProjectName, "project-name", "", "name of this project, the default being directory name")
+	fs.StringVar(&p.domain, "domain", "my.domain", "domain for groups")
+	fs.StringVar(&p.projectName, "project-name", "", "name of this project, the default being directory name")
 	p.apiPlugin.BindFlags(fs)
 }
 
 // InjectConfig will inject the PROJECT file/config in the plugin
-func (p *initSubcommand) InjectConfig(c *config.Config) {
+func (p *initSubcommand) InjectConfig(c config.Config) {
 	// v3 project configs get a 'layout' value.
-	c.Layout = pluginKey
+	_ = c.SetLayout(pluginKey)
 	p.config = c
 	p.apiPlugin.config = p.config
 }
@@ -136,17 +139,27 @@ func (p *initSubcommand) Run() error {
 
 // Validate perform the required validations for this plugin
 func (p *initSubcommand) Validate() error {
+	// Set values in the config
+	if err := p.config.SetProjectName(p.projectName); err != nil {
+		return err
+	}
+	if err := p.config.SetDomain(p.domain); err != nil {
+		return err
+	}
 
 	// Check if the project name is a valid k8s namespace (DNS 1123 label).
-	if p.config.ProjectName == "" {
+	if p.config.GetProjectName() == "" {
 		dir, err := os.Getwd()
 		if err != nil {
 			return fmt.Errorf("error getting current directory: %v", err)
 		}
-		p.config.ProjectName = strings.ToLower(filepath.Base(dir))
+		if err = p.config.SetProjectName(strings.ToLower(filepath.Base(dir))); err != nil {
+			return err
+		}
 	}
-	if err := validation.IsDNS1123Label(p.config.ProjectName); err != nil {
-		return fmt.Errorf("project name (%s) is invalid: %v", p.config.ProjectName, err)
+
+	if err := validation.IsDNS1123Label(p.config.GetProjectName()); err != nil {
+		return fmt.Errorf("project name (%s) is invalid: %v", p.config.GetProjectName(), err)
 	}
 
 	defaultOpts := chartutil.CreateOptions{CRDVersion: "v1"}

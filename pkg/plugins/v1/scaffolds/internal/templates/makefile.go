@@ -20,7 +20,7 @@ package templates
 import (
 	"errors"
 
-	"sigs.k8s.io/kubebuilder/v2/pkg/model/file"
+	"sigs.k8s.io/kubebuilder/v3/pkg/model/file"
 )
 
 var _ file.Template = &Makefile{}
@@ -99,34 +99,40 @@ docker-build:
 docker-push:
 	docker push ${IMG}
 
-PATH  := $(PATH):$(PWD)/bin
-SHELL := env PATH=$(PATH) /bin/sh
-OS    = $(shell uname -s | tr '[:upper:]' '[:lower:]')
-ARCH  = $(shell uname -m | sed 's/x86_64/amd64/')
+OS := $(shell uname -s | tr '[:upper:]' '[:lower:]')
+ARCH := $(shell uname -m | sed 's/x86_64/amd64/')
 
+# Download kustomize locally if necessary, preferring the $(pwd)/bin path over global if both exist.
+.PHONY: kustomize
+KUSTOMIZE = $(shell pwd)/bin/kustomize
 kustomize:
-ifeq (, $(shell which kustomize 2>/dev/null))
+ifeq (,$(wildcard $(KUSTOMIZE)))
+ifeq (,$(shell which kustomize 2>/dev/null))
 	@{ \
 	set -e ;\
-	mkdir -p bin ;\
-	curl -sSLo - https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/{{ .KustomizeVersion }}/kustomize_{{ .KustomizeVersion }}_$(OS)_$(ARCH).tar.gz | tar xzf - -C bin/ ;\
+	mkdir -p $(dir $(KUSTOMIZE)) ;\
+	curl -sSLo - https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/{{ .KustomizeVersion }}/kustomize_{{ .KustomizeVersion }}_$(OS)_$(ARCH).tar.gz | \
+	tar xzf - -C bin/ ;\
 	}
-KUSTOMIZE=$(realpath ./bin/kustomize)
 else
-KUSTOMIZE=$(shell which kustomize)
+KUSTOMIZE = $(shell which kustomize)
+endif
 endif
 
+# Download helm-operator locally if necessary, preferring the $(pwd)/bin path over global if both exist.
+.PHONY: helm-operator
+HELM_OPERATOR = $(shell pwd)/bin/helm-operator
 helm-operator:
-ifeq (, $(shell which helm-operator 2>/dev/null))
+ifeq (,$(wildcard $(HELM_OPERATOR)))
+ifeq (,$(shell which helm-operator 2>/dev/null))
 	@{ \
 	set -e ;\
-	mkdir -p bin ;\
-	curl -LO https://github.com/joelanford/helm-operator/releases/download/{{ .HelmOperatorVersion }}/helm-operator_$(OS)_$(ARCH) ;\
-	mv helm-operator_$(OS)_$(ARCH) ./bin/helm-operator ;\
-	chmod +x ./bin/helm-operator ;\
+	mkdir -p $(dir $(HELM_OPERATOR)) ;\
+	curl -sSLo $(HELM_OPERATOR) https://github.com/operator-framework/operator-sdk/releases/download/{{ .HelmOperatorVersion }}/helm-operator_$(OS)_$(ARCH) ;\
+	chmod +x $(HELM_OPERATOR) ;\
 	}
-HELM_OPERATOR=$(realpath ./bin/helm-operator)
 else
-HELM_OPERATOR=$(shell which helm-operator)
+HELM_OPERATOR = $(shell which helm-operator)
+endif
 endif
 `

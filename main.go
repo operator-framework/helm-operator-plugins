@@ -22,8 +22,8 @@ import (
 	"runtime"
 
 	"github.com/spf13/cobra"
-	"sigs.k8s.io/kubebuilder/v2/pkg/cli"
-	"sigs.k8s.io/kubebuilder/v2/pkg/model/config"
+	"sigs.k8s.io/kubebuilder/v3/pkg/cli"
+	config "sigs.k8s.io/kubebuilder/v3/pkg/config/v3"
 
 	"github.com/joelanford/helm-operator/internal/cmd/run"
 	"github.com/joelanford/helm-operator/internal/version"
@@ -40,8 +40,8 @@ func main() {
 		cli.WithPlugins(
 			&pluginv1.Plugin{},
 		),
-		cli.WithDefaultProjectVersion(config.Version3Alpha),
-		cli.WithDefaultPlugins(config.Version3Alpha, &pluginv1.Plugin{}),
+		cli.WithDefaultProjectVersion(config.Version),
+		cli.WithDefaultPlugins(config.Version, &pluginv1.Plugin{}),
 		cli.WithExtraCommands(commands...),
 	)
 	if err != nil {

@@ -19,9 +19,8 @@ import (
 	"strings"
 
 	"github.com/spf13/pflag"
-	"sigs.k8s.io/kubebuilder/v2/pkg/model/config"
-	"sigs.k8s.io/kubebuilder/v2/pkg/model/resource"
-	"sigs.k8s.io/kubebuilder/v2/pkg/plugin"
+	"sigs.k8s.io/kubebuilder/v3/pkg/config"
+	"sigs.k8s.io/kubebuilder/v3/pkg/plugin"
 
 	"github.com/joelanford/helm-operator/pkg/plugins/internal/kubebuilder/cmdutil"
 	"github.com/joelanford/helm-operator/pkg/plugins/v1/chartutil"
@@ -29,8 +28,7 @@ import (
 )
 
 type createAPISubcommand struct {
-	config *config.Config
-
+	config        config.Config
 	createOptions chartutil.CreateOptions
 }
 
@@ -94,8 +92,7 @@ const (
 	helmChartVersionFlag = "helm-chart-version"
 	crdVersionFlag       = "crd-version"
 
-	crdVersionV1      = "v1"
-	crdVersionV1beta1 = "v1beta1"
+	crdVersionV1 = "v1"
 )
 
 // BindFlags will set the flags for the plugin
@@ -115,7 +112,7 @@ func (p *createAPISubcommand) BindFlags(fs *pflag.FlagSet) {
 }
 
 // InjectConfig will inject the PROJECT file/config in the plugin
-func (p *createAPISubcommand) InjectConfig(c *config.Config) {
+func (p *createAPISubcommand) InjectConfig(c config.Config) {
 	p.config = c
 }
 
@@ -126,36 +123,15 @@ func (p *createAPISubcommand) Run() error {
 
 // Validate perform the required validations for this plugin
 func (p *createAPISubcommand) Validate() error {
-	if p.createOptions.CRDVersion != crdVersionV1 && p.createOptions.CRDVersion != crdVersionV1beta1 {
-		return fmt.Errorf("value of --%s must be either %q or %q", crdVersionFlag, crdVersionV1, crdVersionV1beta1)
-	}
-
 	if len(strings.TrimSpace(p.createOptions.Chart)) == 0 {
 		if len(strings.TrimSpace(p.createOptions.Repo)) != 0 {
 			return fmt.Errorf("value of --%s can only be used with --%s", helmChartRepoFlag, helmChartFlag)
 		} else if len(p.createOptions.Version) != 0 {
 			return fmt.Errorf("value of --%s can only be used with --%s", helmChartVersionFlag, helmChartFlag)
 		}
-	}
 
-	if len(strings.TrimSpace(p.createOptions.Chart)) == 0 {
-		if len(strings.TrimSpace(p.createOptions.GVK.Group)) == 0 {
-			return fmt.Errorf("value of --%s must not have empty value", groupFlag)
-		}
-		if len(strings.TrimSpace(p.createOptions.GVK.Version)) == 0 {
-			return fmt.Errorf("value of --%s must not have empty value", versionFlag)
-		}
-		if len(strings.TrimSpace(p.createOptions.GVK.Kind)) == 0 {
-			return fmt.Errorf("value of --%s must not have empty value", kindFlag)
-		}
-
-		// Validate the resource.
-		r := resource.Options{
-			Namespaced: true,
-			Group:      p.createOptions.GVK.Group,
-			Version:    p.createOptions.GVK.Version,
-			Kind:       p.createOptions.GVK.Kind,
-		}
+		r := p.createOptions.Resource()
+		r.Domain = p.config.GetDomain()
 		if err := r.Validate(); err != nil {
 			return err
 		}
