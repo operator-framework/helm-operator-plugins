@@ -14,6 +14,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package annotation allows to set custom install, upgrade or uninstall options on custom resource objects with annotations.
+// To create custom annotations implement the Install, Upgrade or Uninstall interface.
+//
+// Example:
+//
+// To disable hooks based on annotations the InstallDisableHooks is passed to the reconciler as an option.
+//
+//    r, err := reconciler.New(
+//	    reconciler.WithChart(*w.Chart),
+//	    reconciler.WithGroupVersionKind(w.GroupVersionKind),
+//	    reconciler.WithInstallAnnotations(annotation.InstallDisableHook{}),
+//	  )
+//
+// If the reconciler detects an annotation named "helm.sdk.operatorframework.io/install-disable-hooks"
+// on the watched custom resource it sets the install.DisableHooks option to the annotations value. For more information
+// take a look at the InstallDisableHooks.InstallOption method.
+//
+//   kind: OperatorHelmKind
+//   apiVersion: test.example.com/v1
+//   metadata:
+//     name: nginx-sample
+//     annotations:
+//       "helm.sdk.operatorframework.io/install-disable-hooks": true
+//
 package annotation
 
 import (
@@ -30,26 +54,23 @@ var (
 	DefaultUninstallAnnotations = []Uninstall{UninstallDescription{}, UninstallDisableHooks{}}
 )
 
+// Install configures an install annotation.
 type Install interface {
 	Name() string
 	InstallOption(string) helmclient.InstallOption
 }
 
+// Upgrade configures an upgrade annotation.
 type Upgrade interface {
 	Name() string
 	UpgradeOption(string) helmclient.UpgradeOption
 }
 
+// Uninstall configures an install annotation.
 type Uninstall interface {
 	Name() string
 	UninstallOption(string) helmclient.UninstallOption
 }
-
-type InstallDisableHooks struct {
-	CustomName string
-}
-
-var _ Install = &InstallDisableHooks{}
 
 const (
 	defaultDomain                    = "helm.sdk.operatorframework.io"
@@ -63,6 +84,12 @@ const (
 	defaultUpgradeDescriptionName   = defaultDomain + "/upgrade-description"
 	defaultUninstallDescriptionName = defaultDomain + "/uninstall-description"
 )
+
+type InstallDisableHooks struct {
+	CustomName string
+}
+
+var _ Install = &InstallDisableHooks{}
 
 func (i InstallDisableHooks) Name() string {
 	if i.CustomName != "" {
