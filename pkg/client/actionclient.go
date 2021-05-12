@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
 	sdkhandler "github.com/operator-framework/operator-lib/handler"
 	"gomodules.xyz/jsonpatch/v2"
 	"helm.sh/helm/v3/pkg/action"
