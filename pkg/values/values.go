@@ -18,14 +18,17 @@ package values
 
 import (
 	"helm.sh/helm/v3/pkg/chartutil"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 type Mapper interface {
-	Map(chartutil.Values) chartutil.Values
+	Map(*unstructured.Unstructured, chartutil.Values) chartutil.Values
 }
 
-type MapperFunc func(chartutil.Values) chartutil.Values
+// MapperFunc takes the original values and the watched custom resource to modify its contents, i.e. to map a custom
+// resource or set new values based on cluster state.
+type MapperFunc func(*unstructured.Unstructured, chartutil.Values) chartutil.Values
 
-func (m MapperFunc) Map(v chartutil.Values) chartutil.Values {
-	return m(v)
+func (m MapperFunc) Map(cr *unstructured.Unstructured, v chartutil.Values) chartutil.Values {
+	return m(cr, v)
 }

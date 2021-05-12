@@ -529,7 +529,7 @@ func (r *Reconciler) getValues(obj *unstructured.Unstructured) (chartutil.Values
 	if err := crVals.ApplyOverrides(r.overrideValues); err != nil {
 		return chartutil.Values{}, err
 	}
-	vals := r.valueMapper.Map(crVals.Map())
+	vals := r.valueMapper.Map(obj, crVals.Map())
 	vals, err = chartutil.CoalesceValues(r.chrt, vals)
 	if err != nil {
 		return chartutil.Values{}, err
