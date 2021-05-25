@@ -61,7 +61,8 @@ const uninstallFinalizer = "uninstall-helm-release"
 type Reconciler struct {
 	client             client.Client
 	actionClientGetter helmclient.ActionClientGetter
-	valueMapper        values.Mapper
+	valueTranslator    values.Translator
+	valueMapper        values.Mapper // nolint:staticcheck
 	eventRecorder      record.EventRecorder
 	preHooks           []hook.PreHook
 	postHooks          []hook.PostHook
@@ -231,8 +232,8 @@ func WithOverrideValues(overrides map[string]string) Option {
 		// Validate that overrides can be parsed and applied
 		// so that we fail fast during operator setup rather
 		// than during the first reconciliation.
-		m := internalvalues.New(map[string]interface{}{})
-		if err := m.ApplyOverrides(overrides); err != nil {
+		obj := &unstructured.Unstructured{Object: map[string]interface{}{"spec": map[string]interface{}{}}}
+		if err := internalvalues.ApplyOverrides(overrides, obj); err != nil {
 			return err
 		}
 
@@ -375,8 +376,36 @@ func WithPostHook(h hook.PostHook) Option {
 	}
 }
 
+// WithValueTranslator is an Option that configures a function that translates a
+// custom resource to the values passed to Helm.
+// Use this if you need to customize the logic that translates your custom resource to Helm values.
+// If you wish to, you can convert the Unstructured that is passed to your Translator to your own
+// Custom Resource struct like this:
+//
+//   import "k8s.io/apimachinery/pkg/runtime"
+//   foo := your.Foo{}
+//   if err = runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, &foo); err != nil {
+//     return nil, err
+//   }
+//   // work with the type-safe foo
+//
+// Alternatively, your translator can also work similarly to a Mapper, by accessing the spec with:
+//
+//   u.Object["spec"].(map[string]interface{})
+func WithValueTranslator(t values.Translator) Option {
+	return func(r *Reconciler) error {
+		r.valueTranslator = t
+		return nil
+	}
+}
+
 // WithValueMapper is an Option that configures a function that maps values
-// from a custom resource spec to the values passed to Helm
+// from a custom resource spec to the values passed to Helm.
+// Use this if you want to apply a transformation on the values obtained from your custom resource, before
+// they are passed to Helm.
+//
+// Deprecated: Use WithValueTranslator instead.
+// WithValueMapper will be removed in a future release.
 func WithValueMapper(m values.Mapper) Option {
 	return func(r *Reconciler) error {
 		r.valueMapper = m
@@ -471,7 +500,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.
 		return ctrl.Result{}, err
 	}
 
-	vals, err := r.getValues(obj)
+	vals, err := r.getValues(ctx, obj)
 	if err != nil {
 		u.UpdateStatus(
 			updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionTrue, conditions.ReasonErrorGettingValues, err)),
@@ -534,15 +563,15 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.
 	return ctrl.Result{RequeueAfter: r.reconcilePeriod}, nil
 }
 
-func (r *Reconciler) getValues(obj *unstructured.Unstructured) (chartutil.Values, error) {
-	crVals, err := internalvalues.FromUnstructured(obj)
+func (r *Reconciler) getValues(ctx context.Context, obj *unstructured.Unstructured) (chartutil.Values, error) {
+	if err := internalvalues.ApplyOverrides(r.overrideValues, obj); err != nil {
+		return chartutil.Values{}, err
+	}
+	vals, err := r.valueTranslator.Translate(ctx, obj)
 	if err != nil {
 		return chartutil.Values{}, err
 	}
-	if err := crVals.ApplyOverrides(r.overrideValues); err != nil {
-		return chartutil.Values{}, err
-	}
-	vals := r.valueMapper.Map(crVals.Map())
+	vals = r.valueMapper.Map(vals)
 	vals, err = chartutil.CoalesceValues(r.chrt, vals)
 	if err != nil {
 		return chartutil.Values{}, err
@@ -760,6 +789,9 @@ func (r *Reconciler) addDefaults(mgr ctrl.Manager, controllerName string) {
 	}
 	if r.eventRecorder == nil {
 		r.eventRecorder = mgr.GetEventRecorderFor(controllerName)
+	}
+	if r.valueTranslator == nil {
+		r.valueTranslator = internalvalues.DefaultTranslator
 	}
 	if r.valueMapper == nil {
 		r.valueMapper = internalvalues.DefaultMapper

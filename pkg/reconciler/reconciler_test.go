@@ -372,6 +372,16 @@ var _ = Describe("Reconciler", func() {
 				Expect(r.valueMapper.Map(chartutil.Values{})).To(Equal(chartutil.Values{"mapped": true}))
 			})
 		})
+		var _ = Describe("WithValueTranslator", func() {
+			It("should set the reconciler value translator", func() {
+				translator := values.TranslatorFunc(func(ctx context.Context, u *unstructured.Unstructured) (chartutil.Values, error) {
+					return chartutil.Values{"translated": true}, nil
+				})
+				Expect(WithValueTranslator(translator)(r)).To(Succeed())
+				Expect(r.valueTranslator).NotTo(BeNil())
+				Expect(r.valueTranslator.Translate(context.Background(), &unstructured.Unstructured{})).To(Equal(chartutil.Values{"translated": true}))
+			})
+		})
 	})
 
 	var _ = Describe("Reconcile", func() {
@@ -550,6 +560,7 @@ var _ = Describe("Reconciler", func() {
 						By("reconciling unsuccessfully", func() {
 							res, err := r.Reconcile(ctx, req)
 							Expect(res).To(Equal(reconcile.Result{}))
+							Expect(err).ToNot(BeNil())
 							Expect(err.Error()).To(ContainSubstring("error parsing index"))
 						})
 
@@ -795,6 +806,7 @@ var _ = Describe("Reconciler", func() {
 						By("reconciling unsuccessfully", func() {
 							res, err := r.Reconcile(ctx, req)
 							Expect(res).To(Equal(reconcile.Result{}))
+							Expect(err).ToNot(BeNil())
 							Expect(err.Error()).To(ContainSubstring("error parsing index"))
 						})
 
@@ -814,6 +826,45 @@ var _ = Describe("Reconciler", func() {
 							Expect(c).NotTo(BeNil())
 							Expect(c.Reason).To(Equal(conditions.ReasonErrorGettingValues))
 							Expect(c.Message).To(ContainSubstring("error parsing index"))
+
+							Expect(objStat.Status.DeployedRelease.Name).To(Equal(currentRelease.Name))
+							Expect(objStat.Status.DeployedRelease.Manifest).To(Equal(currentRelease.Manifest))
+						})
+
+						By("verifying the uninstall finalizer is not present on the CR", func() {
+							Expect(controllerutil.ContainsFinalizer(obj, uninstallFinalizer)).To(BeTrue())
+						})
+					})
+				})
+				When("value translator fails", func() {
+					BeforeEach(func() {
+						r.valueTranslator = values.TranslatorFunc(func(ctx context.Context, u *unstructured.Unstructured) (chartutil.Values, error) {
+							return nil, errors.New("translation failure")
+						})
+					})
+					It("returns an error", func() {
+						By("reconciling unsuccessfully", func() {
+							res, err := r.Reconcile(ctx, req)
+							Expect(res).To(Equal(reconcile.Result{}))
+							Expect(err.Error()).To(ContainSubstring("translation failure"))
+						})
+
+						By("getting the CR", func() {
+							Expect(mgr.GetAPIReader().Get(ctx, objKey, obj)).To(Succeed())
+						})
+
+						By("verifying the CR status", func() {
+							objStat := &objStatus{}
+							Expect(runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, objStat)).To(Succeed())
+							Expect(objStat.Status.Conditions.IsTrueFor(conditions.TypeInitialized)).To(BeTrue())
+							Expect(objStat.Status.Conditions.IsTrueFor(conditions.TypeIrreconcilable)).To(BeTrue())
+							Expect(objStat.Status.Conditions.IsTrueFor(conditions.TypeDeployed)).To(BeTrue())
+							Expect(objStat.Status.Conditions.IsUnknownFor(conditions.TypeReleaseFailed)).To(BeTrue())
+
+							c := objStat.Status.Conditions.GetCondition(conditions.TypeIrreconcilable)
+							Expect(c).NotTo(BeNil())
+							Expect(c.Reason).To(Equal(conditions.ReasonErrorGettingValues))
+							Expect(c.Message).To(ContainSubstring("translation failure"))
 
 							Expect(objStat.Status.DeployedRelease.Name).To(Equal(currentRelease.Name))
 							Expect(objStat.Status.DeployedRelease.Manifest).To(Equal(currentRelease.Manifest))
@@ -1221,14 +1272,38 @@ func verifyRelease(ctx context.Context, cl client.Reader, ns string, rel *releas
 		}
 	})
 
+	var objs []client.Object
+
 	By("verifying the release resources exist", func() {
-		objs := manifestToObjects(rel.Manifest)
+		objs = manifestToObjects(rel.Manifest)
 		for _, obj := range objs {
 			key := client.ObjectKeyFromObject(obj)
 			err := cl.Get(ctx, key, obj)
 			Expect(err).To(BeNil())
 		}
 	})
+
+	By("verifying that deployment image was overridden", func() {
+		for _, obj := range objs {
+			if obj.GetName() == "test-test-chart" && obj.GetObjectKind().GroupVersionKind().Kind == "Deployment" {
+				expectDeploymentImagePrefix(obj, "custom-nginx:")
+				return
+			}
+		}
+		Fail("expected deployment not found")
+	})
+}
+
+func expectDeploymentImagePrefix(obj client.Object, prefix string) {
+	u := obj.(*unstructured.Unstructured)
+	containers, ok, err := unstructured.NestedSlice(u.Object, "spec", "template", "spec", "containers")
+	Expect(ok).To(BeTrue())
+	Expect(err).To(BeNil())
+	container := containers[0].(map[string]interface{})
+	val, ok, err := unstructured.NestedString(container, "image")
+	Expect(ok).To(BeTrue())
+	Expect(err).To(BeNil())
+	Expect(val).To(HavePrefix(prefix))
 }
 
 func verifyNoRelease(ctx context.Context, cl client.Client, ns string, name string, rel *release.Release) {
