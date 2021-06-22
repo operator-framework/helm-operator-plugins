@@ -73,6 +73,7 @@ type Reconciler struct {
 	skipDependentWatches    bool
 	maxConcurrentReconciles int
 	reconcilePeriod         time.Duration
+	maxHistory              int
 
 	annotSetupOnce       sync.Once
 	annotations          map[string]struct{}
@@ -276,6 +277,18 @@ func WithReconcilePeriod(rp time.Duration) Option {
 			return errors.New("reconcile period must not be negative")
 		}
 		r.reconcilePeriod = rp
+		return nil
+	}
+}
+
+// WithMaxReleaseHistory specifies the maximum size of the Helm release history maintained
+// on upgrades/rollbacks. Zero (default) means unlimited.
+func WithMaxReleaseHistory(maxHistory int) Option {
+	return func(r *Reconciler) error {
+		if maxHistory < 0 {
+			return errors.New("maximum Helm release history size must not be negative")
+		}
+		r.maxHistory = maxHistory
 		return nil
 	}
 }
@@ -592,6 +605,12 @@ func (r *Reconciler) getReleaseState(client helmclient.ActionInterface, obj meta
 	}
 
 	var opts []helmclient.UpgradeOption
+	if r.maxHistory > 0 {
+		opts = append(opts, func(u *action.Upgrade) error {
+			u.MaxHistory = r.maxHistory
+			return nil
+		})
+	}
 	for name, annot := range r.upgradeAnnotations {
 		if v, ok := obj.GetAnnotations()[name]; ok {
 			opts = append(opts, annot.UpgradeOption(v))
@@ -636,6 +655,12 @@ func (r *Reconciler) doInstall(actionClient helmclient.ActionInterface, u *updat
 
 func (r *Reconciler) doUpgrade(actionClient helmclient.ActionInterface, u *updater.Updater, obj *unstructured.Unstructured, vals map[string]interface{}, log logr.Logger) (*release.Release, error) {
 	var opts []helmclient.UpgradeOption
+	if r.maxHistory > 0 {
+		opts = append(opts, func(u *action.Upgrade) error {
+			u.MaxHistory = r.maxHistory
+			return nil
+		})
+	}
 	for name, annot := range r.upgradeAnnotations {
 		if v, ok := obj.GetAnnotations()[name]; ok {
 			opts = append(opts, annot.UpgradeOption(v))

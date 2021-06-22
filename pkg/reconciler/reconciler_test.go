@@ -173,6 +173,19 @@ var _ = Describe("Reconciler", func() {
 				Expect(WithReconcilePeriod(-time.Nanosecond)(r)).NotTo(Succeed())
 			})
 		})
+		var _ = Describe("WithMaxReleaseHistory", func() {
+			It("should set the max history size", func() {
+				Expect(WithMaxReleaseHistory(10)(r)).To(Succeed())
+				Expect(r.maxHistory).To(Equal(10))
+			})
+			It("should allow setting the history to unlimited", func() {
+				Expect(WithMaxReleaseHistory(0)(r)).To(Succeed())
+				Expect(r.maxHistory).To(Equal(0))
+			})
+			It("should fail if value is less than 0", func() {
+				Expect(WithMaxReleaseHistory(-1)(r)).NotTo(Succeed())
+			})
+		})
 		var _ = Describe("WithInstallAnnotations", func() {
 			It("should set multiple reconciler install annotations", func() {
 				a1 := annotation.InstallDisableHooks{CustomName: "my.domain/custom-name1"}
