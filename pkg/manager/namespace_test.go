@@ -34,7 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	. "github.com/joelanford/helm-operator/pkg/manager"
+	. "github.com/operator-framework/helm-operator-plugins/pkg/manager"
 )
 
 var _ = Describe("ConfigureWatchNamespaces", func() {

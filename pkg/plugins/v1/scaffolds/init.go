@@ -23,15 +23,15 @@ import (
 	"sigs.k8s.io/kubebuilder/v3/pkg/config"
 	"sigs.k8s.io/kubebuilder/v3/pkg/model"
 
-	"github.com/joelanford/helm-operator/internal/version"
-	"github.com/joelanford/helm-operator/pkg/plugins/internal/kubebuilder/cmdutil"
-	"github.com/joelanford/helm-operator/pkg/plugins/internal/kubebuilder/machinery"
-	"github.com/joelanford/helm-operator/pkg/plugins/v1/chartutil"
-	"github.com/joelanford/helm-operator/pkg/plugins/v1/scaffolds/internal/templates"
-	"github.com/joelanford/helm-operator/pkg/plugins/v1/scaffolds/internal/templates/config/kdefault"
-	"github.com/joelanford/helm-operator/pkg/plugins/v1/scaffolds/internal/templates/config/manager"
-	"github.com/joelanford/helm-operator/pkg/plugins/v1/scaffolds/internal/templates/config/prometheus"
-	"github.com/joelanford/helm-operator/pkg/plugins/v1/scaffolds/internal/templates/config/rbac"
+	"github.com/operator-framework/helm-operator-plugins/internal/version"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/internal/kubebuilder/cmdutil"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/internal/kubebuilder/machinery"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/v1/chartutil"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/v1/scaffolds/internal/templates"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/v1/scaffolds/internal/templates/config/kdefault"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/v1/scaffolds/internal/templates/config/manager"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/v1/scaffolds/internal/templates/config/prometheus"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/v1/scaffolds/internal/templates/config/rbac"
 )
 
 const (

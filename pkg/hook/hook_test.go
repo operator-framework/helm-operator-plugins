@@ -24,7 +24,7 @@ import (
 	"helm.sh/helm/v3/pkg/release"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	. "github.com/joelanford/helm-operator/pkg/hook"
+	. "github.com/operator-framework/helm-operator-plugins/pkg/hook"
 )
 
 var _ = Describe("Hook", func() {

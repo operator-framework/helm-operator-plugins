@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/kubebuilder/v3/pkg/model"
 	"sigs.k8s.io/kubebuilder/v3/pkg/model/file"
 
-	"github.com/joelanford/helm-operator/pkg/plugins/internal/kubebuilder/filesystem"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/internal/kubebuilder/filesystem"
 )
 
 var _ = Describe("Scaffold", func() {

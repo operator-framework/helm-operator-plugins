@@ -23,7 +23,7 @@ import (
 	. "github.com/onsi/gomega"
 	"helm.sh/helm/v3/pkg/kube"
 
-	"github.com/joelanford/helm-operator/pkg/manifestutil"
+	"github.com/operator-framework/helm-operator-plugins/pkg/manifestutil"
 )
 
 var _ = Describe("HasResourcePolicyKeep", func() {

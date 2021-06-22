@@ -49,15 +49,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/yaml"
 
-	"github.com/joelanford/helm-operator/pkg/annotation"
-	helmclient "github.com/joelanford/helm-operator/pkg/client"
-	"github.com/joelanford/helm-operator/pkg/hook"
-	"github.com/joelanford/helm-operator/pkg/internal/sdk/controllerutil"
-	"github.com/joelanford/helm-operator/pkg/internal/sdk/status"
-	"github.com/joelanford/helm-operator/pkg/internal/testutil"
-	"github.com/joelanford/helm-operator/pkg/reconciler/internal/conditions"
-	helmfake "github.com/joelanford/helm-operator/pkg/reconciler/internal/fake"
-	"github.com/joelanford/helm-operator/pkg/values"
+	"github.com/operator-framework/helm-operator-plugins/pkg/annotation"
+	helmclient "github.com/operator-framework/helm-operator-plugins/pkg/client"
+	"github.com/operator-framework/helm-operator-plugins/pkg/hook"
+	"github.com/operator-framework/helm-operator-plugins/pkg/internal/sdk/controllerutil"
+	"github.com/operator-framework/helm-operator-plugins/pkg/internal/sdk/status"
+	"github.com/operator-framework/helm-operator-plugins/pkg/internal/testutil"
+	"github.com/operator-framework/helm-operator-plugins/pkg/reconciler/internal/conditions"
+	helmfake "github.com/operator-framework/helm-operator-plugins/pkg/reconciler/internal/fake"
+	"github.com/operator-framework/helm-operator-plugins/pkg/values"
 )
 
 var _ = Describe("Reconciler", func() {

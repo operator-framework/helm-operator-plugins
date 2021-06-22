@@ -28,7 +28,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/joelanford/helm-operator/pkg/internal/testutil"
+	"github.com/operator-framework/helm-operator-plugins/pkg/internal/testutil"
 )
 
 func TestReconciler(t *testing.T) {

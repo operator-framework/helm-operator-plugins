@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/kubebuilder/v3/pkg/model/resource"
 
-	"github.com/joelanford/helm-operator/pkg/plugins/v1/chartutil"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/v1/chartutil"
 )
 
 func TestCreateChart(t *testing.T) {

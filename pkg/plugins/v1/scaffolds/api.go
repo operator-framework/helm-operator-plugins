@@ -27,13 +27,13 @@ import (
 	"sigs.k8s.io/kubebuilder/v3/pkg/model"
 	"sigs.k8s.io/kubebuilder/v3/pkg/model/resource"
 
-	"github.com/joelanford/helm-operator/pkg/plugins/internal/kubebuilder/cmdutil"
-	"github.com/joelanford/helm-operator/pkg/plugins/internal/kubebuilder/machinery"
-	"github.com/joelanford/helm-operator/pkg/plugins/v1/chartutil"
-	"github.com/joelanford/helm-operator/pkg/plugins/v1/scaffolds/internal/templates"
-	"github.com/joelanford/helm-operator/pkg/plugins/v1/scaffolds/internal/templates/config/crd"
-	"github.com/joelanford/helm-operator/pkg/plugins/v1/scaffolds/internal/templates/config/rbac"
-	"github.com/joelanford/helm-operator/pkg/plugins/v1/scaffolds/internal/templates/config/samples"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/internal/kubebuilder/cmdutil"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/internal/kubebuilder/machinery"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/v1/chartutil"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/v1/scaffolds/internal/templates"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/v1/scaffolds/internal/templates/config/crd"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/v1/scaffolds/internal/templates/config/rbac"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/v1/scaffolds/internal/templates/config/samples"
 )
 
 var _ cmdutil.Scaffolder = &apiScaffolder{}

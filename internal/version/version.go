@@ -26,7 +26,7 @@ import (
 
 const (
 	Unknown    = "unknown"
-	modulePath = "github.com/joelanford/helm-operator"
+	modulePath = "github.com/operator-framework/helm-operator-plugins"
 )
 
 var (

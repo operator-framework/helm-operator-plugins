@@ -22,7 +22,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
-	"github.com/joelanford/helm-operator/pkg/internal/testutil"
+	"github.com/operator-framework/helm-operator-plugins/pkg/internal/testutil"
 )
 
 var _ = Describe("ActionConfig", func() {

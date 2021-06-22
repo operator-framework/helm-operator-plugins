@@ -25,9 +25,9 @@ import (
 	"sigs.k8s.io/kubebuilder/v3/pkg/config"
 	"sigs.k8s.io/kubebuilder/v3/pkg/plugin"
 
-	"github.com/joelanford/helm-operator/pkg/plugins/internal/kubebuilder/cmdutil"
-	"github.com/joelanford/helm-operator/pkg/plugins/v1/chartutil"
-	"github.com/joelanford/helm-operator/pkg/plugins/v1/scaffolds"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/internal/kubebuilder/cmdutil"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/v1/chartutil"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/v1/scaffolds"
 )
 
 type initSubcommand struct {

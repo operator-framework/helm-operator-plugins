@@ -54,7 +54,7 @@ jobs:
     - name: Prepare
       id: prep
       run: |
-        IMG=quay.io/joelanford/helm-operator
+        IMG=quay.io/operator-framework/helm-operator-plugins
         if [[ $GITHUB_REF == refs/tags/* ]]; then
           TAG=${GITHUB_REF#refs/tags/}
           MAJOR_MINOR=${TAG%.*}

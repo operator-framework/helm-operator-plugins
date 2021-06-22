@@ -1,4 +1,4 @@
-module github.com/joelanford/helm-operator
+module github.com/operator-framework/helm-operator-plugins
 
 go 1.16
 

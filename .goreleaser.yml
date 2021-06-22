@@ -3,7 +3,7 @@ env:
   - CGO_ENABLED=0
   - GO111MODULE=on
   - GOPROXY=https://proxy.golang.org|direct
-  - VERSION_PKG=github.com/joelanford/helm-operator/internal/version
+  - VERSION_PKG=github.com/operator-framework/helm-operator-plugins/internal/version
 
 # Hooks to run before any build is run.
 before:
