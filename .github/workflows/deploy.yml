@@ -42,6 +42,9 @@ jobs:
         GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
 
   docker:
+    # TODO(fabianvf): skip pushing images for now, reenable once we're
+    # working on migrating the official helm plugin here
+    if: ${{ false }}
     name: Docker
     runs-on: ubuntu-latest
     steps:
@@ -54,7 +57,7 @@ jobs:
     - name: Prepare
       id: prep
       run: |
-        IMG=quay.io/operator-framework/helm-operator-plugins
+        IMG=quay.io/operator-framework/helm-operator
         if [[ $GITHUB_REF == refs/tags/* ]]; then
           TAG=${GITHUB_REF#refs/tags/}
           MAJOR_MINOR=${TAG%.*}
