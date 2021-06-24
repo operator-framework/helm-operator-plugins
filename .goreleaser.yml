@@ -48,5 +48,6 @@ checksum:
   name_template: "checksums.txt"
 
 signs:
-  - artifacts: checksum
-    args: ["--batch", "-u", "{{ .Env.GPG_FINGERPRINT }}", "--output", "${signature}", "--detach-sign", "${artifact}"]
+  - signature: "${artifact}.asc"
+    artifacts: checksum
+    args: ["--home", ".ci/gpg/keyring", "-u", "A20B5C7E", "--output", "${signature}", "--detach-sign", "${artifact}"]
