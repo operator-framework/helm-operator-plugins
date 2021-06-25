@@ -13,11 +13,9 @@ require (
 	github.com/operator-framework/operator-lib v0.3.0
 	github.com/prometheus/client_golang v1.7.1
 	github.com/sirupsen/logrus v1.7.0
-	github.com/spf13/afero v1.2.2
 	github.com/spf13/cobra v1.1.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.6.1
-	golang.org/x/tools v0.0.0-20201224043029-2b0845dc783e
 	gomodules.xyz/jsonpatch/v2 v2.1.0
 	helm.sh/helm/v3 v3.5.0
 	k8s.io/api v0.20.4
