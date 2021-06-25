@@ -27,39 +27,29 @@ import (
 
 var _ = Describe("Errors", func() {
 	var (
-		path                     = filepath.Join("path", "to", "file")
-		err                      = errors.New("test error")
-		fileAlreadyExistsErr     = fileAlreadyExistsError{path}
-		modelAlreadyExistsErr    = modelAlreadyExistsError{path}
-		unknownIfExistsActionErr = unknownIfExistsActionError{path, -1}
+		path    = filepath.Join("path", "to", "file")
+		testErr = errors.New("test error")
 	)
 
-	DescribeTable("IsXxxxError should return true for themselves and false for the rest",
-		func(f func(error) bool, itself error, rest ...error) {
-			Expect(f(itself)).To(BeTrue())
-			for _, err := range rest {
-				Expect(f(err)).To(BeFalse())
-			}
-		},
-		Entry("file exists", IsFileAlreadyExistsError, fileAlreadyExistsErr,
-			err, modelAlreadyExistsErr, unknownIfExistsActionErr),
-		Entry("model exists", IsModelAlreadyExistsError, modelAlreadyExistsErr,
-			err, fileAlreadyExistsErr, unknownIfExistsActionErr),
-		Entry("unknown if exists action", IsUnknownIfExistsActionError, unknownIfExistsActionErr,
-			err, fileAlreadyExistsErr, modelAlreadyExistsErr),
-	)
-
-	DescribeTable("should contain the wrapped error and error message",
+	DescribeTable("should contain the wrapped error",
 		func(err error) {
-			Expect(err).To(MatchError(err))
-			Expect(err.Error()).To(ContainSubstring(err.Error()))
+			Expect(errors.Is(err, testErr)).To(BeTrue())
 		},
+		Entry("for validate errors", ValidateError{testErr}),
+		Entry("for set template defaults errors", SetTemplateDefaultsError{testErr}),
+		Entry("for file existence errors", ExistsFileError{testErr}),
+		Entry("for file opening errors", OpenFileError{testErr}),
+		Entry("for directory creation errors", CreateDirectoryError{testErr}),
+		Entry("for file creation errors", CreateFileError{testErr}),
+		Entry("for file reading errors", ReadFileError{testErr}),
+		Entry("for file writing errors", WriteFileError{testErr}),
+		Entry("for file closing errors", CloseFileError{testErr}),
 	)
 
 	// NOTE: the following test increases coverage
 	It("should print a descriptive error message", func() {
-		Expect(fileAlreadyExistsErr.Error()).To(ContainSubstring("file already exists"))
-		Expect(modelAlreadyExistsErr.Error()).To(ContainSubstring("model already exists"))
-		Expect(unknownIfExistsActionErr.Error()).To(ContainSubstring("unknown behavior if file exists"))
+		Expect(ModelAlreadyExistsError{path}.Error()).To(ContainSubstring("model already exists"))
+		Expect(UnknownIfExistsActionError{path, -1}.Error()).To(ContainSubstring("unknown behavior if file exists"))
+		Expect(FileAlreadyExistsError{path}.Error()).To(ContainSubstring("file already exists"))
 	})
 })
