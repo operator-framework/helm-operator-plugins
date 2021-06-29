@@ -23,7 +23,7 @@ import (
 	"helm.sh/helm/v3/pkg/release"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/joelanford/helm-operator/pkg/client"
+	"github.com/operator-framework/helm-operator-plugins/pkg/client"
 )
 
 func NewActionClientGetter(actionClient client.ActionInterface, orErr error) client.ActionClientGetter {

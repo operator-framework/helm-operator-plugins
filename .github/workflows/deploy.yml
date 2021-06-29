@@ -19,12 +19,11 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Import GPG Key
-      id: import_gpg
-      uses: crazy-max/ghaction-import-gpg@v3
-      with:
-        gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
-        passphrase: ${{ secrets.GPG_PASSPHRASE }}
+    - name: gpg init
+      if: github.event_name != 'pull_request'
+      run: .ci/gpg/create-keyring.sh
+      env:
+        GPG_PASSWORD: ${{ secrets.GPG_PASSWORD }}
 
     - name: Install Go
       uses: actions/setup-go@v2
@@ -42,6 +41,9 @@ jobs:
         GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
 
   docker:
+    # TODO(fabianvf): skip pushing images for now, reenable once we're
+    # working on migrating the official helm plugin here
+    if: ${{ false }}
     name: Docker
     runs-on: ubuntu-latest
     steps:
@@ -54,7 +56,7 @@ jobs:
     - name: Prepare
       id: prep
       run: |
-        IMG=quay.io/joelanford/helm-operator
+        IMG=quay.io/operator-framework/helm-operator
         if [[ $GITHUB_REF == refs/tags/* ]]; then
           TAG=${GITHUB_REF#refs/tags/}
           MAJOR_MINOR=${TAG%.*}

@@ -23,8 +23,8 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/joelanford/helm-operator/pkg/internal/sdk/status"
-	. "github.com/joelanford/helm-operator/pkg/reconciler/internal/conditions"
+	"github.com/operator-framework/helm-operator-plugins/pkg/internal/sdk/status"
+	. "github.com/operator-framework/helm-operator-plugins/pkg/reconciler/internal/conditions"
 )
 
 var _ = Describe("Conditions", func() {

@@ -29,9 +29,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 
-	"github.com/joelanford/helm-operator/pkg/hook"
-	"github.com/joelanford/helm-operator/pkg/internal/sdk/fake"
-	internalhook "github.com/joelanford/helm-operator/pkg/reconciler/internal/hook"
+	"github.com/operator-framework/helm-operator-plugins/pkg/hook"
+	"github.com/operator-framework/helm-operator-plugins/pkg/internal/sdk/fake"
+	internalhook "github.com/operator-framework/helm-operator-plugins/pkg/reconciler/internal/hook"
 )
 
 var _ = Describe("Hook", func() {

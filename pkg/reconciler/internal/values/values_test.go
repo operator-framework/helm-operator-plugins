@@ -22,7 +22,7 @@ import (
 	"helm.sh/helm/v3/pkg/chartutil"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	. "github.com/joelanford/helm-operator/pkg/reconciler/internal/values"
+	. "github.com/operator-framework/helm-operator-plugins/pkg/reconciler/internal/values"
 )
 
 var _ = Describe("Values", func() {

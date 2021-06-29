@@ -54,7 +54,7 @@ lint:
 	fetch golangci-lint 1.35.2 && golangci-lint run
 
 .PHONY: release
-release: GORELEASER_ARGS ?= --snapshot --rm-dist
+release: GORELEASER_ARGS ?= --snapshot --rm-dist --skip-sign
 release:
 	fetch goreleaser 0.156.2 && goreleaser $(GORELEASER_ARGS)
 

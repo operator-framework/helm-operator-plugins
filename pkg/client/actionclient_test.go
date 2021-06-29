@@ -43,7 +43,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/yaml"
 
-	"github.com/joelanford/helm-operator/pkg/internal/testutil"
+	"github.com/operator-framework/helm-operator-plugins/pkg/internal/testutil"
 )
 
 const mockTestDesc = "Test Description"

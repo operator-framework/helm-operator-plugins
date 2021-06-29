@@ -25,9 +25,9 @@ import (
 	"sigs.k8s.io/kubebuilder/v3/pkg/cli"
 	config "sigs.k8s.io/kubebuilder/v3/pkg/config/v3"
 
-	"github.com/joelanford/helm-operator/internal/cmd/run"
-	"github.com/joelanford/helm-operator/internal/version"
-	pluginv1 "github.com/joelanford/helm-operator/pkg/plugins/v1"
+	"github.com/operator-framework/helm-operator-plugins/internal/cmd/run"
+	"github.com/operator-framework/helm-operator-plugins/internal/version"
+	pluginv1 "github.com/operator-framework/helm-operator-plugins/pkg/plugins/v1"
 )
 
 func main() {

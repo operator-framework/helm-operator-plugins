@@ -45,7 +45,7 @@ import (
 
 	"helm.sh/helm/v3/pkg/action"
 
-	helmclient "github.com/joelanford/helm-operator/pkg/client"
+	helmclient "github.com/operator-framework/helm-operator-plugins/pkg/client"
 )
 
 var (

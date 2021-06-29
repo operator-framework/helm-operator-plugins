@@ -21,17 +21,13 @@ import (
 	"os"
 
 	"sigs.k8s.io/kubebuilder/v3/pkg/config"
-	"sigs.k8s.io/kubebuilder/v3/pkg/model"
+	"sigs.k8s.io/kubebuilder/v3/pkg/plugins"
 
-	"github.com/joelanford/helm-operator/internal/version"
-	"github.com/joelanford/helm-operator/pkg/plugins/internal/kubebuilder/cmdutil"
-	"github.com/joelanford/helm-operator/pkg/plugins/internal/kubebuilder/machinery"
-	"github.com/joelanford/helm-operator/pkg/plugins/v1/chartutil"
-	"github.com/joelanford/helm-operator/pkg/plugins/v1/scaffolds/internal/templates"
-	"github.com/joelanford/helm-operator/pkg/plugins/v1/scaffolds/internal/templates/config/kdefault"
-	"github.com/joelanford/helm-operator/pkg/plugins/v1/scaffolds/internal/templates/config/manager"
-	"github.com/joelanford/helm-operator/pkg/plugins/v1/scaffolds/internal/templates/config/prometheus"
-	"github.com/joelanford/helm-operator/pkg/plugins/v1/scaffolds/internal/templates/config/rbac"
+	"github.com/operator-framework/helm-operator-plugins/internal/version"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/v1/chartutil"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/v1/scaffolds/internal/templates"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/v1/scaffolds/internal/templates/config/rbac"
+	"sigs.k8s.io/kubebuilder/v3/pkg/machinery"
 )
 
 const (
@@ -43,44 +39,40 @@ const (
 
 // helmOperatorVersion is set to the version of helm-operator at compile-time.
 var helmOperatorVersion = mustGetScaffoldVersion()
-var _ cmdutil.Scaffolder = &initScaffolder{}
+var _ plugins.Scaffolder = &initScaffolder{}
 
 type initScaffolder struct {
-	config        config.Config
-	apiScaffolder cmdutil.Scaffolder
+	fs machinery.Filesystem
+
+	config config.Config
 }
 
-// NewInitScaffolder returns a new Scaffolder for project initialization operations
-func NewInitScaffolder(config config.Config, apiScaffolder cmdutil.Scaffolder) cmdutil.Scaffolder {
+// NewInitScaffolder returns a new plugins.Scaffolder for project initialization operations
+func NewInitScaffolder(config config.Config) plugins.Scaffolder {
 	return &initScaffolder{
-		config:        config,
-		apiScaffolder: apiScaffolder,
+		config: config,
 	}
 }
 
-func (s *initScaffolder) newUniverse() *model.Universe {
-	return model.NewUniverse(
-		model.WithConfig(s.config),
-	)
+// InjectFS implements plugins.Scaffolder
+func (s *initScaffolder) InjectFS(fs machinery.Filesystem) {
+	s.fs = fs
 }
 
 // Scaffold implements Scaffolder
 func (s *initScaffolder) Scaffold() error {
-	if err := s.scaffold(); err != nil {
-		return err
-	}
-	if s.apiScaffolder != nil {
-		return s.apiScaffolder.Scaffold()
-	}
-	return nil
-}
+	// Initialize the machinery.Scaffold that will write the files to disk
+	scaffold := machinery.NewScaffold(s.fs,
+		// NOTE: kubebuilder's default permissions are only for root users
+		machinery.WithDirectoryPermissions(0755),
+		machinery.WithFilePermissions(0644),
+		machinery.WithConfig(s.config),
+	)
 
-func (s *initScaffolder) scaffold() error {
 	if err := os.MkdirAll(chartutil.HelmChartsDir, 0755); err != nil {
 		return err
 	}
-	return machinery.NewScaffold().Execute(
-		s.newUniverse(),
+	return scaffold.Execute(
 		&templates.Dockerfile{
 			HelmOperatorVersion: helmOperatorVersion,
 		},
@@ -91,21 +83,7 @@ func (s *initScaffolder) scaffold() error {
 			HelmOperatorVersion: helmOperatorVersion,
 		},
 		&templates.Watches{},
-		&rbac.AuthProxyRole{},
-		&rbac.AuthProxyRoleBinding{},
-		&rbac.AuthProxyService{},
-		&rbac.ClientClusterRole{},
-		&rbac.Kustomization{},
-		&rbac.LeaderElectionRole{},
-		&rbac.LeaderElectionRoleBinding{},
 		&rbac.ManagerRole{},
-		&rbac.ManagerRoleBinding{},
-		&manager.Kustomization{},
-		&manager.Manager{Image: imageName},
-		&prometheus.Kustomization{},
-		&prometheus.ServiceMonitor{},
-		&kdefault.AuthProxyPatch{},
-		&kdefault.Kustomization{},
 	)
 }
 

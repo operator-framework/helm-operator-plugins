@@ -3,7 +3,7 @@ env:
   - CGO_ENABLED=0
   - GO111MODULE=on
   - GOPROXY=https://proxy.golang.org|direct
-  - VERSION_PKG=github.com/joelanford/helm-operator/internal/version
+  - VERSION_PKG=github.com/operator-framework/helm-operator-plugins/internal/version
 
 # Hooks to run before any build is run.
 before:
@@ -48,5 +48,6 @@ checksum:
   name_template: "checksums.txt"
 
 signs:
-  - artifacts: checksum
-    args: ["--batch", "-u", "{{ .Env.GPG_FINGERPRINT }}", "--output", "${signature}", "--detach-sign", "${artifact}"]
+  - signature: "${artifact}.asc"
+    artifacts: checksum
+    args: ["--home", ".ci/gpg/keyring", "-u", "A20B5C7E", "--output", "${signature}", "--detach-sign", "${artifact}"]

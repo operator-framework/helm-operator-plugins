@@ -31,12 +31,12 @@ import (
 	zapl "sigs.k8s.io/controller-runtime/pkg/log/zap"
 	crmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 
-	"github.com/joelanford/helm-operator/internal/metrics"
-	"github.com/joelanford/helm-operator/internal/version"
-	"github.com/joelanford/helm-operator/pkg/annotation"
-	"github.com/joelanford/helm-operator/pkg/manager"
-	"github.com/joelanford/helm-operator/pkg/reconciler"
-	"github.com/joelanford/helm-operator/pkg/watches"
+	"github.com/operator-framework/helm-operator-plugins/internal/metrics"
+	"github.com/operator-framework/helm-operator-plugins/internal/version"
+	"github.com/operator-framework/helm-operator-plugins/pkg/annotation"
+	"github.com/operator-framework/helm-operator-plugins/pkg/manager"
+	"github.com/operator-framework/helm-operator-plugins/pkg/reconciler"
+	"github.com/operator-framework/helm-operator-plugins/pkg/watches"
 )
 
 func NewCmd() *cobra.Command {

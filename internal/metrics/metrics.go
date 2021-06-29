@@ -17,7 +17,7 @@ package metrics
 import (
 	"github.com/prometheus/client_golang/prometheus"
 
-	helmVersion "github.com/joelanford/helm-operator/internal/version"
+	helmVersion "github.com/operator-framework/helm-operator-plugins/internal/version"
 )
 
 const (
