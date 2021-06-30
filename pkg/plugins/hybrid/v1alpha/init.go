@@ -42,7 +42,7 @@ type initSubcommand struct {
 
 var _ plugin.InitSubcommand = &initSubcommand{}
 
-// UpdateMetadata define plugin context
+// UpdateMetadata defines plugin context
 func (p *initSubcommand) UpdateMetadata(cliMeta plugin.CLIMetadata, subcmdMeta *plugin.SubcommandMetadata) {
 	subcmdMeta.Description = `Initialize a new project including the following files:
 	- a "go.mod" with project dependencies
