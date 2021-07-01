@@ -120,7 +120,10 @@ func (s *initScaffolder) Scaffold() error {
 			HybridOperatorVersion:    hybridOperatorVersion,
 			ControllerToolsVersion:   ControllerToolsVersion,
 			ControllerRuntimeVersion: ControllerRuntimeVersion,
-		})
+		},
+		&templates.Dockerfile{},
+		&templates.DockerIgnore{},
+	)
 
 	if err != nil {
 		return err

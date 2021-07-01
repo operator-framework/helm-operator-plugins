@@ -107,6 +107,17 @@ SHELL = /usr/bin/env bash -o pipefail
 help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
+##@ Build
+
+run: helm-operator ## Run against the configured Kubernetes cluster in ~/.kube/config
+	$(HELM_OPERATOR) run
+	
+docker-build: ## Build docker image with the manager.
+	docker build -t ${IMG} .
+	
+docker-push: ## Push docker image with the manager.
+	docker push ${IMG}
+
 ##@ Development
 
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
@@ -166,4 +177,21 @@ GOBIN=$(PROJECT_DIR)/bin go get $(2) ;\
 rm -rf $$TMP_DIR ;\
 }
 endef
+
+.PHONY: helm-operator
+HELM_OPERATOR = $(shell pwd)/bin/helm-operator
+helm-operator: ## Download helm-operator locally if necessary, preferring the $(pwd)/bin path over global if both exist.
+ifeq (,$(wildcard $(HELM_OPERATOR)))
+ifeq (,$(shell which helm-operator 2>/dev/null))
+	@{ \
+	set -e ;\
+	mkdir -p $(dir $(HELM_OPERATOR)) ;\
+	curl -sSLo $(HELM_OPERATOR) https://github.com/operator-framework/operator-sdk/releases/download/v1.9.0/helm-operator_$(OS)_$(ARCH) ;\
+	chmod +x $(HELM_OPERATOR) ;\
+	}
+else
+HELM_OPERATOR = $(shell which helm-operator)
+endif
+endif
+
 `
