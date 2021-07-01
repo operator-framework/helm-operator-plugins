@@ -19,12 +19,16 @@ package main
 import (
 	"flag"
 	"os"
+	"runtime"
+	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
-	// to ensure that exec-entrypoint and run can make use of them.
+	"github.com/operator-framework/helm-operator-plugins/pkg/annotation"
+	"github.com/operator-framework/helm-operator-plugins/pkg/reconciler"
+	"github.com/operator-framework/helm-operator-plugins/pkg/watches"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	"k8s.io/apimachinery/pkg/runtime"
+	ctrlruntime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -34,8 +38,10 @@ import (
 )
 
 var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
+	scheme                         = ctrlruntime.NewScheme()
+	setupLog                       = ctrl.Log.WithName("setup")
+	defaultMaxConcurrentReconciles = runtime.NumCPU()
+	defaultReconcilePeriod         = time.Minute
 )
 
 func init() {
@@ -83,6 +89,46 @@ func main() {
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up ready check")
 		os.Exit(1)
+	}
+
+	ws, err := watches.Load("./watches.yaml")
+	if err != nil {
+		setupLog.Error(err, "Failed to create new manager factories")
+		os.Exit(1)
+	}
+
+	for _, w := range ws {
+		// Register controller with the factory
+		reconcilePeriod := defaultReconcilePeriod
+		if w.ReconcilePeriod != nil {
+			reconcilePeriod = w.ReconcilePeriod.Duration
+		}
+
+		maxConcurrentReconciles := defaultMaxConcurrentReconciles
+		if w.MaxConcurrentReconciles != nil {
+			maxConcurrentReconciles = *w.MaxConcurrentReconciles
+		}
+
+		r, err := reconciler.New(
+			reconciler.WithChart(*w.Chart),
+			reconciler.WithGroupVersionKind(w.GroupVersionKind),
+			reconciler.WithOverrideValues(w.OverrideValues),
+			reconciler.SkipDependentWatches(w.WatchDependentResources != nil && !*w.WatchDependentResources),
+			reconciler.WithMaxConcurrentReconciles(maxConcurrentReconciles),
+			reconciler.WithReconcilePeriod(reconcilePeriod),
+			reconciler.WithInstallAnnotations(annotation.DefaultInstallAnnotations...),
+			reconciler.WithUpgradeAnnotations(annotation.DefaultUpgradeAnnotations...),
+			reconciler.WithUninstallAnnotations(annotation.DefaultUninstallAnnotations...),
+		)
+		if err != nil {
+			setupLog.Error(err, "unable to create helm reconciler", "controller", "Helm")
+			os.Exit(1)
+		}
+		if err := r.SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Helm")
+			os.Exit(1)
+		}
+		setupLog.Info("configured watch", "gvk", w.GroupVersionKind, "chartPath", w.ChartPath, "maxConcurrentReconciles", maxConcurrentReconciles, "reconcilePeriod", reconcilePeriod)
 	}
 
 	setupLog.Info("starting manager")

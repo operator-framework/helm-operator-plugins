@@ -26,6 +26,7 @@ import (
 	"github.com/spf13/afero"
 	"sigs.k8s.io/kubebuilder/v3/pkg/config"
 	"sigs.k8s.io/kubebuilder/v3/pkg/machinery"
+	"sigs.k8s.io/kubebuilder/v3/pkg/plugin/util"
 	"sigs.k8s.io/kubebuilder/v3/pkg/plugins"
 )
 
@@ -41,6 +42,9 @@ const (
 
 	// TODO: This is a placeholder for now. This would probably be the operator-sdk version
 	hybridOperatorVersion = "0.0.1"
+
+	// helmPluginVersion is the operator-framework/helm-operator-plugin version to be used in the project
+	helmPluginVersion = "dc6c589504b2884e68dff6dc0e5e87ce8c24702f"
 )
 
 var _ plugins.Scaffolder = &initScaffolder{}
@@ -104,7 +108,7 @@ func (s *initScaffolder) Scaffold() error {
 		machinery.WithBoilerplate(string(boilerplate)),
 	)
 
-	return scaffold.Execute(
+	err = scaffold.Execute(
 		&templates.Main{},
 		&templates.GoMod{ControllerRuntimeVersion: ControllerRuntimeVersion},
 		&templates.GitIgnore{},
@@ -117,4 +121,16 @@ func (s *initScaffolder) Scaffold() error {
 			ControllerToolsVersion:   ControllerToolsVersion,
 			ControllerRuntimeVersion: ControllerRuntimeVersion,
 		})
+
+	if err != nil {
+		return err
+	}
+
+	err = util.RunCmd("Get helm-operator-plugins", "go", "get",
+		"github.com/operator-framework/helm-operator-plugins@"+helmPluginVersion)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
