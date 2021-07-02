@@ -53,7 +53,6 @@ RUN go mod download
 
 # Copy the go source
 COPY main.go main.go
-COPY watches.yaml ${HOME}/watches.yaml
 
 # Build
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o manager main.go
@@ -62,6 +61,14 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o manager main.go
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM gcr.io/distroless/static:nonroot
 WORKDIR /
+
+ENV HOME=/opt/helm
+
+# Copy necessary files
+COPY watches.yaml ${HOME}/watches.yaml
+COPY helm-charts  ${HOME}/helm-charts
+
+# Copy manager binary
 COPY --from=builder /workspace/manager .
 USER 65532:65532
 
