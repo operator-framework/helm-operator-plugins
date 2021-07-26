@@ -24,8 +24,11 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	zapl "sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -118,7 +121,19 @@ func (r *run) run(cmd *cobra.Command) {
 		LeaderElectionID:           r.leaderElectionID,
 		LeaderElectionNamespace:    r.leaderElectionNamespace,
 		LeaderElectionResourceLock: resourcelock.ConfigMapsResourceLock,
-		ClientBuilder:              manager.NewCachingClientBuilder(),
+		NewClient: func(cache cache.Cache, config *rest.Config, options client.Options, uncachedObjects ...client.Object) (client.Client, error) {
+			// Create the client for Write operation
+			c, err := client.New(config, options)
+			if err != nil {
+				return nil, err
+			}
+			return client.NewDelegatingClient(client.NewDelegatingClientInput{
+				CacheReader:       cache,
+				Client:            c,
+				UncachedObjects:   uncachedObjects,
+				CacheUnstructured: true,
+			})
+		},
 	}
 	manager.ConfigureWatchNamespaces(&options, log)
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
