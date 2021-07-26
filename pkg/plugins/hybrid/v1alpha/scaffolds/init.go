@@ -19,10 +19,12 @@ package scaffolds
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/hybrid/v1alpha/scaffolds/internal/templates"
 	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/hybrid/v1alpha/scaffolds/internal/templates/hack"
 	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/hybrid/v1alpha/scaffolds/internal/templates/rbac"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/v1/chartutil"
 	"github.com/spf13/afero"
 	"sigs.k8s.io/kubebuilder/v3/pkg/config"
 	"sigs.k8s.io/kubebuilder/v3/pkg/machinery"
@@ -108,6 +110,10 @@ func (s *initScaffolder) Scaffold() error {
 		machinery.WithBoilerplate(string(boilerplate)),
 	)
 
+	if err := os.MkdirAll(chartutil.HelmChartsDir, 0755); err != nil {
+		return err
+	}
+
 	err = scaffold.Execute(
 		&templates.Main{},
 		&templates.GoMod{ControllerRuntimeVersion: ControllerRuntimeVersion},
@@ -124,6 +130,9 @@ func (s *initScaffolder) Scaffold() error {
 		&templates.Dockerfile{},
 		&templates.DockerIgnore{},
 	)
+
+	// Add note to include any depedencies in dockerfile which are required to build `main.go`.
+	fmt.Println("Include any dependencies required to build `main.go` in your project to Dockerfile")
 
 	if err != nil {
 		return err

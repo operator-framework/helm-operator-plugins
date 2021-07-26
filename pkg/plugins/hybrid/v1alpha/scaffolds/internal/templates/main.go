@@ -179,8 +179,11 @@ func (f *MainUpdater) GetCodeFragments() machinery.CodeFragmentsMap {
 	return fragments
 }
 
-// TODO: this template would be modified when pkg/watches is updated according to the latest
+// TODO:
+// 1. Modify the template when pkg/watches is updated according to the latest
 // helm v1 plugin in operator-sdk.
+// 2. Move the flags to a seprate package and clean up the scaffolding.
+// 3. Modify leader-election-id to be the project name.
 var mainTemplate = `{{ .Boilerplate }}
 
 package main
@@ -226,6 +229,8 @@ func main() {
 	var probeAddr string
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	flag.StringVar(&watchesPath, "watches-file", "watches.yaml", "path to watches file")
+	flag.StringVar(&leaderElectionID, "leader-election-id", "{{ hashFNV .Repo }}.{{ .Domain }}", "provide leader election")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. " +
 		"Enabling this will ensure there is only one active controller manager.")
@@ -251,7 +256,7 @@ func main() {
 		Port:                   9443,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "{{ hashFNV .Repo }}.{{ .Domain }}",
+		LeaderElectionID:       leaderElectionID,
 	})
 {{- else }}
 	var err error
@@ -282,7 +287,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	ws, err := watches.Load("./watches.yaml")
+	ws, err := watches.Load(watchesPath)
 	if err != nil {
 		setupLog.Error(err, "Failed to create new manager factories")
 		os.Exit(1)
