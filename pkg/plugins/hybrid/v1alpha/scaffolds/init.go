@@ -110,7 +110,9 @@ func (s *initScaffolder) Scaffold() error {
 		machinery.WithBoilerplate(string(boilerplate)),
 	)
 
-	if err := os.MkdirAll(chartutil.HelmChartsDir, 0755); err != nil {
+	// create placeholder directories for helm charts and go apis
+	err = createDirectories([]string{chartutil.HelmChartsDir, "api", "controllers"})
+	if err != nil {
 		return err
 	}
 
@@ -131,9 +133,6 @@ func (s *initScaffolder) Scaffold() error {
 		&templates.DockerIgnore{},
 	)
 
-	// Add note to include any depedencies in dockerfile which are required to build `main.go`.
-	fmt.Println("Include any dependencies required to build `main.go` in your project to Dockerfile")
-
 	if err != nil {
 		return err
 	}
@@ -144,5 +143,14 @@ func (s *initScaffolder) Scaffold() error {
 		return err
 	}
 
+	return nil
+}
+
+func createDirectories(directories []string) error {
+	for _, dir := range directories {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return fmt.Errorf("unable to create directory %q : %v", dir, err)
+		}
+	}
 	return nil
 }
