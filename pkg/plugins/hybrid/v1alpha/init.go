@@ -16,8 +16,10 @@ package v1alpha
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/hybrid/v1alpha/scaffolds"
+	projutil "github.com/operator-framework/helm-operator-plugins/pkg/plugins/util"
 	"github.com/spf13/pflag"
 	"sigs.k8s.io/kubebuilder/v3/pkg/config"
 	"sigs.k8s.io/kubebuilder/v3/pkg/machinery"
@@ -100,6 +102,10 @@ func (p *initSubcommand) InjectConfig(c config.Config) error {
 // helm operator.
 func (p *initSubcommand) Scaffold(fs machinery.Filesystem) error {
 
+	if err := addInitCustomizations(p.config.GetProjectName()); err != nil {
+		return fmt.Errorf("error updating init manifests: %q", err)
+	}
+
 	scaffolder := scaffolds.NewInitScaffolder(p.config, p.license, p.owner)
 	scaffolder.InjectFS(fs)
 	err := scaffolder.Scaffold()
@@ -121,6 +127,61 @@ func (p *initSubcommand) PostScaffold() error {
 	err := util.RunCmd("Update dependencies", "go", "mod", "tidy")
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+
+// addInitCustomizations will perform the required customizations for this plugin on the common base
+func addInitCustomizations(projectName string) error {
+	managerFile := filepath.Join("config", "manager", "manager.yaml")
+
+	// todo: we ought to use afero instead. Replace this methods to insert/update
+	// by https://github.com/kubernetes-sigs/kubebuilder/pull/2119
+
+	// Add leader election arg in config/manager/manager.yaml and in config/default/manager_auth_proxy_patch.yaml
+	err := projutil.InsertCode(managerFile,
+		"--leader-elect",
+		fmt.Sprintf("\n        - --leader-election-id=%s", projectName))
+	if err != nil {
+		return err
+	}
+	err = projutil.InsertCode(filepath.Join("config", "default", "manager_auth_proxy_patch.yaml"),
+		"- \"--leader-elect\"",
+		fmt.Sprintf("\n        - \"--leader-election-id=%s\"", projectName))
+	if err != nil {
+		return err
+	}
+
+	// Increase the default memory required.
+	err = projutil.ReplaceInFile(managerFile, "memory: 30Mi", "memory: 90Mi")
+	if err != nil {
+		return err
+	}
+	err = projutil.ReplaceInFile(managerFile, "memory: 20Mi", "memory: 60Mi")
+	if err != nil {
+		return err
+	}
+
+	// Remove the webhook option for the componentConfig since webhooks are not supported by helm
+	err = projutil.ReplaceInFile(filepath.Join("config", "manager", "controller_manager_config.yaml"),
+		"webhook:\n  port: 9443", "")
+	if err != nil {
+		return err
+	}
+
+	// Remove the call to the command as manager. Helm has not been exposing this entrypoint
+	// todo: provide the manager entrypoint for helm and then remove it
+	const command = `command:
+        - /manager
+        `
+	err = projutil.ReplaceInFile(managerFile, command, "")
+	if err != nil {
+		return err
+	}
+
+	if err := projutil.UpdateKustomizationsInit(); err != nil {
+		return fmt.Errorf("error updating kustomization.yaml files: %v", err)
 	}
 
 	return nil
