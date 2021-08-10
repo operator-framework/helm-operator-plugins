@@ -118,7 +118,7 @@ func (r *run) run(cmd *cobra.Command) {
 		LeaderElectionID:           r.leaderElectionID,
 		LeaderElectionNamespace:    r.leaderElectionNamespace,
 		LeaderElectionResourceLock: resourcelock.ConfigMapsResourceLock,
-		ClientBuilder:              manager.NewCachingClientBuilder(),
+		NewClient:                  manager.NewCachingClientFunc(),
 	}
 	manager.ConfigureWatchNamespaces(&options, log)
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)

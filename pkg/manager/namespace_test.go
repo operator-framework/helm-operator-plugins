@@ -24,7 +24,6 @@ import (
 	"sync"
 
 	"github.com/go-logr/logr"
-	"github.com/go-logr/logr/testing"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -40,7 +39,7 @@ import (
 var _ = Describe("ConfigureWatchNamespaces", func() {
 	var (
 		opts manager.Options
-		log  logr.Logger = &testing.NullLogger{}
+		log  logr.Logger = &logr.DiscardLogger{}
 	)
 
 	BeforeEach(func() {

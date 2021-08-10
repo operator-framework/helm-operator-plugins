@@ -30,7 +30,7 @@ import (
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/cluster"
 
 	. "github.com/operator-framework/helm-operator-plugins/pkg/manager"
 )
@@ -39,7 +39,7 @@ var _ = Describe("NewCachingClientBuilder", func() {
 	var ns *unstructured.Unstructured
 	var pod *v1.Pod
 	var cfgMap *v1.ConfigMap
-	var builder manager.ClientBuilder
+	var clientFunc cluster.NewClientFunc
 
 	BeforeEach(func() {
 		ns = &unstructured.Unstructured{}
@@ -64,8 +64,8 @@ var _ = Describe("NewCachingClientBuilder", func() {
 			},
 			Data: map[string]string{"foo": "bar"},
 		}
-		builder = NewCachingClientBuilder().WithUncached(cfgMap)
-		Expect(builder).NotTo(BeNil())
+		clientFunc = NewCachingClientFunc()
+		Expect(clientFunc).NotTo(BeNil())
 	})
 
 	When("the ClientBuilder is valid", func() {
@@ -79,7 +79,7 @@ var _ = Describe("NewCachingClientBuilder", func() {
 			c, err = cache.New(cfg, cache.Options{})
 			Expect(err).To(BeNil())
 
-			cl, err = builder.Build(c, cfg, client.Options{})
+			cl, err = clientFunc(c, cfg, client.Options{}, cfgMap)
 			Expect(err).To(BeNil())
 
 			Expect(cl.Create(context.TODO(), ns)).To(Succeed())
@@ -140,7 +140,7 @@ var _ = Describe("NewCachingClientBuilder", func() {
 		badConfig := rest.Config{
 			Host: "/path/to/foobar",
 		}
-		_, err = builder.Build(c, &badConfig, client.Options{})
+		_, err = clientFunc(c, &badConfig, client.Options{})
 		Expect(err).NotTo(BeNil())
 	})
 })

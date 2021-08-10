@@ -32,9 +32,9 @@ all: test lint build
 .PHONY: test
 export KUBEBUILDER_ASSETS := $(TOOLS_BIN_DIR)
 TESTPKG ?= ./...
-CR_VERSION=$(shell go list -m sigs.k8s.io/controller-runtime | cut -d" " -f2 | sed 's/^v//')
+# TODO: Modify this to use setup-envtest binary
 test:
-	fetch envtest $(CR_VERSION) && go test -race -covermode atomic -coverprofile cover.out $(TESTPKG)
+	fetch envtest 0.8.3 && go test -race -covermode atomic -coverprofile cover.out $(TESTPKG)
 
 # Build manager binary
 .PHONY: build

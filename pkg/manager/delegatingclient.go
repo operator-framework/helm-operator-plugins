@@ -20,32 +20,22 @@ import (
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/cluster"
 )
 
-func NewCachingClientBuilder() manager.ClientBuilder {
-	return &cachingClientBuilder{}
-}
+// NewCachingClientFunc returns a NewClientFunc which can be used to initialize a client.
+func NewCachingClientFunc() cluster.NewClientFunc {
+	return func(cache cache.Cache, config *rest.Config, options client.Options, uncachedObjects ...client.Object) (client.Client, error) {
+		c, err := client.New(config, options)
+		if err != nil {
+			return nil, err
+		}
 
-type cachingClientBuilder struct {
-	uncached []client.Object
-}
-
-func (b *cachingClientBuilder) WithUncached(objs ...client.Object) manager.ClientBuilder {
-	b.uncached = append(b.uncached, objs...)
-	return b
-}
-
-func (b *cachingClientBuilder) Build(cache cache.Cache, config *rest.Config, options client.Options) (client.Client, error) {
-	c, err := client.New(config, options)
-	if err != nil {
-		return nil, err
+		return client.NewDelegatingClient(client.NewDelegatingClientInput{
+			CacheReader:       cache,
+			Client:            c,
+			UncachedObjects:   uncachedObjects,
+			CacheUnstructured: true,
+		})
 	}
-
-	return client.NewDelegatingClient(client.NewDelegatingClientInput{
-		CacheReader:       cache,
-		Client:            c,
-		UncachedObjects:   b.uncached,
-		CacheUnstructured: true,
-	})
 }
