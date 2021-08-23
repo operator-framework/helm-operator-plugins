@@ -1,4 +1,0 @@
-- group: helm.sdk.operatorframework.io
-  version: v1
-  kind: Nginx
-  chart: ./helm-charts/nginx
