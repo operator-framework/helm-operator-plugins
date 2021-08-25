@@ -256,7 +256,7 @@ var _ = Describe("ActionClient", func() {
 				})
 				It("should rollback a failed upgrade", func() {
 					By("failing to install the release", func() {
-						vals = chartutil.Values{"service": map[string]interface{}{"type": "ClusterIP"}}
+						vals := chartutil.Values{"service": map[string]interface{}{"type": "FooBar"}}
 						r, err := ac.Upgrade(obj.GetName(), obj.GetNamespace(), &chrt, vals)
 						Expect(err).NotTo(BeNil())
 						Expect(r).To(BeNil())
