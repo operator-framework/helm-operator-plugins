@@ -34,9 +34,9 @@ import (
 
 const (
 	// ControllerRuntimeVersion is the kubernetes-sigs/controller-runtime version to be used in the project
-	ControllerRuntimeVersion = "v0.8.3"
+	ControllerRuntimeVersion = "v0.9.2"
 	// ControllerToolsVersion is the kubernetes-sigs/controller-tools version to be used in the project
-	ControllerToolsVersion = "v0.5.0"
+	ControllerToolsVersion = "v0.6.1"
 	// KustomizeVersion is the kubernetes-sigs/kustomize version to be used in the project
 	KustomizeVersion = "v3.8.7"
 
@@ -46,7 +46,7 @@ const (
 	hybridOperatorVersion = "0.0.1"
 
 	// helmPluginVersion is the operator-framework/helm-operator-plugin version to be used in the project
-	helmPluginVersion = "dc6c589504b2884e68dff6dc0e5e87ce8c24702f"
+	helmPluginVersion = "ae6656410e152305beb5f1d923ab8e7dd55bd91c"
 )
 
 var _ plugins.Scaffolder = &initScaffolder{}
