@@ -1,10 +1,8 @@
-
----
+# permissions for end users to edit memcacheds.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  creationTimestamp: null
-  name: manager-role
+  name: memcached-editor-role
 rules:
 - apiGroups:
   - cache.my.domain
@@ -21,14 +19,6 @@ rules:
 - apiGroups:
   - cache.my.domain
   resources:
-  - memcacheds/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - cache.my.domain
-  resources:
   - memcacheds/status
   verbs:
   - get
-  - patch
-  - update

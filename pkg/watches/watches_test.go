@@ -79,6 +79,7 @@ var _ = Describe("LoadReader", func() {
 
 		watchesData := bytes.NewBufferString(data)
 		watches, err := LoadReader(watchesData)
+		Expect(err).NotTo(HaveOccurred())
 		verifyEqualWatches(expectedWatches, watches)
 	})
 
@@ -110,6 +111,7 @@ var _ = Describe("LoadReader", func() {
 
 		watchesData := bytes.NewBufferString(data)
 		watches, err := LoadReader(watchesData)
+		Expect(err).NotTo(HaveOccurred())
 		verifyEqualWatches(expectedWatches, watches)
 	})
 

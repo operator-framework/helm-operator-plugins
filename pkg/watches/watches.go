@@ -27,6 +27,7 @@ import (
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/chartutil"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/yaml"
 )
@@ -37,6 +38,8 @@ type Watch struct {
 
 	WatchDependentResources *bool             `json:"watchDependentResources,omitempty"`
 	OverrideValues          map[string]string `json:"overrideValues,omitempty"`
+	ReconcilePeriod         *metav1.Duration  `json:"reconcilePeriod,omitempty"`
+	MaxConcurrentReconciles *int              `json:"maxConcurrentReconciles,omitempty"`
 	Chart                   *chart.Chart      `json:"-"`
 }
 
