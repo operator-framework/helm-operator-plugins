@@ -30,11 +30,17 @@ all: test lint build
 
 # Run tests
 .PHONY: test
-export KUBEBUILDER_ASSETS := $(TOOLS_BIN_DIR)
+# Use envtest based on the version of kubernetes/client-go configured in the go.mod file.
+# If this version of envtest is not available yet, submit a PR similar to
+# https://github.com/kubernetes-sigs/kubebuilder/pull/2287 targeting the kubebuilder
+# "tools-releases" branch. Make sure to look up the appropriate etcd version in the
+# kubernetes release notes for the minor version you're building tools for.
+ENVTEST_VERSION = $(shell go list -m k8s.io/client-go | cut -d" " -f2 | sed 's/^v0\.\([[:digit:]]\+\)\.[[:digit:]]\+$$/1.\1.x/')
 TESTPKG ?= ./...
 # TODO: Modify this to use setup-envtest binary
 test:
-	fetch envtest 0.8.3 && go test -race -covermode atomic -coverprofile cover.out $(TESTPKG)
+	go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+	source <(setup-envtest use -p env $(ENVTEST_VERSION)) && go test -race -covermode atomic -coverprofile cover.out $(TESTPKG)
 
 # Build manager binary
 .PHONY: build
