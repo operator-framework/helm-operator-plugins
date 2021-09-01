@@ -2,6 +2,8 @@
 /bin
 /tools/bin
 /dist
+/build
+/tmp
 
 # Other IDE files
 .idea

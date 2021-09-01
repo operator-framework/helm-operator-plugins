@@ -38,9 +38,17 @@ all: test lint build
 ENVTEST_VERSION = $(shell go list -m k8s.io/client-go | cut -d" " -f2 | sed 's/^v0\.\([[:digit:]]\+\)\.[[:digit:]]\+$$/1.\1.x/')
 TESTPKG ?= ./...
 # TODO: Modify this to use setup-envtest binary
-test: build/operator-sdk
+test: test-hybrid-plugin
 	go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 	source <(setup-envtest use -p env $(ENVTEST_VERSION)) && go test -race -covermode atomic -coverprofile cover.out $(TESTPKG)
+
+test-hybrid-plugin: remove-tmp build/operator-sdk
+	mkdir -p tmp/test-hybrid-operator
+	(cd tmp/test-hybrid-operator && \
+	 ../../build/operator-sdk init --plugins hybrid --domain example.com --repo example.com/example/example-operator && \
+	 ../../build/operator-sdk create api --plugins go.kubebuilder.io/v3 --group apps --version v1alpha1 --kind=MemcachedBackup --resource --controller && \
+	 ../../build/operator-sdk create api --plugins helm.sdk.operatorframework.io/v1 --helm-chart=memcached --helm-chart-repo=https://charts.bitnami.com/bitnami --group apps --version v1alpha1 --kind=Memcached && \
+	 make docker-build)
 
 # Build manager binary
 .PHONY: build
@@ -48,17 +56,18 @@ build:
 	CGO_ENABLED=0 mkdir -p $(BUILD_DIR) && go build $(GO_BUILD_ARGS) -o $(BUILD_DIR) ./
 
 # Incredibly fragile nad hopefully temporary build step for the SDK binary
-build/operator-sdk: remove-tmp-sdk
-	git clone https://github.com/operator-framework/operator-sdk.git /tmp/operator-sdk-hybrid-patched
-	cp hack/osdk.patch /tmp/operator-sdk-hybrid-patched/
-	(cd /tmp/operator-sdk-hybrid-patched && git apply osdk.patch)
-	sed -i".bak" "s|REPLACE_ME_WITH_PATH|$(shell pwd)|" /tmp/operator-sdk-hybrid-patched/go.mod
-	(cd /tmp/operator-sdk-hybrid-patched && go mod tidy && make build/operator-sdk)
+build/operator-sdk:
+	mkdir -p tmp
+	git clone https://github.com/operator-framework/operator-sdk.git tmp/operator-sdk-hybrid-patched
+	cp hack/osdk.patch tmp/operator-sdk-hybrid-patched/
+	(cd tmp/operator-sdk-hybrid-patched && git apply osdk.patch)
+	sed -i".bak" "s|REPLACE_ME_WITH_PATH|$(shell pwd)|" tmp/operator-sdk-hybrid-patched/go.mod
+	(cd tmp/operator-sdk-hybrid-patched && go mod tidy && make build/operator-sdk)
 	mkdir -p build
-	cp /tmp/operator-sdk-hybrid-patched/build/operator-sdk ./build/operator-sdk
+	cp tmp/operator-sdk-hybrid-patched/build/operator-sdk ./build/operator-sdk
 
-remove-tmp-sdk:
-	rm -rf /tmp/operator-sdk-hybrid-patched
+remove-tmp:
+	rm -rf tmp/
 
 # Run go fmt and go mod tidy, and check for clean git tree
 .PHONY: fix
