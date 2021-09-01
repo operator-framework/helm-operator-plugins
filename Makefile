@@ -38,7 +38,7 @@ all: test lint build
 ENVTEST_VERSION = $(shell go list -m k8s.io/client-go | cut -d" " -f2 | sed 's/^v0\.\([[:digit:]]\+\)\.[[:digit:]]\+$$/1.\1.x/')
 TESTPKG ?= ./...
 # TODO: Modify this to use setup-envtest binary
-test:
+test: build/operator-sdk
 	go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 	source <(setup-envtest use -p env $(ENVTEST_VERSION)) && go test -race -covermode atomic -coverprofile cover.out $(TESTPKG)
 
@@ -46,6 +46,19 @@ test:
 .PHONY: build
 build:
 	CGO_ENABLED=0 mkdir -p $(BUILD_DIR) && go build $(GO_BUILD_ARGS) -o $(BUILD_DIR) ./
+
+# Incredibly fragile nad hopefully temporary build step for the SDK binary
+build/operator-sdk: remove-tmp-sdk
+	git clone https://github.com/operator-framework/operator-sdk.git /tmp/operator-sdk-hybrid-patched
+	cp hack/osdk.patch /tmp/operator-sdk-hybrid-patched/
+	(cd /tmp/operator-sdk-hybrid-patched && git apply osdk.patch)
+	sed -i".bak" "s|REPLACE_ME_WITH_PATH|$(shell pwd)|" /tmp/operator-sdk-hybrid-patched/go.mod
+	(cd /tmp/operator-sdk-hybrid-patched && go mod tidy && make build/operator-sdk)
+	mkdir -p build
+	cp /tmp/operator-sdk-hybrid-patched/build/operator-sdk ./build/operator-sdk
+
+remove-tmp-sdk:
+	rm -rf /tmp/operator-sdk-hybrid-patched
 
 # Run go fmt and go mod tidy, and check for clean git tree
 .PHONY: fix
