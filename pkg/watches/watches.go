@@ -34,7 +34,7 @@ import (
 
 type Watch struct {
 	schema.GroupVersionKind `json:",inline"`
-	ChartDir                string `json:"chart"`
+	ChartPath               string `json:"chart"`
 
 	WatchDependentResources *bool             `json:"watchDependentResources,omitempty"`
 	OverrideValues          map[string]string `json:"overrideValues,omitempty"`
@@ -82,13 +82,13 @@ func LoadReader(reader io.Reader) ([]Watch, error) {
 			return nil, fmt.Errorf("invalid GVK: %s: %w", gvk, err)
 		}
 
-		if _, err := chartutil.IsChartDir(w.ChartDir); err != nil {
-			return nil, fmt.Errorf("invalid chart directory %s: %w", w.ChartDir, err)
+		if _, err := chartutil.IsChartDir(w.ChartPath); err != nil {
+			return nil, fmt.Errorf("invalid chart directory %s: %w", w.ChartPath, err)
 		}
 
-		cl, err := loader.Load(w.ChartDir)
+		cl, err := loader.Load(w.ChartPath)
 		if err != nil {
-			return nil, fmt.Errorf("invalid chart %s: %w", w.ChartDir, err)
+			return nil, fmt.Errorf("invalid chart %s: %w", w.ChartPath, err)
 		}
 		w.Chart = cl
 

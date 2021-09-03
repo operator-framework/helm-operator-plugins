@@ -329,7 +329,7 @@ func main() {
 			setupLog.Error(err, "unable to create controller", "controller", "Helm")
 			os.Exit(1)
 		}
-		setupLog.Info("configured watch", "gvk", w.GroupVersionKind, "chartPath", w.ChartDir, "maxConcurrentReconciles", maxConcurrentReconciles, "reconcilePeriod", reconcilePeriod)
+		setupLog.Info("configured watch", "gvk", w.GroupVersionKind, "chartPath", w.ChartPath, "maxConcurrentReconciles", maxConcurrentReconciles, "reconcilePeriod", reconcilePeriod)
 	}
 
 	setupLog.Info("starting manager")

@@ -211,7 +211,7 @@ func run(cmd *cobra.Command, f *flags.Flags) {
 			log.Error(err, "unable to create controller", "controller", "Helm")
 			os.Exit(1)
 		}
-		log.Info("configured watch", "gvk", w.GroupVersionKind, "chartPath", w.ChartDir, "maxConcurrentReconciles", f.MaxConcurrentReconciles, "reconcilePeriod", f.ReconcilePeriod)
+		log.Info("configured watch", "gvk", w.GroupVersionKind, "chartPath", w.ChartPath, "maxConcurrentReconciles", f.MaxConcurrentReconciles, "reconcilePeriod", f.ReconcilePeriod)
 	}
 
 	log.Info("starting manager")

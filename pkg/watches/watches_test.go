@@ -43,7 +43,7 @@ var _ = Describe("LoadReader", func() {
 		expectedWatches = []Watch{
 			{
 				GroupVersionKind:        schema.GroupVersionKind{Group: "mygroup", Version: "v1alpha1", Kind: "MyKind"},
-				ChartDir:                "../../testdata/test-chart",
+				ChartPath:               "../../testdata/test-chart",
 				WatchDependentResources: &falseVal,
 				OverrideValues:          map[string]string{"key": "value"},
 			},
@@ -68,7 +68,7 @@ var _ = Describe("LoadReader", func() {
 		expectedWatches = []Watch{
 			{
 				GroupVersionKind:        schema.GroupVersionKind{Group: "mygroup", Version: "v1alpha1", Kind: "MyKind"},
-				ChartDir:                "../../testdata/test-chart",
+				ChartPath:               "../../testdata/test-chart",
 				WatchDependentResources: &falseVal,
 				OverrideValues:          map[string]string{"key": "value"},
 			},
@@ -97,7 +97,7 @@ var _ = Describe("LoadReader", func() {
 		expectedWatches = []Watch{
 			{
 				GroupVersionKind:        schema.GroupVersionKind{Group: "mygroup", Version: "v1alpha1", Kind: "MyKind"},
-				ChartDir:                "../../testdata/test-chart",
+				ChartPath:               "../../testdata/test-chart",
 				WatchDependentResources: &falseVal,
 				OverrideValues: map[string]string{
 					"repo": "quay.io/operator-framework/helm-operator",
@@ -148,12 +148,12 @@ var _ = Describe("LoadReader", func() {
 		expectedWatches = []Watch{
 			{
 				GroupVersionKind:        schema.GroupVersionKind{Group: "mygroup", Version: "v1alpha1", Kind: "MyFirstKind"},
-				ChartDir:                "../../testdata/test-chart",
+				ChartPath:               "../../testdata/test-chart",
 				WatchDependentResources: &trueVal,
 			},
 			{
 				GroupVersionKind:        schema.GroupVersionKind{Group: "mygroup", Version: "v1alpha1", Kind: "MySecondKind"},
-				ChartDir:                "../../testdata/test-chart",
+				ChartPath:               "../../testdata/test-chart",
 				WatchDependentResources: &trueVal,
 			},
 		}
@@ -265,7 +265,7 @@ var _ = Describe("Load", func() {
 		expectedWatches = []Watch{
 			{
 				GroupVersionKind:        schema.GroupVersionKind{Group: "mygroup", Version: "v1alpha1", Kind: "MyKind"},
-				ChartDir:                "../../testdata/test-chart",
+				ChartPath:               "../../testdata/test-chart",
 				WatchDependentResources: &falseVal,
 				OverrideValues:          map[string]string{"key": "value"},
 			},
@@ -290,7 +290,7 @@ func verifyEqualWatches(expectedWatch, obtainedWatch []Watch) {
 		Expect(expectedWatch[i]).NotTo(BeNil())
 		Expect(obtainedWatch[i]).NotTo(BeNil())
 		Expect(expectedWatch[i].GroupVersionKind).To(BeEquivalentTo(obtainedWatch[i].GroupVersionKind))
-		Expect(expectedWatch[i].ChartDir).To(BeEquivalentTo(obtainedWatch[i].ChartDir))
+		Expect(expectedWatch[i].ChartPath).To(BeEquivalentTo(obtainedWatch[i].ChartPath))
 		Expect(expectedWatch[i].WatchDependentResources).To(BeEquivalentTo(obtainedWatch[i].WatchDependentResources))
 		Expect(expectedWatch[i].OverrideValues).To(BeEquivalentTo(obtainedWatch[i].OverrideValues))
 	}
