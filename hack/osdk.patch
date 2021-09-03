@@ -1,0 +1,93 @@
+diff --git a/go.mod b/go.mod
+index 12ba033a..2a1aeaa7 100644
+--- a/go.mod
++++ b/go.mod
+@@ -7,13 +7,14 @@ require (
+ 	github.com/fatih/structtag v1.1.0
+ 	github.com/go-logr/logr v0.4.0
+ 	github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0
+-	github.com/iancoleman/strcase v0.0.0-20191112232945-16388991a334
++	github.com/iancoleman/strcase v0.1.2
+ 	github.com/kr/text v0.2.0
+ 	github.com/markbates/inflect v1.0.4
+ 	github.com/maxbrunsfeld/counterfeiter/v6 v6.2.2
+ 	github.com/onsi/ginkgo v1.16.4
+ 	github.com/onsi/gomega v1.13.0
+ 	github.com/operator-framework/api v0.10.5
++	github.com/operator-framework/helm-operator-plugins v0.0.8-0.20210825183301-ae6656410e15
+ 	github.com/operator-framework/java-operator-plugins v0.0.0-20210708174638-463fb91f3d5e
+ 	github.com/operator-framework/operator-lib v0.6.0
+ 	github.com/operator-framework/operator-registry v1.17.4
+@@ -54,6 +55,8 @@ replace (
+ 	github.com/docker/distribution => github.com/docker/distribution v0.0.0-20191216044856-a8371794149d
+ 	github.com/mattn/go-sqlite3 => github.com/mattn/go-sqlite3 v1.10.0
+ 	golang.org/x/text => golang.org/x/text v0.3.3 // Required to fix CVE-2020-14040
++
++  github.com/operator-framework/helm-operator-plugins => REPLACE_ME_WITH_PATH
+ )
+ 
+ exclude github.com/spf13/viper v1.3.2 // Required to fix CVE-2018-1098
+diff --git a/internal/cmd/operator-sdk/cli/cli.go b/internal/cmd/operator-sdk/cli/cli.go
+index 0f4e5f69..cce04188 100644
+--- a/internal/cmd/operator-sdk/cli/cli.go
++++ b/internal/cmd/operator-sdk/cli/cli.go
+@@ -26,6 +26,7 @@ import (
+ 	kustomizev1 "sigs.k8s.io/kubebuilder/v3/pkg/plugins/common/kustomize/v1"
+ 	declarativev1 "sigs.k8s.io/kubebuilder/v3/pkg/plugins/golang/declarative/v1"
+ 
++	"sigs.k8s.io/kubebuilder/v3/pkg/model/stage"
+ 	"sigs.k8s.io/kubebuilder/v3/pkg/plugins/golang"
+ 	golangv2 "sigs.k8s.io/kubebuilder/v3/pkg/plugins/golang/v2"
+ 	golangv3 "sigs.k8s.io/kubebuilder/v3/pkg/plugins/golang/v3"
+@@ -46,6 +47,8 @@ import (
+ 	manifestsv2 "github.com/operator-framework/operator-sdk/internal/plugins/manifests/v2"
+ 	scorecardv2 "github.com/operator-framework/operator-sdk/internal/plugins/scorecard/v2"
+ 	"github.com/operator-framework/operator-sdk/internal/util/projutil"
++
++	hybrid "github.com/operator-framework/helm-operator-plugins/pkg/plugins/hybrid/v1alpha"
+ )
+ 
+ var (
+@@ -98,6 +101,12 @@ func GetPluginsCLIAndRoot() (*cli.CLI, *cobra.Command) {
+ 		manifestsv2.Plugin{},
+ 		scorecardv2.Plugin{},
+ 	)
++	hybridHelmBundle, _ := plugin.NewBundle("hybrid.helm"+plugins.DefaultNameQualifier, plugin.Version{Number: 1, Stage: stage.Alpha},
++		kustomizev1.Plugin{},
++		hybrid.Plugin{},
++		manifestsv2.Plugin{},
++		scorecardv2.Plugin{},
++	)
+ 	c, err := cli.New(
+ 		cli.WithCommandName("operator-sdk"),
+ 		cli.WithVersion(makeVersionString()),
+@@ -106,6 +115,7 @@ func GetPluginsCLIAndRoot() (*cli.CLI, *cobra.Command) {
+ 			gov2Bundle,
+ 			gov3Bundle,
+ 			helmBundle,
++			hybridHelmBundle,
+ 			kustomizev1.Plugin{},
+ 			declarativev1.Plugin{},
+ 			&quarkusv1.Plugin{},
+diff --git a/internal/util/projutil/project_util.go b/internal/util/projutil/project_util.go
+index af0db0e4..966afd35 100644
+--- a/internal/util/projutil/project_util.go
++++ b/internal/util/projutil/project_util.go
+@@ -55,6 +55,8 @@ const (
+ 	OperatorTypeAnsible OperatorType = "ansible"
+ 	// OperatorTypeHelm - helm type of operator.
+ 	OperatorTypeHelm OperatorType = "helm"
++	// OperatorTypeHybridHelm - hybrid helm type of operator.
++	OperatorTypeHybridHelm OperatorType = "hybrid.helm"
+ 	// OperatorTypeUnknown - unknown type of operator.
+ 	OperatorTypeUnknown OperatorType = "unknown"
+ )
+@@ -103,6 +105,8 @@ func PluginChainToOperatorType(pluginKeys []string) OperatorType {
+ 			return OperatorTypeGo
+ 		case strings.HasPrefix(pluginKey, "helm"):
+ 			return OperatorTypeHelm
++		case strings.HasPrefix(pluginKey, "hybrid.helm"):
++			return OperatorTypeHybridHelm
+ 		case strings.HasPrefix(pluginKey, "ansible"):
+ 			return OperatorTypeAnsible
+ 		}
