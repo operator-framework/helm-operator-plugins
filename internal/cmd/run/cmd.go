@@ -30,11 +30,7 @@ import (
 	"github.com/operator-framework/helm-operator-plugins/pkg/reconciler"
 	"github.com/operator-framework/helm-operator-plugins/pkg/watches"
 	"github.com/spf13/cobra"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/cache"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -132,37 +128,9 @@ func run(cmd *cobra.Command, f *flags.Flags) {
 	options = f.ToManagerOptions(options)
 
 	if options.NewClient == nil {
-		options.NewClient = func(cache cache.Cache, config *rest.Config, options client.Options, uncachedObjects ...client.Object) (client.Client, error) {
-			// Create the Client for Write operations.
-			c, err := client.New(config, options)
-			if err != nil {
-				return nil, err
-			}
-
-			return helmmgr.NewCachingClientFunc()
-		}
+		options.NewClient = helmmgr.NewCachingClientFunc()
 	}
-	namespace, found := os.LookupEnv(helmmgr.WatchNamespaceEnvVar)
-	log = log.WithValues("Namespace", namespace)
-	if found {
-		log.V(1).Info(fmt.Sprintf("Setting namespace with value in %s", helmmgr.WatchNamespaceEnvVar))
-		if namespace == metav1.NamespaceAll {
-			log.Info("Watching all namespaces.")
-			options.Namespace = metav1.NamespaceAll
-		} else {
-			if strings.Contains(namespace, ",") {
-				log.Info("Watching multiple namespaces.")
-				options.NewCache = cache.MultiNamespacedCacheBuilder(strings.Split(namespace, ","))
-			} else {
-				log.Info("Watching single namespace.")
-				options.Namespace = namespace
-			}
-		}
-	} else if options.Namespace == "" {
-		log.Info(fmt.Sprintf("Watch namespaces not configured by environment variable %s or file. "+
-			"Watching all namespaces.", helmmgr.WatchNamespaceEnvVar))
-		options.Namespace = metav1.NamespaceAll
-	}
+	helmmgr.ConfigureWatchNamespaces(&options, log)
 
 	mgr, err := manager.New(cfg, options)
 	if err != nil {
@@ -181,18 +149,28 @@ func run(cmd *cobra.Command, f *flags.Flags) {
 
 	ws, err := watches.Load(f.WatchesFile)
 	if err != nil {
-		log.Error(err, "Failed to create new manager factories.")
+		log.Error(err, "unable to load watches.yaml", "path", f.WatchesFile)
 		os.Exit(1)
 	}
 
 	for _, w := range ws {
+		reconcilePeriod := f.ReconcilePeriod
+		if w.ReconcilePeriod != nil {
+			reconcilePeriod = w.ReconcilePeriod.Duration
+		}
+
+		maxConcurrentReconciles := f.MaxConcurrentReconciles
+		if w.MaxConcurrentReconciles != nil {
+			maxConcurrentReconciles = *w.MaxConcurrentReconciles
+		}
+
 		r, err := reconciler.New(
 			reconciler.WithChart(*w.Chart),
 			reconciler.WithGroupVersionKind(w.GroupVersionKind),
 			reconciler.WithOverrideValues(w.OverrideValues),
 			reconciler.SkipDependentWatches(w.WatchDependentResources != nil && !*w.WatchDependentResources),
-			reconciler.WithMaxConcurrentReconciles(f.MaxConcurrentReconciles),
-			reconciler.WithReconcilePeriod(f.ReconcilePeriod),
+			reconciler.WithMaxConcurrentReconciles(maxConcurrentReconciles),
+			reconciler.WithReconcilePeriod(reconcilePeriod),
 			reconciler.WithInstallAnnotations(annotation.DefaultInstallAnnotations...),
 			reconciler.WithUpgradeAnnotations(annotation.DefaultUpgradeAnnotations...),
 			reconciler.WithUninstallAnnotations(annotation.DefaultUninstallAnnotations...),
@@ -220,7 +198,7 @@ func run(cmd *cobra.Command, f *flags.Flags) {
 // if any of those fields are not their default values.
 func exitIfUnsupported(options manager.Options) {
 	var keys []string
-	// The below options are webhook-specific, which is not supported by ansible.
+	// The below options are webhook-specific, which is not supported by helm.
 	if options.CertDir != "" {
 		keys = append(keys, "certDir")
 	}
