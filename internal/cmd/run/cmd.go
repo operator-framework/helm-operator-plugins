@@ -22,10 +22,10 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/operator-framework/helm-operator-plugins/internal/flags"
 	"github.com/operator-framework/helm-operator-plugins/internal/metrics"
 	"github.com/operator-framework/helm-operator-plugins/internal/version"
 	"github.com/operator-framework/helm-operator-plugins/pkg/annotation"
-	"github.com/operator-framework/helm-operator-plugins/pkg/flags"
 	helmmgr "github.com/operator-framework/helm-operator-plugins/pkg/manager"
 	"github.com/operator-framework/helm-operator-plugins/pkg/reconciler"
 	"github.com/operator-framework/helm-operator-plugins/pkg/watches"
@@ -139,12 +139,7 @@ func run(cmd *cobra.Command, f *flags.Flags) {
 				return nil, err
 			}
 
-			return client.NewDelegatingClient(client.NewDelegatingClientInput{
-				CacheReader:       cache,
-				Client:            c,
-				UncachedObjects:   uncachedObjects,
-				CacheUnstructured: true,
-			})
+			return helmmgr.NewCachingClientFunc()
 		}
 	}
 	namespace, found := os.LookupEnv(helmmgr.WatchNamespaceEnvVar)
