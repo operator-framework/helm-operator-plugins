@@ -21,6 +21,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -71,6 +72,39 @@ var _ = Describe("LoadReader", func() {
 				ChartPath:               "../../testdata/test-chart",
 				WatchDependentResources: &falseVal,
 				OverrideValues:          map[string]string{"key": "value"},
+			},
+		}
+
+		err := os.Setenv("MY_VALUE", "value")
+		Expect(err).NotTo(HaveOccurred())
+
+		watchesData := bytes.NewBufferString(data)
+		watches, err := LoadReader(watchesData)
+		Expect(err).NotTo(HaveOccurred())
+		verifyEqualWatches(expectedWatches, watches)
+	})
+
+	It("should create valid watches with MaxConcurrentReconciles and ReconcilePeriod", func() {
+		concurrentReconciles := 2
+		data = `---
+- group: mygroup
+  version: v1alpha1
+  kind: MyKind
+  chart: ../../testdata/test-chart
+  watchDependentResources: false
+  reconcilePeriod: 1s
+  maxConcurrentReconciles: 2
+  overrideValues:
+    key: $MY_VALUE
+`
+		expectedWatches = []Watch{
+			{
+				GroupVersionKind:        schema.GroupVersionKind{Group: "mygroup", Version: "v1alpha1", Kind: "MyKind"},
+				ChartPath:               "../../testdata/test-chart",
+				WatchDependentResources: &falseVal,
+				OverrideValues:          map[string]string{"key": "value"},
+				MaxConcurrentReconciles: &concurrentReconciles,
+				ReconcilePeriod:         &v1.Duration{Duration: 1000000000},
 			},
 		}
 
@@ -293,6 +327,8 @@ func verifyEqualWatches(expectedWatch, obtainedWatch []Watch) {
 		Expect(expectedWatch[i].ChartPath).To(BeEquivalentTo(obtainedWatch[i].ChartPath))
 		Expect(expectedWatch[i].WatchDependentResources).To(BeEquivalentTo(obtainedWatch[i].WatchDependentResources))
 		Expect(expectedWatch[i].OverrideValues).To(BeEquivalentTo(obtainedWatch[i].OverrideValues))
+		Expect(expectedWatch[i].MaxConcurrentReconciles).To(BeEquivalentTo(obtainedWatch[i].MaxConcurrentReconciles))
+		Expect(expectedWatch[i].ReconcilePeriod).To(BeEquivalentTo(obtainedWatch[i].ReconcilePeriod))
 	}
 }
 

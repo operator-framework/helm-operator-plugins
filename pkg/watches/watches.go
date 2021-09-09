@@ -26,7 +26,6 @@ import (
 	sprig "github.com/go-task/slim-sprig"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
-	"helm.sh/helm/v3/pkg/chartutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/yaml"
@@ -82,10 +81,6 @@ func LoadReader(reader io.Reader) ([]Watch, error) {
 			return nil, fmt.Errorf("invalid GVK: %s: %w", gvk, err)
 		}
 
-		if _, err := chartutil.IsChartDir(w.ChartPath); err != nil {
-			return nil, fmt.Errorf("invalid chart directory %s: %w", w.ChartPath, err)
-		}
-
 		cl, err := loader.Load(w.ChartPath)
 		if err != nil {
 			return nil, fmt.Errorf("invalid chart %s: %w", w.ChartPath, err)
@@ -95,8 +90,8 @@ func LoadReader(reader io.Reader) ([]Watch, error) {
 		if _, ok := watchesMap[gvk]; ok {
 			return nil, fmt.Errorf("duplicate GVK: %s", gvk)
 		}
-
 		watchesMap[gvk] = struct{}{}
+
 		if w.WatchDependentResources == nil {
 			trueVal := true
 			w.WatchDependentResources = &trueVal
