@@ -63,14 +63,13 @@ FROM registry.access.redhat.com/ubi8/ubi-minimal:8.4
 
 ENV HOME=/opt/helm \
     USER_NAME=helm \
-    USER_UID=1001 \
-	G_ID=0
+    USER_UID=1001
 
 RUN echo "${USER_NAME}:x:${USER_UID}:0:${USER_NAME} user:${HOME}:/sbin/nologin" >> /etc/passwd
 
 # Copy necessary files with the right permissions
-COPY --chown=${USER_UID}:${G_ID} watches.yaml ${HOME}/watches.yaml
-COPY --chown=${USER_UID}:${G_ID} helm-charts  ${HOME}/helm-charts
+COPY --chown=${USER_UID}:0 watches.yaml ${HOME}/watches.yaml
+COPY --chown=${USER_UID}:0 helm-charts  ${HOME}/helm-charts
 
 # Copy manager binary
 COPY --from=builder /workspace/manager .
