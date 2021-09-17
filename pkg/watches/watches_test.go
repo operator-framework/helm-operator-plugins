@@ -15,195 +15,327 @@
 package watches
 
 import (
+	"bytes"
 	"io/ioutil"
 	"os"
-	"reflect"
-	"testing"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-type testCase struct {
-	name            string
-	data            string
-	env             map[string]string
-	expectLen       int
-	expectErr       bool
-	expectOverrides []map[string]string
-}
-
-// TODO(joelanford): convert to ginkgo/gomega
-func TestLoadWatches(t *testing.T) {
-	testCases := []testCase{
-		{
-			name: "valid",
-			data: `---
+var _ = Describe("LoadReader", func() {
+	var (
+		expectedWatches   []Watch
+		data              string
+		falseVal, trueVal = false, true
+	)
+	It("should create valid watches", func() {
+		data = `---
 - group: mygroup
   version: v1alpha1
   kind: MyKind
-  chart: ../../testdata/test-chart-0.1.0.tgz
+  chart: ../../testdata/test-chart
   watchDependentResources: false
-  reconcilePeriod: 10s
   overrideValues:
     key: value
-`,
-			expectLen:       1,
-			expectErr:       false,
-			expectOverrides: []map[string]string{{"key": "value"}},
-		},
-		{
-			name: "valid with override expansion",
-			data: `---
+`
+		expectedWatches = []Watch{
+			{
+				GroupVersionKind:        schema.GroupVersionKind{Group: "mygroup", Version: "v1alpha1", Kind: "MyKind"},
+				ChartPath:               "../../testdata/test-chart",
+				WatchDependentResources: &falseVal,
+				OverrideValues:          map[string]string{"key": "value"},
+			},
+		}
+
+		watchesData := bytes.NewBufferString(data)
+		watches, err := LoadReader(watchesData)
+		Expect(err).NotTo(HaveOccurred())
+		verifyEqualWatches(expectedWatches, watches)
+	})
+
+	It("should create valid watches with override env expansion", func() {
+		data = `---
 - group: mygroup
   version: v1alpha1
   kind: MyKind
-  chart: ../../testdata/test-chart-0.1.0.tgz
+  chart: ../../testdata/test-chart
   watchDependentResources: false
   overrideValues:
     key: $MY_VALUE
-`,
-			env:             map[string]string{"MY_VALUE": "value"},
-			expectLen:       1,
-			expectErr:       false,
-			expectOverrides: []map[string]string{{"key": "value"}},
-		},
-		{
-			name: "multiple gvk",
-			data: `---
+`
+		expectedWatches = []Watch{
+			{
+				GroupVersionKind:        schema.GroupVersionKind{Group: "mygroup", Version: "v1alpha1", Kind: "MyKind"},
+				ChartPath:               "../../testdata/test-chart",
+				WatchDependentResources: &falseVal,
+				OverrideValues:          map[string]string{"key": "value"},
+			},
+		}
+
+		err := os.Setenv("MY_VALUE", "value")
+		Expect(err).NotTo(HaveOccurred())
+
+		watchesData := bytes.NewBufferString(data)
+		watches, err := LoadReader(watchesData)
+		Expect(err).NotTo(HaveOccurred())
+		verifyEqualWatches(expectedWatches, watches)
+	})
+
+	It("should create valid watches with MaxConcurrentReconciles and ReconcilePeriod", func() {
+		concurrentReconciles := 2
+		data = `---
+- group: mygroup
+  version: v1alpha1
+  kind: MyKind
+  chart: ../../testdata/test-chart
+  watchDependentResources: false
+  reconcilePeriod: 1s
+  maxConcurrentReconciles: 2
+  overrideValues:
+    key: $MY_VALUE
+`
+		expectedWatches = []Watch{
+			{
+				GroupVersionKind:        schema.GroupVersionKind{Group: "mygroup", Version: "v1alpha1", Kind: "MyKind"},
+				ChartPath:               "../../testdata/test-chart",
+				WatchDependentResources: &falseVal,
+				OverrideValues:          map[string]string{"key": "value"},
+				MaxConcurrentReconciles: &concurrentReconciles,
+				ReconcilePeriod:         &v1.Duration{Duration: 1000000000},
+			},
+		}
+
+		err := os.Setenv("MY_VALUE", "value")
+		Expect(err).NotTo(HaveOccurred())
+
+		watchesData := bytes.NewBufferString(data)
+		watches, err := LoadReader(watchesData)
+		Expect(err).NotTo(HaveOccurred())
+		verifyEqualWatches(expectedWatches, watches)
+	})
+
+	It("should create valid watches file with override template expansion", func() {
+		data = `---
+- group: mygroup
+  version: v1alpha1
+  kind: MyKind
+  chart: ../../testdata/test-chart
+  watchDependentResources: false
+  overrideValues:
+    repo: '{{ ("$MY_IMAGE" | split ":")._0 }}'
+    tag: '{{ ("$MY_IMAGE" | split ":")._1 }}'
+`
+		expectedWatches = []Watch{
+			{
+				GroupVersionKind:        schema.GroupVersionKind{Group: "mygroup", Version: "v1alpha1", Kind: "MyKind"},
+				ChartPath:               "../../testdata/test-chart",
+				WatchDependentResources: &falseVal,
+				OverrideValues: map[string]string{
+					"repo": "quay.io/operator-framework/helm-operator",
+					"tag":  "latest",
+				},
+			},
+		}
+
+		err := os.Setenv("MY_IMAGE", "quay.io/operator-framework/helm-operator:latest")
+		Expect(err).NotTo(HaveOccurred())
+
+		watchesData := bytes.NewBufferString(data)
+		watches, err := LoadReader(watchesData)
+		Expect(err).NotTo(HaveOccurred())
+		verifyEqualWatches(expectedWatches, watches)
+	})
+
+	It("should error for invalid watches file with override expansion", func() {
+		data = `---
+- group: mygroup
+  version: v1alpha1
+  kind: MyKind
+  chart: ../../testdata/test-chart
+  overrideValues:
+    repo: '{{ ("$MY_IMAGE" | split ":")._0 }}'
+    tag: '{{ ("$MY_IMAGE" | split ":")._1'
+`
+		err := os.Setenv("MY_IMAGE", "quay.io/operator-framework/helm-operator:latest")
+		Expect(err).NotTo(HaveOccurred())
+
+		watchesData := bytes.NewBufferString(data)
+		watches, err := LoadReader(watchesData)
+		Expect(err).To(HaveOccurred())
+		Expect(watches).To(BeNil())
+	})
+
+	It("should not error with multiple gvk", func() {
+		data = `---
 - group: mygroup
   version: v1alpha1
   kind: MyFirstKind
-  chart: ../../testdata/test-chart-0.1.0.tgz
+  chart: ../../testdata/test-chart
 - group: mygroup
   version: v1alpha1
   kind: MySecondKind
-  chart: ../../testdata/test-chart-0.1.0.tgz
-`,
-			expectLen: 2,
-			expectErr: false,
-		},
-		{
-			name: "duplicate gvk",
-			data: `---
+  chart: ../../testdata/test-chart
+`
+		expectedWatches = []Watch{
+			{
+				GroupVersionKind:        schema.GroupVersionKind{Group: "mygroup", Version: "v1alpha1", Kind: "MyFirstKind"},
+				ChartPath:               "../../testdata/test-chart",
+				WatchDependentResources: &trueVal,
+			},
+			{
+				GroupVersionKind:        schema.GroupVersionKind{Group: "mygroup", Version: "v1alpha1", Kind: "MySecondKind"},
+				ChartPath:               "../../testdata/test-chart",
+				WatchDependentResources: &trueVal,
+			},
+		}
+		watchesData := bytes.NewBufferString(data)
+		watches, err := LoadReader(watchesData)
+		Expect(err).NotTo(HaveOccurred())
+		verifyEqualWatches(expectedWatches, watches)
+	})
+
+	It("should error because of duplicate gvk", func() {
+		data = `---
 - group: mygroup
   version: v1alpha1
   kind: MyKind
-  chart: ../../testdata/test-chart-0.1.0.tgz
+  chart: ../../testdata/test-chart
 - group: mygroup
   version: v1alpha1
   kind: MyKind
-  chart: ../../testdata/test-chart-0.1.0.tgz
-`,
-			expectLen: 0,
-			expectErr: true,
-		},
-		{
-			name: "no version",
-			data: `---
+  chart: ../../testdata/test-chart
+`
+		watchesData := bytes.NewBufferString(data)
+		watches, err := LoadReader(watchesData)
+		Expect(err).To(HaveOccurred())
+		Expect(watches).To(BeNil())
+	})
+
+	It("should error because of no version", func() {
+		data = `---
 - group: mygroup
   kind: MyKind
-  chart: ../../testdata/test-chart-0.1.0.tgz
-`,
-			expectLen: 0,
-			expectErr: true,
-		},
-		{
-			name: "no kind",
-			data: `---
+  chart: ../../testdata/test-chart
+`
+		watchesData := bytes.NewBufferString(data)
+		watches, err := LoadReader(watchesData)
+		Expect(err).To(HaveOccurred())
+		Expect(watches).To(BeNil())
+	})
+
+	It("should error because no kind is specified", func() {
+		data = `---
 - group: mygroup
   version: v1alpha1
-  chart: ../../testdata/test-chart-0.1.0.tgz
-`,
-			expectLen: 0,
-			expectErr: true,
-		},
-		{
-			name: "bad chart path",
-			data: `---
+  chart: ../../testdata/test-chart
+`
+		watchesData := bytes.NewBufferString(data)
+		watches, err := LoadReader(watchesData)
+		Expect(err).To(HaveOccurred())
+		Expect(watches).To(BeNil())
+	})
+
+	It("shoule error when bad chart path is specified", func() {
+		data = `---
 - group: mygroup
   version: v1alpha1
   kind: MyKind
   chart: nonexistent/path/to/chart
-`,
-			expectLen: 0,
-			expectErr: true,
-		},
-		{
-			name: "invalid overrides",
-			data: `---
+`
+		watchesData := bytes.NewBufferString(data)
+		watches, err := LoadReader(watchesData)
+		Expect(err).To(HaveOccurred())
+		Expect(watches).To(BeNil())
+	})
+
+	It("should error when invalid overrides are specified", func() {
+		data = `---
 - group: mygroup
   version: v1alpha1
   kind: MyKind
-  chart: ../../testdata/test-chart-0.1.0.tgz
+  chart: ../../testdata/test-chart
   overrideValues:
     key1:
-		key2: value
-`,
-			expectLen: 0,
-			expectErr: true,
-		},
-		{
-			name: "invalid yaml",
-			data: `---
+      key2: value
+`
+		watchesData := bytes.NewBufferString(data)
+		watches, err := LoadReader(watchesData)
+		Expect(err).To(HaveOccurred())
+		Expect(watches).To(BeNil())
+	})
+
+	It("should error because of invalid yaml", func() {
+		data = `---
 foo: bar
-`,
-			expectLen: 0,
-			expectErr: true,
-		},
-	}
+`
+		watchesData := bytes.NewBufferString(data)
+		watches, err := LoadReader(watchesData)
+		Expect(err).To(HaveOccurred())
+		Expect(watches).To(BeNil())
+	})
+})
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			tmp, err := ioutil.TempFile("", "watches.yaml")
-			if err != nil {
-				t.Fatalf("Failed to create temporary watches.yaml file: %v", err)
-			}
-			defer func() { _ = os.Remove(tmp.Name()) }()
-			if _, err := tmp.WriteString(tc.data); err != nil {
-				t.Fatalf("Failed to write data to temporary watches.yaml file: %v", err)
-			}
-			if err := tmp.Close(); err != nil {
-				t.Fatalf("Failed to close temporary watches.yaml file: %v", err)
-			}
+var _ = Describe("Load", func() {
+	var (
+		expectedWatches []Watch
+		data            string
+		falseVal        = false
+	)
 
-			for k, v := range tc.env {
-				if err := os.Setenv(k, v); err != nil {
-					t.Fatalf("Failed to set environment variable %q: %v", k, err)
-				}
-			}
+	It("should return valid watches", func() {
+		data = `---
+- group: mygroup
+  version: v1alpha1
+  kind: MyKind
+  chart: ../../testdata/test-chart
+  watchDependentResources: false
+  overrideValues:
+    key: value
+`
 
-			doTest(t, tc, tmp.Name())
+		expectedWatches = []Watch{
+			{
+				GroupVersionKind:        schema.GroupVersionKind{Group: "mygroup", Version: "v1alpha1", Kind: "MyKind"},
+				ChartPath:               "../../testdata/test-chart",
+				WatchDependentResources: &falseVal,
+				OverrideValues:          map[string]string{"key": "value"},
+			},
+		}
 
-			for k := range tc.env {
-				if err := os.Unsetenv(k); err != nil {
-					t.Fatalf("Failed to unset environment variable %q: %v", k, err)
-				}
-			}
-		})
+		f, err := ioutil.TempFile("", "osdk-test-load")
+		Expect(err).NotTo(HaveOccurred())
+
+		defer removeFile(f)
+		_, err = f.WriteString(data)
+		Expect(err).NotTo(HaveOccurred())
+
+		watches, err := Load(f.Name())
+		Expect(err).NotTo(HaveOccurred())
+		verifyEqualWatches(expectedWatches, watches)
+	})
+})
+
+func verifyEqualWatches(expectedWatch, obtainedWatch []Watch) {
+	Expect(len(expectedWatch)).To(BeEquivalentTo(len(obtainedWatch)))
+	for i := range expectedWatch {
+		Expect(expectedWatch[i]).NotTo(BeNil())
+		Expect(obtainedWatch[i]).NotTo(BeNil())
+		Expect(expectedWatch[i].GroupVersionKind).To(BeEquivalentTo(obtainedWatch[i].GroupVersionKind))
+		Expect(expectedWatch[i].ChartPath).To(BeEquivalentTo(obtainedWatch[i].ChartPath))
+		Expect(expectedWatch[i].WatchDependentResources).To(BeEquivalentTo(obtainedWatch[i].WatchDependentResources))
+		Expect(expectedWatch[i].OverrideValues).To(BeEquivalentTo(obtainedWatch[i].OverrideValues))
+		Expect(expectedWatch[i].MaxConcurrentReconciles).To(BeEquivalentTo(obtainedWatch[i].MaxConcurrentReconciles))
+		Expect(expectedWatch[i].ReconcilePeriod).To(BeEquivalentTo(obtainedWatch[i].ReconcilePeriod))
 	}
 }
 
-func doTest(t *testing.T, tc testCase, watchesFile string) {
-	watches, err := Load(watchesFile)
-	if !tc.expectErr && err != nil {
-		t.Fatalf("Expected no error; got error: %v", err)
-	} else if tc.expectErr && err == nil {
-		t.Fatalf("Expected error; got no error")
-	}
-	if len(watches) != tc.expectLen {
-		t.Fatalf("Expected %d watches; got %d", tc.expectLen, len(watches))
-	}
+func removeFile(f *os.File) {
+	err := f.Close()
+	Expect(err).NotTo(HaveOccurred())
 
-	for i, w := range watches {
-		if len(tc.expectOverrides) <= i {
-			if len(w.OverrideValues) > 0 {
-				t.Fatalf("Expected no overides; got %#v", w.OverrideValues)
-			} else {
-				continue
-			}
-		}
-
-		expectedOverrides := tc.expectOverrides[i]
-		if !reflect.DeepEqual(expectedOverrides, w.OverrideValues) {
-			t.Fatalf("Expected overrides %#v; got %#v", expectedOverrides, w.OverrideValues)
-		}
-	}
+	err = os.Remove(f.Name())
+	Expect(err).NotTo(HaveOccurred())
 }

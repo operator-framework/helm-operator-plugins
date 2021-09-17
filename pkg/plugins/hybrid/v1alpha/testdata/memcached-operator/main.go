@@ -34,6 +34,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
+	cachev1 "github.com/example/memcached-operator/api/v1"
+	"github.com/example/memcached-operator/controllers"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -47,15 +50,23 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
+	utilruntime.Must(cachev1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
 func main() {
-	var metricsAddr string
-	var enableLeaderElection bool
-	var probeAddr string
+	var (
+		metricsAddr          string
+		leaderElectionID     string
+		watchesPath          string
+		probeAddr            string
+		enableLeaderElection bool
+	)
+
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	flag.StringVar(&watchesPath, "watches-file", "watches.yaml", "path to watches file")
+	flag.StringVar(&leaderElectionID, "leader-election-id", "86f835c3.my.domain", "provide leader election")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
@@ -73,13 +84,20 @@ func main() {
 		Port:                   9443,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "86f835c3.my.domain",
+		LeaderElectionID:       leaderElectionID,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
 
+	if err = (&controllers.MemcachedReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Memcached")
+		os.Exit(1)
+	}
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
@@ -91,7 +109,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	ws, err := watches.Load("./watches.yaml")
+	ws, err := watches.Load(watchesPath)
 	if err != nil {
 		setupLog.Error(err, "Failed to create new manager factories")
 		os.Exit(1)

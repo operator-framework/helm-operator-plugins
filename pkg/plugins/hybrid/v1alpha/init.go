@@ -153,13 +153,6 @@ func addInitCustomizations(projectName string) error {
 		return err
 	}
 
-	// Remove the webhook option for the componentConfig since webhooks are not supported by helm
-	err = projutil.ReplaceInFile(filepath.Join("config", "manager", "controller_manager_config.yaml"),
-		"webhook:\n  port: 9443", "")
-	if err != nil {
-		return err
-	}
-
 	// Remove the call to the command as manager. Helm has not been exposing this entrypoint
 	// todo: provide the manager entrypoint for helm and then remove it
 	const command = `command:
@@ -168,10 +161,6 @@ func addInitCustomizations(projectName string) error {
 	err = projutil.ReplaceInFile(managerFile, command, "")
 	if err != nil {
 		return err
-	}
-
-	if err := projutil.UpdateKustomizationsInit(); err != nil {
-		return fmt.Errorf("error updating kustomization.yaml files: %v", err)
 	}
 
 	return nil

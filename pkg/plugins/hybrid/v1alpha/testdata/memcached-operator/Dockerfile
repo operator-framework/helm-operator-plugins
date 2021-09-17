@@ -10,24 +10,28 @@ COPY go.sum go.sum
 RUN go mod download
 
 # Copy the go source
-COPY main.go main.goå
+COPY main.go main.go
+COPY api/ api/
+COPY controllers/ controllers/
 
 # Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o manager main.go
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.4
 
-# Use distroless as minimal base image to package the manager binary
-# Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM gcr.io/distroless/static:nonroot
-WORKDIR /
+ENV HOME=/opt/helm \
+    USER_NAME=helm \
+    USER_UID=1001
 
-ENV HOME=/opt/helm
+RUN echo "${USER_NAME}:x:${USER_UID}:0:${USER_NAME} user:${HOME}:/sbin/nologin" >> /etc/passwd
 
-# Copy necessary files
-COPY watches.yaml ${HOME}/watches.yaml
-COPY helm-charts  ${HOME}/helm-charts
+# Copy necessary files with the right permissions
+COPY --chown=${USER_UID}:0 watches.yaml ${HOME}/watches.yaml
+COPY --chown=${USER_UID}:0 helm-charts  ${HOME}/helm-charts
 
 # Copy manager binary
 COPY --from=builder /workspace/manager .
-USER 65532:65532
+
+USER ${USER_UID}
+
+WORKDIR ${HOME}
 
 ENTRYPOINT ["/manager"]
