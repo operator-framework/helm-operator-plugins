@@ -97,5 +97,5 @@ func (mh *Memcached) Run() {
 		"--resource", "--controller",
 	)
 
-	pkg.CheckError("creating helm api", err)
+	pkg.CheckError("creating go api", err)
 }
