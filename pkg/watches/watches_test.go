@@ -36,7 +36,7 @@ var _ = Describe("LoadReader", func() {
 - group: mygroup
   version: v1alpha1
   kind: MyKind
-  chart: ../../testdata/test-chart
+  chart: ../../pkg/internal/testdata/test-chart
   watchDependentResources: false
   overrideValues:
     key: value
@@ -44,7 +44,7 @@ var _ = Describe("LoadReader", func() {
 		expectedWatches = []Watch{
 			{
 				GroupVersionKind:        schema.GroupVersionKind{Group: "mygroup", Version: "v1alpha1", Kind: "MyKind"},
-				ChartPath:               "../../testdata/test-chart",
+				ChartPath:               "../../pkg/internal/testdata/test-chart",
 				WatchDependentResources: &falseVal,
 				OverrideValues:          map[string]string{"key": "value"},
 			},
@@ -61,7 +61,7 @@ var _ = Describe("LoadReader", func() {
 - group: mygroup
   version: v1alpha1
   kind: MyKind
-  chart: ../../testdata/test-chart
+  chart: ../../pkg/internal/testdata/test-chart
   watchDependentResources: false
   overrideValues:
     key: $MY_VALUE
@@ -69,7 +69,7 @@ var _ = Describe("LoadReader", func() {
 		expectedWatches = []Watch{
 			{
 				GroupVersionKind:        schema.GroupVersionKind{Group: "mygroup", Version: "v1alpha1", Kind: "MyKind"},
-				ChartPath:               "../../testdata/test-chart",
+				ChartPath:               "../../pkg/internal/testdata/test-chart",
 				WatchDependentResources: &falseVal,
 				OverrideValues:          map[string]string{"key": "value"},
 			},
@@ -90,7 +90,7 @@ var _ = Describe("LoadReader", func() {
 - group: mygroup
   version: v1alpha1
   kind: MyKind
-  chart: ../../testdata/test-chart
+  chart: ../../pkg/internal/testdata/test-chart
   watchDependentResources: false
   reconcilePeriod: 1s
   maxConcurrentReconciles: 2
@@ -100,7 +100,7 @@ var _ = Describe("LoadReader", func() {
 		expectedWatches = []Watch{
 			{
 				GroupVersionKind:        schema.GroupVersionKind{Group: "mygroup", Version: "v1alpha1", Kind: "MyKind"},
-				ChartPath:               "../../testdata/test-chart",
+				ChartPath:               "../../pkg/internal/testdata/test-chart",
 				WatchDependentResources: &falseVal,
 				OverrideValues:          map[string]string{"key": "value"},
 				MaxConcurrentReconciles: &concurrentReconciles,
@@ -122,7 +122,7 @@ var _ = Describe("LoadReader", func() {
 - group: mygroup
   version: v1alpha1
   kind: MyKind
-  chart: ../../testdata/test-chart
+  chart: ../../pkg/internal/testdata/test-chart
   watchDependentResources: false
   overrideValues:
     repo: '{{ ("$MY_IMAGE" | split ":")._0 }}'
@@ -131,7 +131,7 @@ var _ = Describe("LoadReader", func() {
 		expectedWatches = []Watch{
 			{
 				GroupVersionKind:        schema.GroupVersionKind{Group: "mygroup", Version: "v1alpha1", Kind: "MyKind"},
-				ChartPath:               "../../testdata/test-chart",
+				ChartPath:               "../../pkg/internal/testdata/test-chart",
 				WatchDependentResources: &falseVal,
 				OverrideValues: map[string]string{
 					"repo": "quay.io/operator-framework/helm-operator",
@@ -154,7 +154,7 @@ var _ = Describe("LoadReader", func() {
 - group: mygroup
   version: v1alpha1
   kind: MyKind
-  chart: ../../testdata/test-chart
+  chart: ../../pkg/internal/testdata/test-chart
   overrideValues:
     repo: '{{ ("$MY_IMAGE" | split ":")._0 }}'
     tag: '{{ ("$MY_IMAGE" | split ":")._1'
@@ -173,21 +173,21 @@ var _ = Describe("LoadReader", func() {
 - group: mygroup
   version: v1alpha1
   kind: MyFirstKind
-  chart: ../../testdata/test-chart
+  chart: ../../pkg/internal/testdata/test-chart
 - group: mygroup
   version: v1alpha1
   kind: MySecondKind
-  chart: ../../testdata/test-chart
+  chart: ../../pkg/internal/testdata/test-chart
 `
 		expectedWatches = []Watch{
 			{
 				GroupVersionKind:        schema.GroupVersionKind{Group: "mygroup", Version: "v1alpha1", Kind: "MyFirstKind"},
-				ChartPath:               "../../testdata/test-chart",
+				ChartPath:               "../../pkg/internal/testdata/test-chart",
 				WatchDependentResources: &trueVal,
 			},
 			{
 				GroupVersionKind:        schema.GroupVersionKind{Group: "mygroup", Version: "v1alpha1", Kind: "MySecondKind"},
-				ChartPath:               "../../testdata/test-chart",
+				ChartPath:               "../../pkg/internal/testdata/test-chart",
 				WatchDependentResources: &trueVal,
 			},
 		}
@@ -202,11 +202,11 @@ var _ = Describe("LoadReader", func() {
 - group: mygroup
   version: v1alpha1
   kind: MyKind
-  chart: ../../testdata/test-chart
+  chart: ../../pkg/internal/testdata/test-chart
 - group: mygroup
   version: v1alpha1
   kind: MyKind
-  chart: ../../testdata/test-chart
+  chart: ../../pkg/internal/testdata/test-chart
 `
 		watchesData := bytes.NewBufferString(data)
 		watches, err := LoadReader(watchesData)
@@ -218,7 +218,7 @@ var _ = Describe("LoadReader", func() {
 		data = `---
 - group: mygroup
   kind: MyKind
-  chart: ../../testdata/test-chart
+  chart: ../../pkg/internal/testdata/test-chart
 `
 		watchesData := bytes.NewBufferString(data)
 		watches, err := LoadReader(watchesData)
@@ -230,7 +230,7 @@ var _ = Describe("LoadReader", func() {
 		data = `---
 - group: mygroup
   version: v1alpha1
-  chart: ../../testdata/test-chart
+  chart: ../../pkg/internal/testdata/test-chart
 `
 		watchesData := bytes.NewBufferString(data)
 		watches, err := LoadReader(watchesData)
@@ -256,7 +256,7 @@ var _ = Describe("LoadReader", func() {
 - group: mygroup
   version: v1alpha1
   kind: MyKind
-  chart: ../../testdata/test-chart
+  chart: ../../pkg/internal/testdata/test-chart
   overrideValues:
     key1:
       key2: value
@@ -290,7 +290,7 @@ var _ = Describe("Load", func() {
 - group: mygroup
   version: v1alpha1
   kind: MyKind
-  chart: ../../testdata/test-chart
+  chart: ../../pkg/internal/testdata/test-chart
   watchDependentResources: false
   overrideValues:
     key: value
@@ -299,7 +299,7 @@ var _ = Describe("Load", func() {
 		expectedWatches = []Watch{
 			{
 				GroupVersionKind:        schema.GroupVersionKind{Group: "mygroup", Version: "v1alpha1", Kind: "MyKind"},
-				ChartPath:               "../../testdata/test-chart",
+				ChartPath:               "../../pkg/internal/testdata/test-chart",
 				WatchDependentResources: &falseVal,
 				OverrideValues:          map[string]string{"key": "value"},
 			},

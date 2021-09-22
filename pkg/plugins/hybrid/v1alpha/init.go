@@ -54,7 +54,7 @@ func (p *initSubcommand) UpdateMetadata(cliMeta plugin.CLIMetadata, subcmdMeta *
 	- a "main.go" file that creates the manager that will run the project controllers
   `
 	subcmdMeta.Examples = fmt.Sprintf(`  # Initialize a new project with your domain and name in copyright
-	$ %[1]s init --plugins=%[2]s --domain=example.com --owner "Your Name"
+	$ %[1]s init --plugins=%[2]s --owner "Your Name"
 
 	# Initialize a new project defining a specific project version
 	%[1]s init --plugins=%[2]s --project-version 3

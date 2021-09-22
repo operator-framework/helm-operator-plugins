@@ -25,6 +25,13 @@ TOOLS_BIN_DIR=$(TOOLS_DIR)/bin
 SCRIPTS_DIR=$(TOOLS_DIR)/scripts
 export PATH := $(BUILD_DIR):$(TOOLS_BIN_DIR):$(SCRIPTS_DIR):$(PATH)
 
+##@ Development
+
+.PHONY: generate
+generate: build # Generate CLI docs and samples
+	go run ./hack/generate/samples/generate_testdata.go
+	go generate ./...
+
 .PHONY: all
 all: test lint build
 
@@ -38,17 +45,9 @@ all: test lint build
 ENVTEST_VERSION = $(shell go list -m k8s.io/client-go | cut -d" " -f2 | sed 's/^v0\.\([[:digit:]]\+\)\.[[:digit:]]\+$$/1.\1.x/')
 TESTPKG ?= ./...
 # TODO: Modify this to use setup-envtest binary
-test: test-hybrid-plugin
+test: build
 	go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 	source <(setup-envtest use -p env $(ENVTEST_VERSION)) && go test -race -covermode atomic -coverprofile cover.out $(TESTPKG)
-
-test-hybrid-plugin: remove-tmp build/operator-sdk
-	mkdir -p tmp/test-hybrid-operator
-	(cd tmp/test-hybrid-operator && \
-	 ../../build/operator-sdk init --plugins hybrid --domain example.com --repo example.com/example/example-operator && \
-	 ../../build/operator-sdk create api --plugins go.kubebuilder.io/v3 --group apps --version v1alpha1 --kind=MemcachedBackup --resource --controller && \
-	 ../../build/operator-sdk create api --plugins helm.sdk.operatorframework.io/v1 --helm-chart=memcached --helm-chart-repo=https://charts.bitnami.com/bitnami --group apps --version v1alpha1 --kind=Memcached && \
-	 make docker-build)
 
 # Build manager binary
 .PHONY: build
