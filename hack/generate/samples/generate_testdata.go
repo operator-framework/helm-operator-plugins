@@ -16,7 +16,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -46,16 +45,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Println("*************")
-	fmt.Println("binary path")
-	fmt.Println(binaryPath)
-
 	// samplesPath is the path where all samples should be generated
 	samplesPath := filepath.Join(wd, "testdata")
 	log.Infof("writing sample directories under %s", samplesPath)
-
-	fmt.Printf(wd)
-	fmt.Println(samplesPath)
 
 	log.Infof("creating Hybrid Memcached Sample")
 	hybrid.GenerateMemcachedSamples(binaryPath, samplesPath)

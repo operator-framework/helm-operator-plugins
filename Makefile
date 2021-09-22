@@ -29,6 +29,7 @@ export PATH := $(BUILD_DIR):$(TOOLS_BIN_DIR):$(SCRIPTS_DIR):$(PATH)
 
 .PHONY: generate
 generate: build # Generate CLI docs and samples
+	rm -rf testdata/
 	go run ./hack/generate/samples/generate_testdata.go
 	go generate ./...
 
@@ -49,24 +50,17 @@ test: build
 	go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 	source <(setup-envtest use -p env $(ENVTEST_VERSION)) && go test -race -covermode atomic -coverprofile cover.out $(TESTPKG)
 
+.PHONY: test-sanity
+test-sanity: generate ## Test repo formatting, linting, etc.
+	git diff --exit-code # fast-fail if generate or fix produced changes
+	go vet ./...
+	$(SCRIPTS_DIR)/fetch golangci-lint 1.31.0 && $(TOOLS_BIN_DIR)/golangci-lint run
+	git diff --exit-code # diff again to ensure other checks don't change repo
+
 # Build manager binary
 .PHONY: build
 build:
 	CGO_ENABLED=0 mkdir -p $(BUILD_DIR) && go build $(GO_BUILD_ARGS) -o $(BUILD_DIR) ./
-
-# Incredibly fragile nad hopefully temporary build step for the SDK binary
-build/operator-sdk:
-	mkdir -p tmp
-	git clone https://github.com/operator-framework/operator-sdk.git tmp/operator-sdk-hybrid-patched
-	cp hack/osdk.patch tmp/operator-sdk-hybrid-patched/
-	(cd tmp/operator-sdk-hybrid-patched && git apply osdk.patch)
-	sed -i".bak" "s|REPLACE_ME_WITH_PATH|$(shell pwd)|" tmp/operator-sdk-hybrid-patched/go.mod
-	(cd tmp/operator-sdk-hybrid-patched && go mod tidy && make build/operator-sdk)
-	mkdir -p build
-	cp tmp/operator-sdk-hybrid-patched/build/operator-sdk ./build/operator-sdk
-
-remove-tmp:
-	rm -rf tmp/
 
 # Run go fmt and go mod tidy, and check for clean git tree
 .PHONY: fix
