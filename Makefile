@@ -51,8 +51,7 @@ test: build
 	source <(setup-envtest use -p env $(ENVTEST_VERSION)) && go test -race -covermode atomic -coverprofile cover.out $(TESTPKG)
 
 .PHONY: test-sanity
-test-sanity: generate ## Test repo formatting, linting, etc.
-	git diff --exit-code # fast-fail if generate or fix produced changes
+test-sanity: generate fix ## Test repo formatting, linting, etc.
 	go vet ./...
 	$(SCRIPTS_DIR)/fetch golangci-lint 1.31.0 && $(TOOLS_BIN_DIR)/golangci-lint run
 	git diff --exit-code # diff again to ensure other checks don't change repo
