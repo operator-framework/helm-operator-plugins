@@ -1,0 +1,2 @@
+# Use the 'create api' subcommand to add watches to this file.
+#+kubebuilder:scaffold:watch

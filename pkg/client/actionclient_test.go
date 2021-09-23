@@ -144,7 +144,7 @@ var _ = Describe("ActionClient", func() {
 				})
 				It("should uninstall a failed install", func() {
 					By("failing to install the release", func() {
-						chrt := testutil.MustLoadChart("../../testdata/test-chart-1.2.0.tgz")
+						chrt := testutil.MustLoadChart("../../pkg/internal/testdata/test-chart-1.2.0.tgz")
 						chrt.Templates[2].Data = append(chrt.Templates[2].Data, []byte("\ngibberish")...)
 						r, err := ac.Install(obj.GetName(), obj.GetNamespace(), &chrt, vals)
 						Expect(err).NotTo(BeNil())
