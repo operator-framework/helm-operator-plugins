@@ -18,12 +18,14 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/helm/v1/scaffolds"
 	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/util"
-	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/v1/scaffolds"
+	projutil "github.com/operator-framework/helm-operator-plugins/pkg/plugins/util"
 	"github.com/spf13/pflag"
 	"sigs.k8s.io/kubebuilder/v3/pkg/config"
 	"sigs.k8s.io/kubebuilder/v3/pkg/machinery"
 	"sigs.k8s.io/kubebuilder/v3/pkg/plugin"
+	kbutils "sigs.k8s.io/kubebuilder/v3/test/e2e/utils"
 )
 
 const (
@@ -144,31 +146,21 @@ func addInitCustomizations(projectName string) error {
 	// by https://github.com/kubernetes-sigs/kubebuilder/pull/2119
 
 	// Add leader election arg in config/manager/manager.yaml and in config/default/manager_auth_proxy_patch.yaml
-	err := util.InsertCode(managerFile,
+	err := kbutils.InsertCode(managerFile,
 		"--leader-elect",
 		fmt.Sprintf("\n        - --leader-election-id=%s", projectName))
 	if err != nil {
 		return err
 	}
-	err = util.InsertCode(filepath.Join("config", "default", "manager_auth_proxy_patch.yaml"),
+	err = kbutils.InsertCode(filepath.Join("config", "default", "manager_auth_proxy_patch.yaml"),
 		"- \"--leader-elect\"",
 		fmt.Sprintf("\n        - \"--leader-election-id=%s\"", projectName))
 	if err != nil {
 		return err
 	}
 
-	// Increase the default memory required.
-	err = util.ReplaceInFile(managerFile, "memory: 30Mi", "memory: 90Mi")
-	if err != nil {
-		return err
-	}
-	err = util.ReplaceInFile(managerFile, "memory: 20Mi", "memory: 60Mi")
-	if err != nil {
-		return err
-	}
-
 	// Remove the webhook option for the componentConfig since webhooks are not supported by helm
-	err = util.ReplaceInFile(filepath.Join("config", "manager", "controller_manager_config.yaml"),
+	err = projutil.ReplaceInFile(filepath.Join("config", "manager", "controller_manager_config.yaml"),
 		"webhook:\n  port: 9443", "")
 	if err != nil {
 		return err
@@ -179,7 +171,7 @@ func addInitCustomizations(projectName string) error {
 	const command = `command:
         - /manager
         `
-	err = util.ReplaceInFile(managerFile, command, "")
+	err = projutil.ReplaceInFile(managerFile, command, "")
 	if err != nil {
 		return err
 	}

@@ -25,7 +25,7 @@ import (
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/repo/repotest"
 
-	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/v1/chartutil"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/helm/v1/chartutil"
 )
 
 func TestChart(t *testing.T) {

@@ -23,6 +23,10 @@ import (
 	"strings"
 )
 
+const (
+	DefaultNameQualifier = ".sdk.operatorframework.io"
+)
+
 func ReplaceInFile(path, old, new string) error {
 	info, err := os.Stat(path)
 	if err != nil {

@@ -26,7 +26,7 @@ var _ machinery.Template = &Dockerfile{}
 type Dockerfile struct {
 	machinery.TemplateMixin
 
-	// HelmOperatorVersion is the version of the Dockerfile base image.
+	// HelmOperatorVersion is the version of the Dockerfile's base image.
 	HelmOperatorVersion string
 }
 

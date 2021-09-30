@@ -20,25 +20,25 @@ package scaffolds
 import (
 	"os"
 
-	"sigs.k8s.io/kubebuilder/v3/pkg/config"
-	"sigs.k8s.io/kubebuilder/v3/pkg/plugins"
-
 	"github.com/operator-framework/helm-operator-plugins/internal/version"
-	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/v1/chartutil"
-	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/v1/scaffolds/internal/templates"
-	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/v1/scaffolds/internal/templates/config/rbac"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/helm/v1/chartutil"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/helm/v1/scaffolds/internal/templates"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/helm/v1/scaffolds/internal/templates/config/rbac"
+	"sigs.k8s.io/kubebuilder/v3/pkg/config"
 	"sigs.k8s.io/kubebuilder/v3/pkg/machinery"
+	"sigs.k8s.io/kubebuilder/v3/pkg/plugins"
 )
 
 const (
 	// kustomizeVersion is the sigs.k8s.io/kustomize version to be used in the project
-	kustomizeVersion = "v3.5.4"
+	kustomizeVersion = "v3.8.7"
 
 	imageName = "controller:latest"
 )
 
 // helmOperatorVersion is set to the version of helm-operator at compile-time.
 var helmOperatorVersion = mustGetScaffoldVersion()
+
 var _ plugins.Scaffolder = &initScaffolder{}
 
 type initScaffolder struct {

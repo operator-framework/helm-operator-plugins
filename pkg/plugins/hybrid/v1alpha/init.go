@@ -26,6 +26,7 @@ import (
 	"sigs.k8s.io/kubebuilder/v3/pkg/plugin"
 	"sigs.k8s.io/kubebuilder/v3/pkg/plugin/util"
 	"sigs.k8s.io/kubebuilder/v3/pkg/plugins/golang"
+	kbutils "sigs.k8s.io/kubebuilder/v3/test/e2e/utils"
 )
 
 type initSubcommand struct {
@@ -140,13 +141,13 @@ func addInitCustomizations(projectName string) error {
 	// by https://github.com/kubernetes-sigs/kubebuilder/pull/2119
 
 	// Add leader election arg in config/manager/manager.yaml and in config/default/manager_auth_proxy_patch.yaml
-	err := projutil.InsertCode(managerFile,
+	err := kbutils.InsertCode(managerFile,
 		"--leader-elect",
 		fmt.Sprintf("\n        - --leader-election-id=%s", projectName))
 	if err != nil {
 		return err
 	}
-	err = projutil.InsertCode(filepath.Join("config", "default", "manager_auth_proxy_patch.yaml"),
+	err = kbutils.InsertCode(filepath.Join("config", "default", "manager_auth_proxy_patch.yaml"),
 		"- \"--leader-elect\"",
 		fmt.Sprintf("\n        - \"--leader-election-id=%s\"", projectName))
 	if err != nil {
