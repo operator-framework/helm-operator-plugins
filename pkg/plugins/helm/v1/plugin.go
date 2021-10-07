@@ -15,19 +15,17 @@
 package v1
 
 import (
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/util"
 	"sigs.k8s.io/kubebuilder/v3/pkg/config"
 	cfgv3 "sigs.k8s.io/kubebuilder/v3/pkg/config/v3"
 	"sigs.k8s.io/kubebuilder/v3/pkg/plugin"
 )
 
-// defaultNameQualifier is the Operator SDK plugin name suffix. Appending
-// this suffix to a short name, ex. "helm", makes it fully qualified.
-const defaultNameQualifier = ".sdk.operatorframework.io"
-const pluginName = "helm" + defaultNameQualifier
+const pluginName = "base.helm" + util.DefaultNameQualifier
 
 var (
-	supportedProjectVersions = []config.Version{cfgv3.Version}
 	pluginVersion            = plugin.Version{Number: 1}
+	supportedProjectVersions = []config.Version{cfgv3.Version}
 	pluginKey                = plugin.KeyFor(Plugin{})
 )
 

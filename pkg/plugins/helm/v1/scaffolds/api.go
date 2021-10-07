@@ -21,11 +21,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/v1/chartutil"
-	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/v1/scaffolds/internal/templates"
-	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/v1/scaffolds/internal/templates/config/crd"
-	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/v1/scaffolds/internal/templates/config/rbac"
-	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/v1/scaffolds/internal/templates/config/samples"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/helm/v1/chartutil"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/helm/v1/scaffolds/internal/templates"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/helm/v1/scaffolds/internal/templates/config/crd"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/helm/v1/scaffolds/internal/templates/config/rbac"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/helm/v1/scaffolds/internal/templates/config/samples"
+
 	"helm.sh/helm/v3/pkg/chart"
 	"sigs.k8s.io/kubebuilder/v3/pkg/config"
 	"sigs.k8s.io/kubebuilder/v3/pkg/machinery"
