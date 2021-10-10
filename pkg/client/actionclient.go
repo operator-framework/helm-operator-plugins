@@ -323,7 +323,7 @@ func (pr *ownerPostRenderer) Run(in *bytes.Buffer) (*bytes.Buffer, error) {
 			return err
 		}
 		u := &unstructured.Unstructured{Object: objMap}
-		useOwnerRef, err := controllerutil.SupportsOwnerReference(pr.rm, pr.owner, u)
+		useOwnerRef, err := controllerutil.SupportsOwnerReference(pr.rm, pr.owner, u, "")
 		if err != nil {
 			return err
 		}

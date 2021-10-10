@@ -56,9 +56,14 @@ func WaitForDeletion(ctx context.Context, cl client.Reader, o client.Object) err
 	}, ctx.Done())
 }
 
-func SupportsOwnerReference(restMapper meta.RESTMapper, owner, dependent client.Object) (bool, error) {
+func SupportsOwnerReference(restMapper meta.RESTMapper, owner, dependent client.Object, depNamespace string) (bool, error) {
 	ownerGVK := owner.GetObjectKind().GroupVersionKind()
 	ownerMapping, err := restMapper.RESTMapping(ownerGVK.GroupKind(), ownerGVK.Version)
+	if err != nil {
+		return false, err
+	}
+
+	mOwner, err := meta.Accessor(owner)
 	if err != nil {
 		return false, err
 	}
@@ -69,10 +74,17 @@ func SupportsOwnerReference(restMapper meta.RESTMapper, owner, dependent client.
 		return false, err
 	}
 
+	mDep, err := meta.Accessor(dependent)
+	if err != nil {
+		return false, err
+	}
+
 	ownerClusterScoped := ownerMapping.Scope.Name() == meta.RESTScopeNameRoot
-	ownerNamespace := owner.GetNamespace()
+	ownerNamespace := mOwner.GetNamespace()
 	depClusterScoped := depMapping.Scope.Name() == meta.RESTScopeNameRoot
-	depNamespace := dependent.GetNamespace()
+	if depNamespace == "" {
+		depNamespace = mDep.GetNamespace()
+	}
 
 	if ownerClusterScoped {
 		return true, nil
