@@ -23,7 +23,7 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/operator-framework/helm-operator-plugins/pkg/internal/sdk/status"
+	"github.com/operator-framework/helm-operator-plugins/pkg/internal/status"
 	. "github.com/operator-framework/helm-operator-plugins/pkg/reconciler/internal/conditions"
 )
 

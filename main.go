@@ -27,8 +27,10 @@ import (
 	"sigs.k8s.io/kubebuilder/v3/pkg/model/stage"
 	"sigs.k8s.io/kubebuilder/v3/pkg/plugin"
 
-	"github.com/operator-framework/helm-operator-plugins/internal/cmd/run"
+	helmcmd "github.com/operator-framework/helm-operator-plugins/internal/cmd/helm-operator/run"
+	hybridcmd "github.com/operator-framework/helm-operator-plugins/internal/cmd/hybrid-operator/run"
 	"github.com/operator-framework/helm-operator-plugins/internal/version"
+	pluginv1 "github.com/operator-framework/helm-operator-plugins/pkg/plugins/helm/v1"
 	pluginv1alpha "github.com/operator-framework/helm-operator-plugins/pkg/plugins/hybrid/v1alpha"
 	kustomizev1 "sigs.k8s.io/kubebuilder/v3/pkg/plugins/common/kustomize/v1"
 	golangv3 "sigs.k8s.io/kubebuilder/v3/pkg/plugins/golang/v3"
@@ -36,7 +38,8 @@ import (
 
 func main() {
 	commands := []*cobra.Command{
-		run.NewCmd(),
+		hybridcmd.NewCmd(),
+		helmcmd.NewCmd(),
 	}
 	c, err := cli.New(
 		cli.WithCommandName("helm-operator"),
@@ -44,9 +47,10 @@ func main() {
 		cli.WithPlugins(
 			getHybridPlugin(),
 			golangv3.Plugin{},
+			getHelmPlugin(),
 		),
 		cli.WithDefaultProjectVersion(config.Version),
-		cli.WithDefaultPlugins(config.Version, getHybridPlugin()),
+		cli.WithDefaultPlugins(config.Version, getHybridPlugin(), getHelmPlugin()),
 		cli.WithExtraCommands(commands...),
 	)
 	if err != nil {
@@ -69,4 +73,12 @@ func getHybridPlugin() plugin.Bundle {
 		pluginv1alpha.Plugin{},
 	)
 	return hybridBundle
+}
+
+func getHelmPlugin() plugin.Bundle {
+	helmBundle, _ := plugin.NewBundle("helm", plugin.Version{Number: 1},
+		kustomizev1.Plugin{},
+		pluginv1.Plugin{},
+	)
+	return helmBundle
 }

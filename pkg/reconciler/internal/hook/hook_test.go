@@ -30,7 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 
 	"github.com/operator-framework/helm-operator-plugins/pkg/hook"
-	"github.com/operator-framework/helm-operator-plugins/pkg/internal/sdk/fake"
+	"github.com/operator-framework/helm-operator-plugins/pkg/internal/fake"
 	internalhook "github.com/operator-framework/helm-operator-plugins/pkg/reconciler/internal/hook"
 )
 

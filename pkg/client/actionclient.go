@@ -44,8 +44,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 
-	"github.com/operator-framework/helm-operator-plugins/pkg/internal/sdk/controllerutil"
 	"github.com/operator-framework/helm-operator-plugins/pkg/manifestutil"
+	"github.com/operator-framework/helm-operator-plugins/pkg/sdk/controllerutil"
 )
 
 type ActionClientGetter interface {

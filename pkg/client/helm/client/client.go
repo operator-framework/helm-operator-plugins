@@ -19,7 +19,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/operator-framework/helm-operator-plugins/pkg/internal/sdk/controllerutil"
+	"github.com/operator-framework/helm-operator-plugins/pkg/sdk/controllerutil"
 	"github.com/operator-framework/operator-lib/handler"
 	"helm.sh/helm/v3/pkg/kube"
 	"k8s.io/apimachinery/pkg/api/meta"

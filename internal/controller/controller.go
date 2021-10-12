@@ -36,8 +36,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	"sigs.k8s.io/yaml"
 
-	"github.com/operator-framework/helm-operator-plugins/pkg/internal/release"
-	"github.com/operator-framework/helm-operator-plugins/pkg/internal/sdk/controllerutil"
+	"github.com/operator-framework/helm-operator-plugins/internal/release"
+	"github.com/operator-framework/helm-operator-plugins/pkg/sdk/controllerutil"
 	libhandler "github.com/operator-framework/operator-lib/handler"
 	"github.com/operator-framework/operator-lib/predicate"
 )
