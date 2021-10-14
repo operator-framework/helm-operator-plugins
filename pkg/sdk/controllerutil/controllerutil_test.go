@@ -91,13 +91,13 @@ var _ = Describe("Controllerutil", func() {
 				})
 				It("should be true for cluster-scoped dependents", func() {
 					dependent = createObject(clusterScoped, types.NamespacedName{Namespace: "", Name: "dependent"})
-					supportsOwnerRef, err := SupportsOwnerReference(rm, owner, dependent, "")
+					supportsOwnerRef, err := SupportsOwnerReference(rm, owner, dependent)
 					Expect(supportsOwnerRef).To(BeTrue())
 					Expect(err).To(BeNil())
 				})
 				It("should be true for namespace-scoped dependents", func() {
 					dependent = createObject(namespaceScoped, types.NamespacedName{Namespace: "ns1", Name: "dependent"})
-					supportsOwnerRef, err := SupportsOwnerReference(rm, owner, dependent, "")
+					supportsOwnerRef, err := SupportsOwnerReference(rm, owner, dependent)
 					Expect(supportsOwnerRef).To(BeTrue())
 					Expect(err).To(BeNil())
 				})
@@ -108,14 +108,14 @@ var _ = Describe("Controllerutil", func() {
 				})
 				It("should be false for cluster-scoped dependents", func() {
 					dependent = createObject(clusterScoped, types.NamespacedName{Namespace: "", Name: "dependent"})
-					supportsOwnerRef, err := SupportsOwnerReference(rm, owner, dependent, dependent.GetNamespace())
+					supportsOwnerRef, err := SupportsOwnerReference(rm, owner, dependent)
 					Expect(supportsOwnerRef).To(BeFalse())
 					Expect(err).To(BeNil())
 				})
 				When("dependent is in owner namespace", func() {
 					It("should be true", func() {
 						dependent = createObject(namespaceScoped, types.NamespacedName{Namespace: "ns1", Name: "dependent"})
-						supportsOwnerRef, err := SupportsOwnerReference(rm, owner, dependent, "")
+						supportsOwnerRef, err := SupportsOwnerReference(rm, owner, dependent)
 						Expect(supportsOwnerRef).To(BeTrue())
 						Expect(err).To(BeNil())
 					})
@@ -123,7 +123,7 @@ var _ = Describe("Controllerutil", func() {
 				When("dependent is not in owner namespace", func() {
 					It("should be false", func() {
 						dependent = createObject(namespaceScoped, types.NamespacedName{Namespace: "ns2", Name: "dependent"})
-						supportsOwnerRef, err := SupportsOwnerReference(rm, owner, dependent, "")
+						supportsOwnerRef, err := SupportsOwnerReference(rm, owner, dependent)
 						Expect(supportsOwnerRef).To(BeFalse())
 						Expect(err).To(BeNil())
 					})
@@ -140,13 +140,13 @@ var _ = Describe("Controllerutil", func() {
 				rm = meta.NewDefaultRESTMapper([]schema.GroupVersion{})
 			})
 			It("fails when owner REST mapping is missing", func() {
-				supportsOwnerRef, err := SupportsOwnerReference(rm, owner, dependent, "")
+				supportsOwnerRef, err := SupportsOwnerReference(rm, owner, dependent)
 				Expect(supportsOwnerRef).To(BeFalse())
 				Expect(err).NotTo(BeNil())
 			})
 			It("fails when dependent REST mapping is missing", func() {
 				rm.Add(clusterScoped, meta.RESTScopeRoot)
-				supportsOwnerRef, err := SupportsOwnerReference(rm, owner, dependent, "")
+				supportsOwnerRef, err := SupportsOwnerReference(rm, owner, dependent)
 				Expect(supportsOwnerRef).To(BeFalse())
 				Expect(err).NotTo(BeNil())
 			})

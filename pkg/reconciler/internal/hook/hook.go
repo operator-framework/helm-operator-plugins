@@ -73,7 +73,7 @@ func (d *dependentResourceWatcher) Exec(owner *unstructured.Unstructured, rel re
 			continue
 		}
 
-		useOwnerRef, err := controllerutil.SupportsOwnerReference(d.restMapper, owner, &obj, "")
+		useOwnerRef, err := controllerutil.SupportsOwnerReference(d.restMapper, owner, &obj)
 		if err != nil {
 			return err
 		}

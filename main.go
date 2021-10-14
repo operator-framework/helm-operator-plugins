@@ -27,7 +27,6 @@ import (
 	"sigs.k8s.io/kubebuilder/v3/pkg/model/stage"
 	"sigs.k8s.io/kubebuilder/v3/pkg/plugin"
 
-	helmcmd "github.com/operator-framework/helm-operator-plugins/internal/cmd/helm-operator/run"
 	hybridcmd "github.com/operator-framework/helm-operator-plugins/internal/cmd/hybrid-operator/run"
 	"github.com/operator-framework/helm-operator-plugins/internal/version"
 	pluginv1 "github.com/operator-framework/helm-operator-plugins/pkg/plugins/helm/v1"
@@ -39,7 +38,6 @@ import (
 func main() {
 	commands := []*cobra.Command{
 		hybridcmd.NewCmd(),
-		helmcmd.NewCmd(),
 	}
 	c, err := cli.New(
 		cli.WithCommandName("helm-operator"),
