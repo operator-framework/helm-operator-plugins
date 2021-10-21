@@ -23,7 +23,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -57,14 +57,9 @@ func WaitForDeletion(ctx context.Context, cl client.Reader, o client.Object) err
 	}, ctx.Done())
 }
 
-func SupportsOwnerReference(restMapper meta.RESTMapper, owner, dependent runtime.Object) (bool, error) {
+func SupportsOwnerReference(restMapper meta.RESTMapper, owner, dependent *unstructured.Unstructured) (bool, error) {
 	ownerGVK := owner.GetObjectKind().GroupVersionKind()
 	ownerMapping, err := restMapper.RESTMapping(ownerGVK.GroupKind(), ownerGVK.Version)
-	if err != nil {
-		return false, err
-	}
-
-	mOwner, err := meta.Accessor(owner)
 	if err != nil {
 		return false, err
 	}
@@ -75,16 +70,11 @@ func SupportsOwnerReference(restMapper meta.RESTMapper, owner, dependent runtime
 		return false, err
 	}
 
-	mDep, err := meta.Accessor(dependent)
-	if err != nil {
-		return false, err
-	}
-
 	ownerClusterScoped := ownerMapping.Scope.Name() == meta.RESTScopeNameRoot
-	ownerNamespace := mOwner.GetNamespace()
+	ownerNamespace := owner.GetNamespace()
 	depClusterScoped := depMapping.Scope.Name() == meta.RESTScopeNameRoot
 
-	depNamespace := mDep.GetNamespace()
+	depNamespace := dependent.GetNamespace()
 
 	if ownerClusterScoped {
 		return true, nil

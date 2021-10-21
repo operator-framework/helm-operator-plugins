@@ -159,7 +159,7 @@ func watchDependentResources(mgr manager.Manager, r *HelmOperatorReconciler, c c
 				}
 
 				restMapper := mgr.GetRESTMapper()
-				useOwnerRef, err := controllerutil.SupportsOwnerReference(restMapper, owner, dependent)
+				useOwnerRef, err := controllerutil.SupportsOwnerReference(restMapper, owner, unstructuredObj)
 				if err != nil {
 					return err
 				}
