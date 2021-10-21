@@ -163,6 +163,7 @@ func (c *actionClient) Upgrade(name, namespace string, chrt *chart.Chart, vals m
 		if rel != nil {
 			rollback := action.NewRollback(c.conf)
 			rollback.Force = true
+			rollback.MaxHistory = upgrade.MaxHistory
 
 			// As of Helm 2.13, if Upgrade returns a non-nil release, that
 			// means the release was also recorded in the release store.
