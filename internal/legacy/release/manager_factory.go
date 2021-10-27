@@ -28,8 +28,8 @@ import (
 	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	crmanager "sigs.k8s.io/controller-runtime/pkg/manager"
 
-	"github.com/operator-framework/helm-operator-plugins/internal/helm/types"
-	"github.com/operator-framework/helm-operator-plugins/pkg/client/helm/client"
+	"github.com/operator-framework/helm-operator-plugins/internal/legacy/helm/client"
+	"github.com/operator-framework/helm-operator-plugins/internal/legacy/helm/types"
 )
 
 // ManagerFactory creates Managers that are specific to custom resources. It is

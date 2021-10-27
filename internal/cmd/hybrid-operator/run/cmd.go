@@ -28,7 +28,7 @@ import (
 	"github.com/operator-framework/helm-operator-plugins/pkg/annotation"
 	helmmgr "github.com/operator-framework/helm-operator-plugins/pkg/manager"
 	"github.com/operator-framework/helm-operator-plugins/pkg/reconciler"
-	watches "github.com/operator-framework/helm-operator-plugins/pkg/watches/hybrid"
+	"github.com/operator-framework/helm-operator-plugins/pkg/watches"
 	"github.com/spf13/cobra"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"

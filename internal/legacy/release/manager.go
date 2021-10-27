@@ -41,8 +41,8 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/discovery"
 
-	"github.com/operator-framework/helm-operator-plugins/internal/helm/types"
-	"github.com/operator-framework/helm-operator-plugins/internal/manifestutil"
+	"github.com/operator-framework/helm-operator-plugins/internal/legacy/helm/types"
+	"github.com/operator-framework/helm-operator-plugins/internal/legacy/manifestutil"
 )
 
 // Manager manages a Helm release. It can install, upgrade, reconcile,
