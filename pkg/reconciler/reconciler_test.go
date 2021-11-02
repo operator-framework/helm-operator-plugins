@@ -52,11 +52,11 @@ import (
 	"github.com/operator-framework/helm-operator-plugins/pkg/annotation"
 	helmclient "github.com/operator-framework/helm-operator-plugins/pkg/client"
 	"github.com/operator-framework/helm-operator-plugins/pkg/hook"
-	"github.com/operator-framework/helm-operator-plugins/pkg/internal/sdk/controllerutil"
-	"github.com/operator-framework/helm-operator-plugins/pkg/internal/sdk/status"
+	"github.com/operator-framework/helm-operator-plugins/pkg/internal/status"
 	"github.com/operator-framework/helm-operator-plugins/pkg/internal/testutil"
 	"github.com/operator-framework/helm-operator-plugins/pkg/reconciler/internal/conditions"
 	helmfake "github.com/operator-framework/helm-operator-plugins/pkg/reconciler/internal/fake"
+	"github.com/operator-framework/helm-operator-plugins/pkg/sdk/controllerutil"
 	"github.com/operator-framework/helm-operator-plugins/pkg/values"
 )
 

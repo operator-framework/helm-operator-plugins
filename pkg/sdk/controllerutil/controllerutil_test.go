@@ -31,7 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	. "github.com/operator-framework/helm-operator-plugins/pkg/internal/sdk/controllerutil"
+	. "github.com/operator-framework/helm-operator-plugins/pkg/sdk/controllerutil"
 )
 
 var _ = Describe("Controllerutil", func() {
@@ -74,8 +74,8 @@ var _ = Describe("Controllerutil", func() {
 	Describe("SupportsOwnerReference", func() {
 		var (
 			rm              *meta.DefaultRESTMapper
-			owner           client.Object
-			dependent       client.Object
+			owner           *unstructured.Unstructured
+			dependent       *unstructured.Unstructured
 			clusterScoped   = schema.GroupVersionKind{Group: "example.com", Version: "v1", Kind: "ClusterScoped"}
 			namespaceScoped = schema.GroupVersionKind{Group: "example.com", Version: "v1", Kind: "NamespaceScoped"}
 		)
