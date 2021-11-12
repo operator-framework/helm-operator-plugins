@@ -23,12 +23,13 @@ import (
 	"strings"
 
 	"github.com/operator-framework/helm-operator-plugins/internal/flags"
-	"github.com/operator-framework/helm-operator-plugins/internal/legacy/controller"
-	"github.com/operator-framework/helm-operator-plugins/internal/legacy/release"
 	watches "github.com/operator-framework/helm-operator-plugins/internal/legacy/watches"
 	"github.com/operator-framework/helm-operator-plugins/internal/metrics"
 	"github.com/operator-framework/helm-operator-plugins/internal/version"
+	"github.com/operator-framework/helm-operator-plugins/pkg/annotation"
 	helmmgr "github.com/operator-framework/helm-operator-plugins/pkg/manager"
+	"github.com/operator-framework/helm-operator-plugins/pkg/reconciler"
+
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -174,23 +175,30 @@ func run(cmd *cobra.Command, f *flags.Flags) {
 	}
 
 	for _, w := range ws {
-		// Register the controller with the factory.
-		err := controller.Add(mgr, controller.WatchOptions{
-			Namespace:               namespace,
-			GVK:                     w.GroupVersionKind,
-			ManagerFactory:          release.NewManagerFactory(mgr, w.ChartDir),
-			ReconcilePeriod:         f.ReconcilePeriod,
-			WatchDependentResources: *w.WatchDependentResources,
-			OverrideValues:          w.OverrideValues,
-			MaxConcurrentReconciles: f.MaxConcurrentReconciles,
-			Selector:                w.Selector,
-		})
+		r, err := reconciler.New(
+			reconciler.WithChart(*w.Chart),
+			reconciler.WithGroupVersionKind(w.GroupVersionKind),
+			reconciler.WithOverrideValues(w.OverrideValues),
+			reconciler.SkipDependentWatches(*w.WatchDependentResources),
+			reconciler.WithMaxConcurrentReconciles(f.MaxConcurrentReconciles),
+			reconciler.WithReconcilePeriod(f.ReconcilePeriod),
+			reconciler.WithInstallAnnotations(annotation.DefaultInstallAnnotations...),
+			reconciler.WithUpgradeAnnotations(annotation.DefaultUpgradeAnnotations...),
+			reconciler.WithUninstallAnnotations(annotation.DefaultUninstallAnnotations...),
+		)
 		if err != nil {
-			log.Error(err, "Failed to add manager factory to controller.")
+			log.Error(err, "unable to creste helm reconciler", "controller", "Helm")
 			os.Exit(1)
 		}
+
+		if err := r.SetupWithManager(mgr); err != nil {
+			log.Error(err, "unable to create controller", "Helm")
+			os.Exit(1)
+		}
+		log.Info("configured watch", "gvk", w.GroupVersionKind, "chartDir", w.ChartDir, "maxConcurrentReconciles", f.MaxConcurrentReconciles, "reconcilePeriod", f.ReconcilePeriod)
 	}
 
+	log.Info("starting manager")
 	// Start the Cmd
 	if err = mgr.Start(signals.SetupSignalHandler()); err != nil {
 		log.Error(err, "Manager exited non-zero.")
