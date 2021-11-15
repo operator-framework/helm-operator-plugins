@@ -24,8 +24,6 @@ import (
 	"text/template"
 
 	sprig "github.com/go-task/slim-sprig"
-	"helm.sh/helm/v3/pkg/chart"
-	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/chartutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -42,9 +40,6 @@ type Watch struct {
 	WatchDependentResources *bool                `json:"watchDependentResources,omitempty"`
 	OverrideValues          map[string]string    `json:"overrideValues,omitempty"`
 	Selector                metav1.LabelSelector `json:"selector"`
-	// This is added in order to pass the chart with the reconciler.
-	// TODO: Merge the watches here with pkg/watches/watches.go
-	Chart *chart.Chart `json:"-"`
 }
 
 // UnmarshalYAML unmarshals an individual watch from the Helm watches.yaml file
@@ -111,13 +106,6 @@ func LoadReader(reader io.Reader) ([]Watch, error) {
 		if _, err := chartutil.IsChartDir(w.ChartDir); err != nil {
 			return nil, fmt.Errorf("invalid chart directory %s: %w", w.ChartDir, err)
 		}
-
-		cl, err := loader.LoadDir(w.ChartDir)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load chart dir: %w", err)
-		}
-
-		w.Chart = cl
 
 		if _, ok := watchesMap[gvk]; ok {
 			return nil, fmt.Errorf("duplicate GVK: %s", gvk)

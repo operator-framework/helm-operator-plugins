@@ -29,6 +29,8 @@ import (
 	"github.com/operator-framework/helm-operator-plugins/pkg/annotation"
 	helmmgr "github.com/operator-framework/helm-operator-plugins/pkg/manager"
 	"github.com/operator-framework/helm-operator-plugins/pkg/reconciler"
+	"helm.sh/helm/v3/pkg/chart"
+	"helm.sh/helm/v3/pkg/chart/loader"
 
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -176,8 +178,16 @@ func run(cmd *cobra.Command, f *flags.Flags) {
 	}
 
 	for _, w := range ws {
+
+		// TODO: remove this after modifying watches of hybrid lib.
+		cl, err := getChart(w)
+		if err != nil {
+			log.Error(err, "Unable to read chart")
+			os.Exit(1)
+		}
+
 		r, err := reconciler.New(
-			reconciler.WithChart(*w.Chart),
+			reconciler.WithChart(*cl),
 			reconciler.WithGroupVersionKind(w.GroupVersionKind),
 			reconciler.WithOverrideValues(w.OverrideValues),
 			reconciler.WithSelector(w.Selector),
@@ -228,4 +238,14 @@ func exitIfUnsupported(options manager.Options) {
 		log.Error(fmt.Errorf("%s set in manager options", strings.Join(keys, ", ")), "unsupported fields")
 		os.Exit(1)
 	}
+}
+
+// getChart returns the chart from the chartDir passed to the watches file.
+func getChart(w watches.Watch) (*chart.Chart, error) {
+	c, err := loader.LoadDir(w.ChartDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load chart dir: %w", err)
+	}
+
+	return c, nil
 }
