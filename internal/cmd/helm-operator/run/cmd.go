@@ -168,6 +168,7 @@ func run(cmd *cobra.Command, f *flags.Flags) {
 		os.Exit(1)
 	}
 
+	// TODO: remove legacy watches and use watches from lib
 	ws, err := watches.Load(f.WatchesFile)
 	if err != nil {
 		log.Error(err, "Failed to create new manager factories.")
@@ -179,6 +180,7 @@ func run(cmd *cobra.Command, f *flags.Flags) {
 			reconciler.WithChart(*w.Chart),
 			reconciler.WithGroupVersionKind(w.GroupVersionKind),
 			reconciler.WithOverrideValues(w.OverrideValues),
+			reconciler.WithSelector(w.Selector),
 			reconciler.SkipDependentWatches(*w.WatchDependentResources),
 			reconciler.WithMaxConcurrentReconciles(f.MaxConcurrentReconciles),
 			reconciler.WithReconcilePeriod(f.ReconcilePeriod),
