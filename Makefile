@@ -43,12 +43,12 @@ all: test lint build
 # https://github.com/kubernetes-sigs/kubebuilder/pull/2287 targeting the kubebuilder
 # "tools-releases" branch. Make sure to look up the appropriate etcd version in the
 # kubernetes release notes for the minor version you're building tools for.
-ENVTEST_VERSION = $(shell go list -m k8s.io/client-go | cut -d" " -f2 | sed 's/^v0\.\([[:digit:]]\+\)\.[[:digit:]]\+$$/1.\1.x/')
+ENVTEST_VERSION = $(shell go list -m k8s.io/client-go | cut -d" " -f2 | sed 's/^v0\.\([[:digit:]]\{1,\}\)\.[[:digit:]]\{1,\}$$/1.\1.x/')
 TESTPKG ?= ./...
 # TODO: Modify this to use setup-envtest binary
 test: build
 	go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
-	source <(setup-envtest use -p env $(ENVTEST_VERSION)) && go test -race -covermode atomic -coverprofile cover.out $(TESTPKG)
+	eval $$(setup-envtest use -p env $(ENVTEST_VERSION)) && go test -race -covermode atomic -coverprofile cover.out $(TESTPKG)
 
 .PHONY: test-sanity
 test-sanity: generate fix ## Test repo formatting, linting, etc.
