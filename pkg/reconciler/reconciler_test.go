@@ -1171,6 +1171,27 @@ var _ = Describe("Reconciler", func() {
 			})
 		})
 	})
+
+	var _ = Describe("Test predicate selector", func() {
+		It("verifying when a valid selector is passed", func() {
+			selectorPass := metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"testKey": "testValue",
+				},
+			}
+
+			passPredicate, err := parsePredicateSelector(selectorPass)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(passPredicate).NotTo(BeNil())
+		})
+
+		It("verifying there is no error when no predicate is passed", func() {
+			noSelector := metav1.LabelSelector{}
+			nilPredicate, err := parsePredicateSelector(noSelector)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(nilPredicate).To(BeNil())
+		})
+	})
 })
 
 func getManagerOrFail() manager.Manager {
