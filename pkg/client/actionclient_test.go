@@ -470,7 +470,7 @@ var _ = Describe("ActionClient", func() {
 			}
 			patch, patchType, err := createPatch(o1, o2)
 			Expect(err).To(BeNil())
-			Expect(string(patch)).To(Equal(`{}`))
+			Expect(patch).To(BeNil())
 			Expect(patchType).To(Equal(apitypes.StrategicMergePatchType))
 		})
 		It("replaces incorrect fields in core types", func() {
@@ -511,7 +511,7 @@ var _ = Describe("ActionClient", func() {
 			}
 			patch, patchType, err := createPatch(o1, o2)
 			Expect(err).To(BeNil())
-			Expect(string(patch)).To(Equal(`{}`))
+			Expect(patch).To(BeNil())
 			Expect(patchType).To(Equal(apitypes.StrategicMergePatchType))
 		})
 	})
