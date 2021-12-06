@@ -215,6 +215,24 @@ var _ = Describe("Hook", func() {
 					Expect(c.WatchCalls[1].Handler).To(BeAssignableToTypeOf(&sdkhandler.EnqueueRequestForAnnotation{}))
 					Expect(c.WatchCalls[2].Handler).To(BeAssignableToTypeOf(&sdkhandler.EnqueueRequestForAnnotation{}))
 				})
+				It("should iterate the kind list and be able to set watches on each item", func() {
+					rel = &release.Release{
+						Manifest: strings.Join([]string{replicaSetList}, "---\n"),
+					}
+					drw = internalhook.NewDependentResourceWatcher(c, rm)
+					Expect(drw.Exec(owner, *rel, log)).To(Succeed())
+					Expect(c.WatchCalls).To(HaveLen(2))
+					Expect(c.WatchCalls[0].Handler).To(BeAssignableToTypeOf(&handler.EnqueueRequestForOwner{}))
+					Expect(c.WatchCalls[1].Handler).To(BeAssignableToTypeOf(&handler.EnqueueRequestForOwner{}))
+				})
+				It("should error when unable to list objects", func() {
+					rel = &release.Release{
+						Manifest: strings.Join([]string{errReplicaSetList}, "---\n"),
+					}
+					drw = internalhook.NewDependentResourceWatcher(c, rm)
+					err := drw.Exec(owner, *rel, log)
+					Expect(err).To(HaveOccurred())
+				})
 			})
 		})
 	})
@@ -280,5 +298,25 @@ metadata:
   name: testClusterRoleBinding
   annotations:
     helm.sh/resource-policy: keep
+`
+	replicaSetList = `
+apiVersion: v1
+kind: List
+items:
+  - apiVersion: apps/v1
+    kind: ReplicaSet
+    metadata: 
+      name: testReplicaSet1
+      namespace: ownerNamespace
+  - apiVersion: apps/v1
+    kind: ReplicaSet
+    metadata: 
+      name: testReplicaSet2
+      namespace: ownerNamespace
+`
+	errReplicaSetList = `
+apiVersion: v1
+kind: List
+items:
 `
 )
