@@ -25,7 +25,7 @@ import (
 	"sigs.k8s.io/kubebuilder/v3/pkg/config"
 	"sigs.k8s.io/kubebuilder/v3/pkg/machinery"
 	"sigs.k8s.io/kubebuilder/v3/pkg/plugin"
-	kbutils "sigs.k8s.io/kubebuilder/v3/test/e2e/utils"
+	kbutils "sigs.k8s.io/kubebuilder/v3/pkg/plugin/util"
 )
 
 const (
