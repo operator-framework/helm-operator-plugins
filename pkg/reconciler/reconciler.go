@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -42,6 +43,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	ctrlpredicate "sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/operator-framework/helm-operator-plugins/pkg/annotation"
@@ -69,6 +71,7 @@ type Reconciler struct {
 	log                     logr.Logger
 	gvk                     *schema.GroupVersionKind
 	chrt                    *chart.Chart
+	selector                metav1.LabelSelector
 	overrideValues          map[string]string
 	skipDependentWatches    bool
 	maxConcurrentReconciles int
@@ -380,6 +383,15 @@ func WithPostHook(h hook.PostHook) Option {
 func WithValueMapper(m values.Mapper) Option {
 	return func(r *Reconciler) error {
 		r.valueMapper = m
+		return nil
+	}
+}
+
+// WithSelector is an Option that configures the reconciler to creates a
+// predicate that is used to filter resources based on the specified selector
+func WithSelector(s metav1.LabelSelector) Option {
+	return func(r *Reconciler) error {
+		r.selector = s
 		return nil
 	}
 }
@@ -774,9 +786,21 @@ func (r *Reconciler) setupScheme(mgr ctrl.Manager) {
 func (r *Reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) error {
 	obj := &unstructured.Unstructured{}
 	obj.SetGroupVersionKind(*r.gvk)
+
+	var preds []ctrlpredicate.Predicate
+	p, err := parsePredicateSelector(r.selector)
+	if err != nil {
+		return err
+	}
+
+	if p != nil {
+		preds = append(preds, p)
+	}
+
 	if err := c.Watch(
 		&source.Kind{Type: obj},
 		&sdkhandler.InstrumentedEnqueueRequestForObject{},
+		preds...,
 	); err != nil {
 		return err
 	}
@@ -802,6 +826,20 @@ func (r *Reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) err
 		r.postHooks = append([]hook.PostHook{internalhook.NewDependentResourceWatcher(c, mgr.GetRESTMapper())}, r.postHooks...)
 	}
 	return nil
+}
+
+// parsePredicateSelector parses the selector in the WatchOptions and creates a predicate
+// that is used to filter resources based on the specified selector
+func parsePredicateSelector(selector metav1.LabelSelector) (ctrlpredicate.Predicate, error) {
+	// If a selector has been specified in watches.yaml, add it to the watch's predicates.
+	if !reflect.ValueOf(selector).IsZero() {
+		p, err := ctrlpredicate.LabelSelectorPredicate(selector)
+		if err != nil {
+			return nil, fmt.Errorf("error constructing predicate from watches selector: %v", err)
+		}
+		return p, nil
+	}
+	return nil, nil
 }
 
 func ensureDeployedRelease(u *updater.Updater, rel *release.Release) {

@@ -23,12 +23,15 @@ import (
 	"strings"
 
 	"github.com/operator-framework/helm-operator-plugins/internal/flags"
-	"github.com/operator-framework/helm-operator-plugins/internal/legacy/controller"
-	"github.com/operator-framework/helm-operator-plugins/internal/legacy/release"
 	watches "github.com/operator-framework/helm-operator-plugins/internal/legacy/watches"
 	"github.com/operator-framework/helm-operator-plugins/internal/metrics"
 	"github.com/operator-framework/helm-operator-plugins/internal/version"
+	"github.com/operator-framework/helm-operator-plugins/pkg/annotation"
 	helmmgr "github.com/operator-framework/helm-operator-plugins/pkg/manager"
+	"github.com/operator-framework/helm-operator-plugins/pkg/reconciler"
+	"helm.sh/helm/v3/pkg/chart"
+	"helm.sh/helm/v3/pkg/chart/loader"
+
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -167,6 +170,7 @@ func run(cmd *cobra.Command, f *flags.Flags) {
 		os.Exit(1)
 	}
 
+	// TODO: remove legacy watches and use watches from lib
 	ws, err := watches.Load(f.WatchesFile)
 	if err != nil {
 		log.Error(err, "Failed to create new manager factories.")
@@ -174,23 +178,39 @@ func run(cmd *cobra.Command, f *flags.Flags) {
 	}
 
 	for _, w := range ws {
-		// Register the controller with the factory.
-		err := controller.Add(mgr, controller.WatchOptions{
-			Namespace:               namespace,
-			GVK:                     w.GroupVersionKind,
-			ManagerFactory:          release.NewManagerFactory(mgr, w.ChartDir),
-			ReconcilePeriod:         f.ReconcilePeriod,
-			WatchDependentResources: *w.WatchDependentResources,
-			OverrideValues:          w.OverrideValues,
-			MaxConcurrentReconciles: f.MaxConcurrentReconciles,
-			Selector:                w.Selector,
-		})
+
+		// TODO: remove this after modifying watches of hybrid lib.
+		cl, err := getChart(w)
 		if err != nil {
-			log.Error(err, "Failed to add manager factory to controller.")
+			log.Error(err, "Unable to read chart")
 			os.Exit(1)
 		}
+
+		r, err := reconciler.New(
+			reconciler.WithChart(*cl),
+			reconciler.WithGroupVersionKind(w.GroupVersionKind),
+			reconciler.WithOverrideValues(w.OverrideValues),
+			reconciler.WithSelector(w.Selector),
+			reconciler.SkipDependentWatches(*w.WatchDependentResources),
+			reconciler.WithMaxConcurrentReconciles(f.MaxConcurrentReconciles),
+			reconciler.WithReconcilePeriod(f.ReconcilePeriod),
+			reconciler.WithInstallAnnotations(annotation.DefaultInstallAnnotations...),
+			reconciler.WithUpgradeAnnotations(annotation.DefaultUpgradeAnnotations...),
+			reconciler.WithUninstallAnnotations(annotation.DefaultUninstallAnnotations...),
+		)
+		if err != nil {
+			log.Error(err, "unable to creste helm reconciler", "controller", "Helm")
+			os.Exit(1)
+		}
+
+		if err := r.SetupWithManager(mgr); err != nil {
+			log.Error(err, "unable to create controller", "Helm")
+			os.Exit(1)
+		}
+		log.Info("configured watch", "gvk", w.GroupVersionKind, "chartDir", w.ChartDir, "maxConcurrentReconciles", f.MaxConcurrentReconciles, "reconcilePeriod", f.ReconcilePeriod)
 	}
 
+	log.Info("starting manager")
 	// Start the Cmd
 	if err = mgr.Start(signals.SetupSignalHandler()); err != nil {
 		log.Error(err, "Manager exited non-zero.")
@@ -218,4 +238,14 @@ func exitIfUnsupported(options manager.Options) {
 		log.Error(fmt.Errorf("%s set in manager options", strings.Join(keys, ", ")), "unsupported fields")
 		os.Exit(1)
 	}
+}
+
+// getChart returns the chart from the chartDir passed to the watches file.
+func getChart(w watches.Watch) (*chart.Chart, error) {
+	c, err := loader.LoadDir(w.ChartDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load chart dir: %w", err)
+	}
+
+	return c, nil
 }
