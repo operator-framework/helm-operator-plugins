@@ -23,14 +23,12 @@ import (
 	"strings"
 
 	"github.com/operator-framework/helm-operator-plugins/internal/flags"
-	watches "github.com/operator-framework/helm-operator-plugins/internal/legacy/watches"
 	"github.com/operator-framework/helm-operator-plugins/internal/metrics"
 	"github.com/operator-framework/helm-operator-plugins/internal/version"
 	"github.com/operator-framework/helm-operator-plugins/pkg/annotation"
 	helmmgr "github.com/operator-framework/helm-operator-plugins/pkg/manager"
 	"github.com/operator-framework/helm-operator-plugins/pkg/reconciler"
-	"helm.sh/helm/v3/pkg/chart"
-	"helm.sh/helm/v3/pkg/chart/loader"
+	"github.com/operator-framework/helm-operator-plugins/pkg/watches"
 
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -179,18 +177,11 @@ func run(cmd *cobra.Command, f *flags.Flags) {
 
 	for _, w := range ws {
 
-		// TODO: remove this after modifying watches of hybrid lib.
-		cl, err := getChart(w)
-		if err != nil {
-			log.Error(err, "Unable to read chart")
-			os.Exit(1)
-		}
-
 		r, err := reconciler.New(
-			reconciler.WithChart(*cl),
+			reconciler.WithChart(*w.Chart),
 			reconciler.WithGroupVersionKind(w.GroupVersionKind),
 			reconciler.WithOverrideValues(w.OverrideValues),
-			reconciler.WithSelector(w.Selector),
+			reconciler.WithSelector(*w.Selector),
 			reconciler.SkipDependentWatches(*w.WatchDependentResources),
 			reconciler.WithMaxConcurrentReconciles(f.MaxConcurrentReconciles),
 			reconciler.WithReconcilePeriod(f.ReconcilePeriod),
@@ -207,7 +198,7 @@ func run(cmd *cobra.Command, f *flags.Flags) {
 			log.Error(err, "unable to create controller", "Helm")
 			os.Exit(1)
 		}
-		log.Info("configured watch", "gvk", w.GroupVersionKind, "chartDir", w.ChartDir, "maxConcurrentReconciles", f.MaxConcurrentReconciles, "reconcilePeriod", f.ReconcilePeriod)
+		log.Info("configured watch", "gvk", w.GroupVersionKind, "chartDir", w.ChartPath, "maxConcurrentReconciles", f.MaxConcurrentReconciles, "reconcilePeriod", f.ReconcilePeriod)
 	}
 
 	log.Info("starting manager")
@@ -238,14 +229,4 @@ func exitIfUnsupported(options manager.Options) {
 		log.Error(fmt.Errorf("%s set in manager options", strings.Join(keys, ", ")), "unsupported fields")
 		os.Exit(1)
 	}
-}
-
-// getChart returns the chart from the chartDir passed to the watches file.
-func getChart(w watches.Watch) (*chart.Chart, error) {
-	c, err := loader.LoadDir(w.ChartDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load chart dir: %w", err)
-	}
-
-	return c, nil
 }
