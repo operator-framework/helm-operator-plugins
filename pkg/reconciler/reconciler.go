@@ -77,6 +77,7 @@ type Reconciler struct {
 	selectorPredicate                predicate.Predicate
 	overrideValues                   map[string]string
 	skipDependentWatches             bool
+	extraWatchSources                []source.Source
 	maxConcurrentReconciles          int
 	reconcilePeriod                  time.Duration
 	waitForDeletionTimeout           time.Duration
@@ -491,6 +492,16 @@ func WithValueTranslator(t values.Translator) Option {
 func WithValueMapper(m values.Mapper) Option {
 	return func(r *Reconciler) error {
 		r.valueMapper = m
+		return nil
+	}
+}
+
+// WithExtraWatch is an Option that adds an extra event watch.
+// Use this if you want your controller to respond to events other than coming from the primary custom resource,
+// the helm release secret, or resources created by your helm chart.
+func WithExtraWatch(src source.Source) Option {
+	return func(r *Reconciler) error {
+		r.extraWatchSources = append(r.extraWatchSources, src)
 		return nil
 	}
 }
@@ -1013,6 +1024,12 @@ func (r *Reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) err
 		),
 	); err != nil {
 		return err
+	}
+
+	for _, s := range r.extraWatchSources {
+		if err := c.Watch(s); err != nil {
+			return err
+		}
 	}
 
 	if !r.skipDependentWatches {
