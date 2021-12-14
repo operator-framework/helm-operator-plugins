@@ -17,6 +17,7 @@ limitations under the License.
 package values_test
 
 import (
+	"context"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"helm.sh/helm/v3/pkg/chartutil"
@@ -25,73 +26,50 @@ import (
 	. "github.com/operator-framework/helm-operator-plugins/pkg/reconciler/internal/values"
 )
 
-var _ = Describe("Values", func() {
-	var _ = Describe("FromUnstructured", func() {
+var _ = Describe("ApplyOverrides", func() {
+	var u *unstructured.Unstructured
+
+	When("Unstructured object is invalid", func() {
+		It("should error with nil unstructured", func() {
+			u = nil
+			Expect(ApplyOverrides(nil, u)).NotTo(BeNil())
+		})
+
 		It("should error with nil object", func() {
-			u := &unstructured.Unstructured{}
-			v, err := FromUnstructured(u)
-			Expect(v).To(BeNil())
-			Expect(err).NotTo(BeNil())
+			u = &unstructured.Unstructured{}
+			Expect(ApplyOverrides(nil, u)).NotTo(BeNil())
 		})
 
 		It("should error with missing spec", func() {
-			u := &unstructured.Unstructured{Object: map[string]interface{}{}}
-			v, err := FromUnstructured(u)
-			Expect(v).To(BeNil())
-			Expect(err).NotTo(BeNil())
+			u = &unstructured.Unstructured{Object: map[string]interface{}{}}
+			Expect(ApplyOverrides(nil, u)).NotTo(BeNil())
 		})
 
 		It("should error with non-map spec", func() {
-			u := &unstructured.Unstructured{Object: map[string]interface{}{"spec": 0}}
-			v, err := FromUnstructured(u)
-			Expect(v).To(BeNil())
-			Expect(err).NotTo(BeNil())
-		})
-
-		It("should succeed with valid spec", func() {
-			values := New(map[string]interface{}{"foo": "bar"})
-			u := &unstructured.Unstructured{Object: map[string]interface{}{"spec": values.Map()}}
-			Expect(FromUnstructured(u)).To(Equal(values))
+			u = &unstructured.Unstructured{Object: map[string]interface{}{"spec": 0}}
+			Expect(ApplyOverrides(nil, u)).NotTo(BeNil())
 		})
 	})
 
-	var _ = Describe("New", func() {
-		It("should return new values", func() {
-			m := map[string]interface{}{"foo": "bar"}
-			v := New(m)
-			Expect(v.Map()).To(Equal(m))
-		})
-	})
+	When("Unstructured object is valid", func() {
 
-	var _ = Describe("Map", func() {
-		It("should return nil with nil values", func() {
-			var v *Values
-			Expect(v.Map()).To(BeNil())
-		})
-
-		It("should return values as a map", func() {
-			m := map[string]interface{}{"foo": "bar"}
-			v := New(m)
-			Expect(v.Map()).To(Equal(m))
-		})
-	})
-
-	var _ = Describe("ApplyOverrides", func() {
-		It("should succeed with empty values", func() {
-			v := New(map[string]interface{}{})
-			Expect(v.ApplyOverrides(map[string]string{"foo": "bar"})).To(Succeed())
-			Expect(v.Map()).To(Equal(map[string]interface{}{"foo": "bar"}))
+		BeforeEach(func() {
+			u = &unstructured.Unstructured{Object: map[string]interface{}{"spec": map[string]interface{}{}}}
 		})
 
 		It("should succeed with empty values", func() {
-			v := New(map[string]interface{}{"foo": "bar"})
-			Expect(v.ApplyOverrides(map[string]string{"foo": "baz"})).To(Succeed())
-			Expect(v.Map()).To(Equal(map[string]interface{}{"foo": "baz"}))
+			Expect(ApplyOverrides(map[string]string{"foo": "bar"}, u)).To(Succeed())
+			Expect(u.Object).To(Equal(map[string]interface{}{"spec": map[string]interface{}{"foo": "bar"}}))
+		})
+
+		It("should succeed with non-empty values", func() {
+			u.Object["spec"].(map[string]interface{})["foo"] = "bar"
+			Expect(ApplyOverrides(map[string]string{"foo": "baz"}, u)).To(Succeed())
+			Expect(u.Object).To(Equal(map[string]interface{}{"spec": map[string]interface{}{"foo": "baz"}}))
 		})
 
 		It("should fail with invalid overrides", func() {
-			v := New(map[string]interface{}{"foo": "bar"})
-			Expect(v.ApplyOverrides(map[string]string{"foo[": "test"})).ToNot(BeNil())
+			Expect(ApplyOverrides(map[string]string{"foo[": "test"}, u)).ToNot(BeNil())
 		})
 	})
 })
@@ -101,5 +79,22 @@ var _ = Describe("DefaultMapper", func() {
 		in := chartutil.Values{"foo": map[string]interface{}{"bar": "baz"}}
 		out := DefaultMapper.Map(in)
 		Expect(out).To(Equal(in))
+	})
+})
+
+var _ = Describe("DefaultTranslator", func() {
+	var m map[string]interface{}
+
+	It("returns empty spec untouched", func() {
+		m = map[string]interface{}{}
+	})
+
+	It("returns filled spec untouched", func() {
+		m = map[string]interface{}{"something": 0}
+	})
+
+	AfterEach(func() {
+		u := &unstructured.Unstructured{Object: map[string]interface{}{"spec": m}}
+		Expect(DefaultTranslator.Translate(context.Background(), u)).To(Equal(chartutil.Values(m)))
 	})
 })
