@@ -58,6 +58,7 @@ import (
 	helmfake "github.com/operator-framework/helm-operator-plugins/pkg/reconciler/internal/fake"
 	"github.com/operator-framework/helm-operator-plugins/pkg/sdk/controllerutil"
 	"github.com/operator-framework/helm-operator-plugins/pkg/values"
+	helmTime "helm.sh/helm/v3/pkg/time"
 )
 
 var _ = Describe("Reconciler", func() {
@@ -382,6 +383,12 @@ var _ = Describe("Reconciler", func() {
 				Expect(r.valueTranslator.Translate(context.Background(), &unstructured.Unstructured{})).To(Equal(chartutil.Values{"translated": true}))
 			})
 		})
+		var _ = Describe("WithMarkedFailAfter", func() {
+			It("should set the reconciler mark failed after duration", func() {
+				Expect(WithMarkFailedAfter(1*time.Minute)(r)).To(Succeed())
+				Expect(r.markFailedAfter).To(Equal(1*time.Minute))
+			})
+		})
 	})
 
 	var _ = Describe("Reconcile", func() {
@@ -472,6 +479,65 @@ var _ = Describe("Reconciler", func() {
 		When("requested CR is found", func() {
 			BeforeEach(func() {
 				Expect(mgr.GetClient().Create(ctx, obj)).To(Succeed())
+			})
+
+			When("release is in pending state", func() {
+				fakeClient := helmfake.NewActionClient()
+				deployTime := helmTime.Now().Add(-5 * time.Minute)
+				exampleRelease := &release.Release{
+					Name: "example-release",
+					Info: &release.Info{
+						Status:        release.StatusPendingUpgrade,
+						LastDeployed:  deployTime,
+						FirstDeployed: deployTime,
+					},
+				}
+
+				BeforeEach(func() {
+					r.actionClientGetter = helmclient.ActionClientGetterFunc(func(object client.Object) (helmclient.ActionInterface, error) {
+						fakeClient.HandleGet = func() (*release.Release, error) {
+							return exampleRelease, nil
+						}
+						fakeClient.HandleMarkFailed = func() error {
+							return nil
+						}
+						return &fakeClient, nil
+					})
+				})
+				AfterEach(func() {
+					r.actionClientGetter = nil
+				})
+
+				When("time elapsed since last deployment exceeds markFailedAfter duration", func() {
+					It("should be marked as failed", func() {
+						r.markFailedAfter = 1 * time.Minute
+						res, err := r.Reconcile(ctx, req)
+						Expect(res).To(Equal(reconcile.Result{}))
+						Expect(err).ToNot(BeNil())
+						Expect(err).To(MatchError("marked release example-release as failed to allow upgrade to succeed in next reconcile attempt"))
+						Expect(len(fakeClient.MarkFaileds)).Should(Equal(1))
+					})
+				})
+
+				When("markFailedAfter is disabled", func() {
+					It("should require user intervention", func() {
+						r.markFailedAfter = 0
+						res, err := r.Reconcile(ctx, req)
+						Expect(res).To(Equal(reconcile.Result{}))
+						Expect(err).ToNot(BeNil())
+						Expect(err).To(MatchError("Release is in a pending (locked) state and cannot be modified. User intervention is required."))
+					})
+				})
+
+				When("time since last deployment is higher than markFiledAfter duration", func () {
+					It("should return duration until the release will be marked as failed", func () {
+						r.markFailedAfter = 10*time.Minute
+						res, err := r.Reconcile(ctx, req)
+						Expect(res).To(Equal(reconcile.Result{}))
+						Expect(err).ToNot(BeNil())
+						Expect(err.Error()).Should(ContainSubstring("Release is in a pending (locked) state and cannot currently be modified. Release will be marked failed to allow a roll-forward in"))
+					})
+				})
 			})
 
 			When("requested CR release is not present", func() {

@@ -41,6 +41,7 @@ const (
 	ReasonUpgradeError             = status.ConditionReason("UpgradeError")
 	ReasonReconcileError           = status.ConditionReason("ReconcileError")
 	ReasonUninstallError           = status.ConditionReason("UninstallError")
+	ReasonPendingError             = status.ConditionReason("PendingError")
 )
 
 func Initialized(stat corev1.ConditionStatus, reason status.ConditionReason, message interface{}) status.Condition {
