@@ -74,18 +74,18 @@ func NewActionClient() ActionClient {
 		return func() error { return err }
 	}
 	return ActionClient{
-		Gets:       make([]GetCall, 0),
-		Installs:   make([]InstallCall, 0),
-		Upgrades:   make([]UpgradeCall, 0),
-		Uninstalls: make([]UninstallCall, 0),
-		Reconciles: make([]ReconcileCall, 0),
+		Gets:        make([]GetCall, 0),
+		Installs:    make([]InstallCall, 0),
+		Upgrades:    make([]UpgradeCall, 0),
+		Uninstalls:  make([]UninstallCall, 0),
+		Reconciles:  make([]ReconcileCall, 0),
 		MarkFaileds: make([]MarkFailedCall, 0),
 
-		HandleGet:       relFunc(errors.New("get not implemented")),
-		HandleInstall:   relFunc(errors.New("install not implemented")),
-		HandleUpgrade:   relFunc(errors.New("upgrade not implemented")),
-		HandleUninstall: uninstFunc(errors.New("uninstall not implemented")),
-		HandleReconcile: recFunc(errors.New("reconcile not implemented")),
+		HandleGet:        relFunc(errors.New("get not implemented")),
+		HandleInstall:    relFunc(errors.New("install not implemented")),
+		HandleUpgrade:    relFunc(errors.New("upgrade not implemented")),
+		HandleUninstall:  uninstFunc(errors.New("uninstall not implemented")),
+		HandleReconcile:  recFunc(errors.New("reconcile not implemented")),
 		HandleMarkFailed: recFunc(errors.New("mark failed not implemented")),
 	}
 }
