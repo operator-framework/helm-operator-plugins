@@ -385,8 +385,8 @@ var _ = Describe("Reconciler", func() {
 		})
 		var _ = Describe("WithMarkedFailAfter", func() {
 			It("should set the reconciler mark failed after duration", func() {
-				Expect(WithMarkFailedAfter(1*time.Minute)(r)).To(Succeed())
-				Expect(r.markFailedAfter).To(Equal(1*time.Minute))
+				Expect(WithMarkFailedAfter(1 * time.Minute)(r)).To(Succeed())
+				Expect(r.markFailedAfter).To(Equal(1 * time.Minute))
 			})
 		})
 	})
@@ -531,7 +531,7 @@ var _ = Describe("Reconciler", func() {
 
 				When("time since last deployment is higher than markFiledAfter duration", func () {
 					It("should return duration until the release will be marked as failed", func () {
-						r.markFailedAfter = 10*time.Minute
+						r.markFailedAfter = 10 * time.Minute
 						res, err := r.Reconcile(ctx, req)
 						Expect(res).To(Equal(reconcile.Result{}))
 						Expect(err).ToNot(BeNil())
