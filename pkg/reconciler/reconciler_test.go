@@ -529,8 +529,8 @@ var _ = Describe("Reconciler", func() {
 					})
 				})
 
-				When("time since last deployment is higher than markFiledAfter duration", func () {
-					It("should return duration until the release will be marked as failed", func () {
+				When("time since last deployment is higher than markFiledAfter duration", func() {
+					It("should return duration until the release will be marked as failed", func() {
 						r.markFailedAfter = 10 * time.Minute
 						res, err := r.Reconcile(ctx, req)
 						Expect(res).To(Equal(reconcile.Result{}))
