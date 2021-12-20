@@ -498,11 +498,10 @@ var _ = Describe("Reconciler", func() {
 						fakeClient.HandleGet = func() (*release.Release, error) {
 							return exampleRelease, nil
 						}
-						fakeClient.HandleMarkFailed = func() error {
-							return nil
-						}
 						return &fakeClient, nil
 					})
+					//TODO: add actionConfigGetter fake
+					//r.actionConfigGetter =
 				})
 				AfterEach(func() {
 					r.actionClientGetter = nil
@@ -515,7 +514,6 @@ var _ = Describe("Reconciler", func() {
 						Expect(res).To(Equal(reconcile.Result{}))
 						Expect(err).ToNot(BeNil())
 						Expect(err).To(MatchError("marked release example-release as failed to allow upgrade to succeed in next reconcile attempt"))
-						Expect(len(fakeClient.MarkFaileds)).Should(Equal(1))
 					})
 				})
 

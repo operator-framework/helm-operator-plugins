@@ -142,11 +142,6 @@ func (c *ActionClient) Upgrade(name, namespace string, chrt *chart.Chart, vals m
 	return c.HandleUpgrade()
 }
 
-func (c *ActionClient) MarkFailed(rel *release.Release, reason string) error {
-	c.MarkFaileds = append(c.MarkFaileds, MarkFailedCall{rel, reason})
-	return c.HandleMarkFailed()
-}
-
 func (c *ActionClient) Uninstall(name string, opts ...client.UninstallOption) (*release.UninstallReleaseResponse, error) {
 	c.Uninstalls = append(c.Uninstalls, UninstallCall{name, opts})
 	return c.HandleUninstall()

@@ -61,13 +61,14 @@ const uninstallFinalizer = "uninstall-helm-release"
 
 // Reconciler reconciles a Helm object
 type Reconciler struct {
-	client             client.Client
-	actionClientGetter helmclient.ActionClientGetter
-	valueTranslator    values.Translator
-	valueMapper        values.Mapper // nolint:staticcheck
-	eventRecorder      record.EventRecorder
-	preHooks           []hook.PreHook
-	postHooks          []hook.PostHook
+	client               client.Client
+	actionClientGetter   helmclient.ActionClientGetter
+	actionConfigGetter   helmclient.ActionConfigGetter
+	valueTranslator      values.Translator
+	valueMapper          values.Mapper // nolint:staticcheck
+	eventRecorder        record.EventRecorder
+	preHooks             []hook.PreHook
+	postHooks            []hook.PostHook
 
 	log                     logr.Logger
 	gvk                     *schema.GroupVersionKind
@@ -172,6 +173,16 @@ func WithClient(cl client.Client) Option {
 func WithActionClientGetter(actionClientGetter helmclient.ActionClientGetter) Option {
 	return func(r *Reconciler) error {
 		r.actionClientGetter = actionClientGetter
+		return nil
+	}
+}
+
+// WithActionConfigGetter is an Option that configures a Reconciler's ActionConfigGetter
+//
+// A default ActionConfigGetter is used if this option is not configured.
+func WithActionConfigGetter(actionConfigGetter helmclient.ActionConfigGetter) Option {
+	return func(r *Reconciler) error {
+		r.actionConfigGetter = actionConfigGetter
 		return nil
 	}
 }
@@ -545,7 +556,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.
 		return ctrl.Result{}, err
 	}
 	if state == statePending {
-		return r.handlePending(actionClient, rel, &u, log)
+		return r.handlePending(obj, rel, &u, log)
 	}
 
 	u.UpdateStatus(updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionFalse, "", "")))
@@ -744,8 +755,8 @@ func (r *Reconciler) doUpgrade(actionClient helmclient.ActionInterface, u *updat
 	return rel, nil
 }
 
-func (r *Reconciler) handlePending(actionClient helmclient.ActionInterface, rel *release.Release, u *updater.Updater, log logr.Logger) (ctrl.Result, error) {
-	err := r.doHandlePending(actionClient, rel, log)
+func (r *Reconciler) handlePending(obj *unstructured.Unstructured, rel *release.Release, u *updater.Updater, log logr.Logger) (ctrl.Result, error) {
+	err := r.doHandlePending(obj, rel, log)
 	if err == nil {
 		err = errors.New("unknown error handling pending release")
 	}
@@ -754,7 +765,7 @@ func (r *Reconciler) handlePending(actionClient helmclient.ActionInterface, rel 
 	return ctrl.Result{}, err
 }
 
-func (r *Reconciler) doHandlePending(actionClient helmclient.ActionInterface, rel *release.Release, log logr.Logger) error {
+func (r *Reconciler) doHandlePending(obj *unstructured.Unstructured, rel *release.Release, log logr.Logger) error {
 	if r.markFailedAfter <= 0 {
 		return errors.New("Release is in a pending (locked) state and cannot be modified. User intervention is required.")
 	}
@@ -766,11 +777,24 @@ func (r *Reconciler) doHandlePending(actionClient helmclient.ActionInterface, re
 	}
 
 	log.Info("Marking release as failed", "releaseName", rel.Name)
-	err := actionClient.MarkFailed(rel, fmt.Sprintf("operator marked pending (locked) release as failed after state did not change for %v", r.markFailedAfter))
+	err := r.markReleaseFailed(obj, rel, fmt.Sprintf("operator marked pending (locked) release as failed after state did not change for %v", r.markFailedAfter))
 	if err != nil {
 		return fmt.Errorf("Failed to mark pending (locked) release as failed: %w", err)
 	}
 	return fmt.Errorf("marked release %s as failed to allow upgrade to succeed in next reconcile attempt", rel.Name)
+}
+
+func (r *Reconciler) markReleaseFailed(obj *unstructured.Unstructured, rel *release.Release, reason string) error {
+	infoCopy := *rel.Info
+	releaseCopy := *rel
+	releaseCopy.Info = &infoCopy
+	releaseCopy.SetStatus(release.StatusFailed, reason)
+
+ 	actionConfig, err := r.actionConfigGetter.ActionConfigFor(obj)
+ 	if err != nil {
+ 		return err
+	}
+	return actionConfig.Releases.Update(&releaseCopy)
 }
 
 func (r *Reconciler) reportOverrideEvents(obj runtime.Object) {
@@ -847,8 +871,8 @@ func (r *Reconciler) addDefaults(mgr ctrl.Manager, controllerName string) {
 		r.log = ctrl.Log.WithName("controllers").WithName("Helm")
 	}
 	if r.actionClientGetter == nil {
-		actionConfigGetter := helmclient.NewActionConfigGetter(mgr.GetConfig(), mgr.GetRESTMapper(), r.log)
-		r.actionClientGetter = helmclient.NewActionClientGetter(actionConfigGetter)
+		r.actionConfigGetter = helmclient.NewActionConfigGetter(mgr.GetConfig(), mgr.GetRESTMapper(), r.log)
+		r.actionClientGetter = helmclient.NewActionClientGetter(r.actionConfigGetter)
 	}
 	if r.eventRecorder == nil {
 		r.eventRecorder = mgr.GetEventRecorderFor(controllerName)
