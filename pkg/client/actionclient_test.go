@@ -22,6 +22,7 @@ import (
 	"errors"
 	"strconv"
 
+	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"helm.sh/helm/v3/pkg/action"
@@ -59,7 +60,7 @@ var _ = Describe("ActionClient", func() {
 	})
 	var _ = Describe("NewActionClientGetter", func() {
 		It("should return a valid ActionConfigGetter", func() {
-			actionConfigGetter := NewActionConfigGetter(cfg, rm, nil)
+			actionConfigGetter := NewActionConfigGetter(cfg, rm, logr.Discard())
 			Expect(NewActionClientGetter(actionConfigGetter)).NotTo(BeNil())
 		})
 	})
@@ -85,7 +86,7 @@ var _ = Describe("ActionClient", func() {
 			obj = testutil.BuildTestCR(gvk)
 		})
 		It("should return a valid ActionClient", func() {
-			acg := NewActionClientGetter(NewActionConfigGetter(cfg, rm, nil))
+			acg := NewActionClientGetter(NewActionConfigGetter(cfg, rm, logr.Discard()))
 			ac, err := acg.ActionClientFor(obj)
 			Expect(err).To(BeNil())
 			Expect(ac).NotTo(BeNil())
@@ -103,7 +104,7 @@ var _ = Describe("ActionClient", func() {
 			obj = testutil.BuildTestCR(gvk)
 
 			var err error
-			actionConfigGetter := NewActionConfigGetter(cfg, rm, nil)
+			actionConfigGetter := NewActionConfigGetter(cfg, rm, logr.Discard())
 			acg := NewActionClientGetter(actionConfigGetter)
 			ac, err = acg.ActionClientFor(obj)
 			Expect(err).To(BeNil())

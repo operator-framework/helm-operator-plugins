@@ -17,6 +17,7 @@ limitations under the License.
 package client
 
 import (
+	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -28,7 +29,7 @@ import (
 var _ = Describe("ActionConfig", func() {
 	var _ = Describe("NewActionConfigGetter", func() {
 		It("should return a valid ActionConfigGetter", func() {
-			Expect(NewActionConfigGetter(nil, nil, nil)).NotTo(BeNil())
+			Expect(NewActionConfigGetter(nil, nil, logr.Discard())).NotTo(BeNil())
 		})
 	})
 
@@ -41,7 +42,7 @@ var _ = Describe("ActionConfig", func() {
 			rm, err := apiutil.NewDiscoveryRESTMapper(cfg)
 			Expect(err).To(BeNil())
 
-			acg := NewActionConfigGetter(cfg, rm, nil)
+			acg := NewActionConfigGetter(cfg, rm, logr.Discard())
 			ac, err := acg.ActionConfigFor(obj)
 			Expect(err).To(BeNil())
 			Expect(ac).NotTo(BeNil())

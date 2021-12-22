@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/go-logr/logr/testing"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"helm.sh/helm/v3/pkg/action"
@@ -98,7 +97,7 @@ var _ = Describe("Reconciler", func() {
 		})
 		var _ = Describe("WithActionClientGetter", func() {
 			It("should set the reconciler action client getter", func() {
-				cfgGetter := helmclient.NewActionConfigGetter(nil, nil, nil)
+				cfgGetter := helmclient.NewActionConfigGetter(nil, nil, logr.Discard())
 				acg := helmclient.NewActionClientGetter(cfgGetter)
 				Expect(WithActionClientGetter(acg)(r)).To(Succeed())
 				Expect(r.actionClientGetter).To(Equal(acg))
@@ -113,7 +112,7 @@ var _ = Describe("Reconciler", func() {
 		})
 		var _ = Describe("WithLog", func() {
 			It("should set the reconciler log", func() {
-				log := testing.TestLogger{}
+				log := logr.Discard()
 				Expect(WithLog(log)(r)).To(Succeed())
 				Expect(r.log).To(Equal(log))
 			})
@@ -345,7 +344,7 @@ var _ = Describe("Reconciler", func() {
 				})
 				Expect(WithPreHook(preHook)(r)).To(Succeed())
 				Expect(r.preHooks).To(HaveLen(1))
-				Expect(r.preHooks[0].Exec(nil, nil, nil)).To(Succeed())
+				Expect(r.preHooks[0].Exec(nil, nil, logr.Discard())).To(Succeed())
 				Expect(called).To(BeTrue())
 			})
 		})
@@ -358,7 +357,7 @@ var _ = Describe("Reconciler", func() {
 				})
 				Expect(WithPostHook(postHook)(r)).To(Succeed())
 				Expect(r.postHooks).To(HaveLen(1))
-				Expect(r.postHooks[0].Exec(nil, release.Release{}, nil)).To(Succeed())
+				Expect(r.postHooks[0].Exec(nil, release.Release{}, logr.Discard())).To(Succeed())
 				Expect(called).To(BeTrue())
 			})
 		})
@@ -880,7 +879,7 @@ var _ = Describe("Reconciler", func() {
 					BeforeEach(func() {
 						By("getting the current release and config", func() {
 							var err error
-							acg := helmclient.NewActionConfigGetter(mgr.GetConfig(), mgr.GetRESTMapper(), nil)
+							acg := helmclient.NewActionConfigGetter(mgr.GetConfig(), mgr.GetRESTMapper(), logr.Discard())
 							actionConf, err = acg.ActionConfigFor(obj)
 							Expect(err).To(BeNil())
 						})

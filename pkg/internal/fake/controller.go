@@ -56,5 +56,5 @@ func (c *Controller) Reconcile(_ context.Context, r reconcile.Request) (reconcil
 }
 
 func (c Controller) GetLogger() logr.Logger {
-	return nil
+	return logr.Discard()
 }

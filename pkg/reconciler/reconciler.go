@@ -792,7 +792,7 @@ func (r *Reconciler) addDefaults(mgr ctrl.Manager, controllerName string) {
 	if r.client == nil {
 		r.client = mgr.GetClient()
 	}
-	if r.log == nil {
+	if r.log.GetSink() == nil {
 		r.log = ctrl.Log.WithName("controllers").WithName("Helm")
 	}
 	if r.actionClientGetter == nil {

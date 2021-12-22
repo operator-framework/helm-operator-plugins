@@ -45,15 +45,13 @@ all: test lint build
 # kubernetes release notes for the minor version you're building tools for.
 ENVTEST_VERSION = $(shell go list -m k8s.io/client-go | cut -d" " -f2 | sed 's/^v0\.\([[:digit:]]\{1,\}\)\.[[:digit:]]\{1,\}$$/1.\1.x/')
 TESTPKG ?= ./...
-# TODO: Modify this to use setup-envtest binary
 test: build
 	go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 	eval $$(setup-envtest use -p env $(ENVTEST_VERSION)) && go test -race -covermode atomic -coverprofile cover.out $(TESTPKG)
 
 .PHONY: test-sanity
-test-sanity: generate fix ## Test repo formatting, linting, etc.
+test-sanity: generate fix lint ## Test repo formatting, linting, etc.
 	go vet ./...
-	$(SCRIPTS_DIR)/fetch golangci-lint 1.31.0 && $(TOOLS_BIN_DIR)/golangci-lint run
 	git diff --exit-code # diff again to ensure other checks don't change repo
 
 # Build manager binary
@@ -71,7 +69,7 @@ fix:
 # Run various checks against code
 .PHONY: lint
 lint:
-	fetch golangci-lint 1.35.2 && golangci-lint run
+	fetch golangci-lint 1.43.0 && golangci-lint run
 
 .PHONY: release
 release: GORELEASER_ARGS ?= --snapshot --rm-dist --skip-sign
