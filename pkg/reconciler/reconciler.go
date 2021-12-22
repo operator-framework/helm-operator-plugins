@@ -46,6 +46,7 @@ import (
 	ctrlpredicate "sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	"github.com/operator-framework/helm-operator-plugins/internal/sdk/controllerutil"
 	"github.com/operator-framework/helm-operator-plugins/pkg/annotation"
 	helmclient "github.com/operator-framework/helm-operator-plugins/pkg/client"
 	"github.com/operator-framework/helm-operator-plugins/pkg/hook"
@@ -53,7 +54,6 @@ import (
 	internalhook "github.com/operator-framework/helm-operator-plugins/pkg/reconciler/internal/hook"
 	"github.com/operator-framework/helm-operator-plugins/pkg/reconciler/internal/updater"
 	internalvalues "github.com/operator-framework/helm-operator-plugins/pkg/reconciler/internal/values"
-	"github.com/operator-framework/helm-operator-plugins/pkg/sdk/controllerutil"
 	"github.com/operator-framework/helm-operator-plugins/pkg/values"
 )
 
