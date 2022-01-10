@@ -79,21 +79,21 @@ func (mh *Memcached) Run() {
 
 	pkg.CheckError("creating the project", err)
 
-	// TODO: Uncomment this code after helm plugin is migrated
-	// err = mh.ctx.CreateAPI(
-	// 	"--plugins", "helm.sdk.operatorframework.io/v1",
-	// 	"--group", mh.ctx.Group,
-	// 	"--version", mh.ctx.Version,
-	// 	"--kind", mh.ctx.Kind,
-	// )
-
-	// pkg.CheckError("creating helm api", err)
-
 	err = mh.ctx.CreateAPI(
-		"--plugins", "base.go.kubebuilder.io/v3",
+		"--plugins", "base.helm.sdk.operatorframework.io/v1",
 		"--group", mh.ctx.Group,
 		"--version", mh.ctx.Version,
 		"--kind", mh.ctx.Kind,
+	)
+
+	pkg.CheckError("creating helm api", err)
+
+	// TODO: wrap the version and kind for second API in the TextContext
+	err = mh.ctx.CreateAPI(
+		"--plugins", "base.go.kubebuilder.io/v3",
+		"--group", mh.ctx.Group,
+		"--version", "v2",
+		"--kind", mh.ctx.Kind+"Backup",
 		"--resource", "--controller",
 	)
 
