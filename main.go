@@ -29,6 +29,7 @@ import (
 
 	"github.com/operator-framework/helm-operator-plugins/internal/cmd/hybrid-operator/run"
 	"github.com/operator-framework/helm-operator-plugins/internal/version"
+	helmv1 "github.com/operator-framework/helm-operator-plugins/pkg/plugins/helm/v1"
 	pluginv1alpha "github.com/operator-framework/helm-operator-plugins/pkg/plugins/hybrid/v1alpha"
 	kustomizev1 "sigs.k8s.io/kubebuilder/v3/pkg/plugins/common/kustomize/v1"
 	golangv3 "sigs.k8s.io/kubebuilder/v3/pkg/plugins/golang/v3"
@@ -44,6 +45,7 @@ func main() {
 		cli.WithPlugins(
 			getHybridPlugin(),
 			golangv3.Plugin{},
+			helmv1.Plugin{},
 		),
 		cli.WithDefaultProjectVersion(config.Version),
 		cli.WithDefaultPlugins(config.Version, getHybridPlugin()),

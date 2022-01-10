@@ -1,5 +1,5 @@
 /*
-Copyright 2021.
+Copyright 2022.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	cachev1alpha1 "github.com/example/memcached-operator/api/v1alpha1"
+	cachev2 "github.com/example/memcached-operator/api/v2"
 	"github.com/example/memcached-operator/controllers"
 	//+kubebuilder:scaffold:imports
 )
@@ -50,7 +50,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(cachev1alpha1.AddToScheme(scheme))
+	utilruntime.Must(cachev2.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -91,11 +91,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controllers.MemcachedReconciler{
+	if err = (&controllers.MemcachedBackupReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Memcached")
+		setupLog.Error(err, "unable to create controller", "controller", "MemcachedBackup")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder
