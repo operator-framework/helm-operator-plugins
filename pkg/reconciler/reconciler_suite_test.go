@@ -41,6 +41,7 @@ var (
 	cfg     *rest.Config
 
 	gvk  = schema.GroupVersionKind{Group: "example.com", Version: "v1", Kind: "TestApp"}
+	gv   = schema.GroupVersion{Group: "example.com", Version: "v1"}
 	chrt = testutil.MustLoadChart("../../pkg/internal/testdata/test-chart-1.2.0.tgz")
 )
 
