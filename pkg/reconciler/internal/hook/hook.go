@@ -32,10 +32,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	"sigs.k8s.io/yaml"
 
+	"github.com/operator-framework/helm-operator-plugins/internal/sdk/controllerutil"
 	"github.com/operator-framework/helm-operator-plugins/pkg/hook"
 	"github.com/operator-framework/helm-operator-plugins/pkg/internal/predicate"
 	"github.com/operator-framework/helm-operator-plugins/pkg/manifestutil"
-	"github.com/operator-framework/helm-operator-plugins/pkg/sdk/controllerutil"
 )
 
 func NewDependentResourceWatcher(c controller.Controller, rm meta.RESTMapper) hook.PostHook {

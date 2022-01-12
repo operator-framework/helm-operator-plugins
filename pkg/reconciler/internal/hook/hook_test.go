@@ -19,7 +19,7 @@ package hook_test
 import (
 	"strings"
 
-	"github.com/go-logr/logr/testing"
+	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	sdkhandler "github.com/operator-framework/operator-lib/handler"
@@ -42,13 +42,13 @@ var _ = Describe("Hook", func() {
 			rm    *meta.DefaultRESTMapper
 			owner *unstructured.Unstructured
 			rel   *release.Release
-			log   *testing.TestLogger
+			log   logr.Logger
 		)
 
 		BeforeEach(func() {
 			rm = meta.NewDefaultRESTMapper([]schema.GroupVersion{})
 			c = &fake.Controller{}
-			log = &testing.TestLogger{}
+			log = logr.Discard()
 		})
 
 		Context("with unknown APIs", func() {

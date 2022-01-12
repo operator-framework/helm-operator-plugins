@@ -35,7 +35,7 @@ var _ = Describe("Hook", func() {
 				called = true
 				return nil
 			})
-			Expect(h.Exec(nil, nil, nil)).To(Succeed())
+			Expect(h.Exec(nil, nil, logr.Discard())).To(Succeed())
 			Expect(called).To(BeTrue())
 		})
 	})
@@ -46,7 +46,7 @@ var _ = Describe("Hook", func() {
 				called = true
 				return nil
 			})
-			Expect(h.Exec(nil, release.Release{}, nil)).To(Succeed())
+			Expect(h.Exec(nil, release.Release{}, logr.Discard())).To(Succeed())
 			Expect(called).To(BeTrue())
 		})
 	})

@@ -44,8 +44,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 
+	"github.com/operator-framework/helm-operator-plugins/internal/sdk/controllerutil"
 	"github.com/operator-framework/helm-operator-plugins/pkg/manifestutil"
-	"github.com/operator-framework/helm-operator-plugins/pkg/sdk/controllerutil"
 )
 
 type ActionClientGetter interface {
@@ -331,7 +331,7 @@ func (pr *ownerPostRenderer) Run(in *bytes.Buffer) (*bytes.Buffer, error) {
 			return err
 		}
 		u := &unstructured.Unstructured{Object: objMap}
-		useOwnerRef, err := controllerutil.SupportsOwnerReference(pr.rm, pr.owner.(*unstructured.Unstructured), u)
+		useOwnerRef, err := controllerutil.SupportsOwnerReference(pr.rm, pr.owner, u)
 		if err != nil {
 			return err
 		}

@@ -39,7 +39,7 @@ import (
 var _ = Describe("ConfigureWatchNamespaces", func() {
 	var (
 		opts manager.Options
-		log  logr.Logger = &logr.DiscardLogger{}
+		log  = logr.Discard()
 	)
 
 	BeforeEach(func() {
