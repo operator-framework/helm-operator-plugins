@@ -35,11 +35,12 @@ type Watch struct {
 	schema.GroupVersionKind `json:",inline"`
 	ChartPath               string `json:"chart"`
 
-	WatchDependentResources *bool             `json:"watchDependentResources,omitempty"`
-	OverrideValues          map[string]string `json:"overrideValues,omitempty"`
-	ReconcilePeriod         *metav1.Duration  `json:"reconcilePeriod,omitempty"`
-	MaxConcurrentReconciles *int              `json:"maxConcurrentReconciles,omitempty"`
-	Chart                   *chart.Chart      `json:"-"`
+	WatchDependentResources *bool                 `json:"watchDependentResources,omitempty"`
+	OverrideValues          map[string]string     `json:"overrideValues,omitempty"`
+	ReconcilePeriod         *metav1.Duration      `json:"reconcilePeriod,omitempty"`
+	MaxConcurrentReconciles *int                  `json:"maxConcurrentReconciles,omitempty"`
+	Selector                *metav1.LabelSelector `json:"selector,omitempty"`
+	Chart                   *chart.Chart          `json:"-"`
 }
 
 // Load loads a slice of Watches from the watch file at `path`. For each entry

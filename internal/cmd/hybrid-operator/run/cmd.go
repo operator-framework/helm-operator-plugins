@@ -168,6 +168,7 @@ func run(cmd *cobra.Command, f *flags.Flags) {
 			reconciler.WithChart(*w.Chart),
 			reconciler.WithGroupVersionKind(w.GroupVersionKind),
 			reconciler.WithOverrideValues(w.OverrideValues),
+			reconciler.WithSelector(*w.Selector),
 			reconciler.SkipDependentWatches(w.WatchDependentResources != nil && !*w.WatchDependentResources),
 			reconciler.WithMaxConcurrentReconciles(maxConcurrentReconciles),
 			reconciler.WithReconcilePeriod(reconcilePeriod),

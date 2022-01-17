@@ -38,6 +38,9 @@ var _ = Describe("LoadReader", func() {
   kind: MyKind
   chart: ../../pkg/internal/testdata/test-chart
   watchDependentResources: false
+  selector:
+    matchExpressions:
+     - {key: testLabel, operator: Exists, values: []}
   overrideValues:
     key: value
 `
@@ -47,6 +50,14 @@ var _ = Describe("LoadReader", func() {
 				ChartPath:               "../../pkg/internal/testdata/test-chart",
 				WatchDependentResources: &falseVal,
 				OverrideValues:          map[string]string{"key": "value"},
+				Selector: &v1.LabelSelector{
+					MatchLabels: nil,
+					MatchExpressions: []v1.LabelSelectorRequirement{{
+						Key:      "testLabel",
+						Operator: v1.LabelSelectorOpExists,
+						Values:   []string{},
+					}},
+				},
 			},
 		}
 
@@ -329,6 +340,7 @@ func verifyEqualWatches(expectedWatch, obtainedWatch []Watch) {
 		Expect(expectedWatch[i].OverrideValues).To(BeEquivalentTo(obtainedWatch[i].OverrideValues))
 		Expect(expectedWatch[i].MaxConcurrentReconciles).To(BeEquivalentTo(obtainedWatch[i].MaxConcurrentReconciles))
 		Expect(expectedWatch[i].ReconcilePeriod).To(BeEquivalentTo(obtainedWatch[i].ReconcilePeriod))
+		Expect(expectedWatch[i].Selector).To(BeEquivalentTo(obtainedWatch[i].Selector))
 	}
 }
 
