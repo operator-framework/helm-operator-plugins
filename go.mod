@@ -26,7 +26,7 @@ require (
 	k8s.io/client-go v0.23.1
 	k8s.io/kubectl v0.23.1
 	sigs.k8s.io/controller-runtime v0.11.0
-	sigs.k8s.io/kubebuilder/v3 v3.0.0-alpha.0.0.20210716121009-fde793f20067
+	sigs.k8s.io/kubebuilder/v3 v3.3.0
 	sigs.k8s.io/yaml v1.3.0
 )
 
