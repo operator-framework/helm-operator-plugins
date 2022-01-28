@@ -48,19 +48,19 @@ func (hcg *fakeActionClientGetter) ActionClientFor(_ crclient.Object) (client.Ac
 }
 
 type ActionClient struct {
-	Gets        []GetCall
-	Installs    []InstallCall
-	Upgrades    []UpgradeCall
-	MarkFaileds []MarkFailedCall
-	Uninstalls  []UninstallCall
-	Reconciles  []ReconcileCall
+	Gets       []GetCall
+	Installs   []InstallCall
+	Upgrades   []UpgradeCall
+	Updates    []UpdateCall
+	Uninstalls []UninstallCall
+	Reconciles []ReconcileCall
 
-	HandleGet        func() (*release.Release, error)
-	HandleInstall    func() (*release.Release, error)
-	HandleUpgrade    func() (*release.Release, error)
-	HandleMarkFailed func() error
-	HandleUninstall  func() (*release.UninstallReleaseResponse, error)
-	HandleReconcile  func() error
+	HandleGet       func() (*release.Release, error)
+	HandleInstall   func() (*release.Release, error)
+	HandleUpgrade   func() (*release.Release, error)
+	HandleUpdate    func() error
+	HandleUninstall func() (*release.UninstallReleaseResponse, error)
+	HandleReconcile func() error
 }
 
 func NewActionClient() ActionClient {
@@ -74,19 +74,19 @@ func NewActionClient() ActionClient {
 		return func() error { return err }
 	}
 	return ActionClient{
-		Gets:        make([]GetCall, 0),
-		Installs:    make([]InstallCall, 0),
-		Upgrades:    make([]UpgradeCall, 0),
-		Uninstalls:  make([]UninstallCall, 0),
-		Reconciles:  make([]ReconcileCall, 0),
-		MarkFaileds: make([]MarkFailedCall, 0),
+		Gets:       make([]GetCall, 0),
+		Installs:   make([]InstallCall, 0),
+		Upgrades:   make([]UpgradeCall, 0),
+		Uninstalls: make([]UninstallCall, 0),
+		Reconciles: make([]ReconcileCall, 0),
+		Updates:    make([]UpdateCall, 0),
 
-		HandleGet:        relFunc(errors.New("get not implemented")),
-		HandleInstall:    relFunc(errors.New("install not implemented")),
-		HandleUpgrade:    relFunc(errors.New("upgrade not implemented")),
-		HandleUninstall:  uninstFunc(errors.New("uninstall not implemented")),
-		HandleReconcile:  recFunc(errors.New("reconcile not implemented")),
-		HandleMarkFailed: recFunc(errors.New("mark failed not implemented")),
+		HandleGet:       relFunc(errors.New("get not implemented")),
+		HandleInstall:   relFunc(errors.New("install not implemented")),
+		HandleUpgrade:   relFunc(errors.New("upgrade not implemented")),
+		HandleUninstall: uninstFunc(errors.New("uninstall not implemented")),
+		HandleReconcile: recFunc(errors.New("reconcile not implemented")),
+		HandleUpdate:    recFunc(errors.New("mark failed not implemented")),
 	}
 }
 
@@ -113,9 +113,8 @@ type UpgradeCall struct {
 	Opts      []client.UpgradeOption
 }
 
-type MarkFailedCall struct {
+type UpdateCall struct {
 	Release *release.Release
-	Reason  string
 }
 
 type UninstallCall struct {
@@ -140,6 +139,11 @@ func (c *ActionClient) Install(name, namespace string, chrt *chart.Chart, vals m
 func (c *ActionClient) Upgrade(name, namespace string, chrt *chart.Chart, vals map[string]interface{}, opts ...client.UpgradeOption) (*release.Release, error) {
 	c.Upgrades = append(c.Upgrades, UpgradeCall{name, namespace, chrt, vals, opts})
 	return c.HandleUpgrade()
+}
+
+func (c *ActionClient) Update(release *release.Release) error {
+	c.Updates = append(c.Updates, UpdateCall{Release: release})
+	return c.HandleUpdate()
 }
 
 func (c *ActionClient) Uninstall(name string, opts ...client.UninstallOption) (*release.UninstallReleaseResponse, error) {
