@@ -62,6 +62,7 @@ type ActionInterface interface {
 	Get(name string, opts ...GetOption) (*release.Release, error)
 	Install(name, namespace string, chrt *chart.Chart, vals map[string]interface{}, opts ...InstallOption) (*release.Release, error)
 	Upgrade(name, namespace string, chrt *chart.Chart, vals map[string]interface{}, opts ...UpgradeOption) (*release.Release, error)
+	Update(release *release.Release) error
 	Uninstall(name string, opts ...UninstallOption) (*release.UninstallReleaseResponse, error)
 	Reconcile(rel *release.Release) error
 }
@@ -178,6 +179,10 @@ func (c *actionClient) Upgrade(name, namespace string, chrt *chart.Chart, vals m
 		return nil, err
 	}
 	return rel, nil
+}
+
+func (c *actionClient) Update(rel *release.Release) error {
+	return c.conf.Releases.Update(rel)
 }
 
 func (c *actionClient) Uninstall(name string, opts ...UninstallOption) (*release.UninstallReleaseResponse, error) {
