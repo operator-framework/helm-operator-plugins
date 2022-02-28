@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -72,7 +71,7 @@ type Reconciler struct {
 	log                     logr.Logger
 	gvk                     *schema.GroupVersionKind
 	chrt                    *chart.Chart
-	selector                metav1.LabelSelector
+	selector                *metav1.LabelSelector
 	overrideValues          map[string]string
 	skipDependentWatches    bool
 	maxConcurrentReconciles int
@@ -420,7 +419,7 @@ func WithValueMapper(m values.Mapper) Option {
 // predicate that is used to filter resources based on the specified selector
 func WithSelector(s metav1.LabelSelector) Option {
 	return func(r *Reconciler) error {
-		r.selector = s
+		r.selector = &s
 		return nil
 	}
 }
@@ -820,12 +819,11 @@ func (r *Reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) err
 	obj.SetGroupVersionKind(*r.gvk)
 
 	var preds []ctrlpredicate.Predicate
-	p, err := parsePredicateSelector(r.selector)
-	if err != nil {
-		return err
-	}
-
-	if p != nil {
+	if r.selector != nil {
+		p, err := ctrlpredicate.LabelSelectorPredicate(*r.selector)
+		if err != nil {
+			return fmt.Errorf("error constructing predicate from watches selector: %v", err)
+		}
 		preds = append(preds, p)
 	}
 
@@ -858,20 +856,6 @@ func (r *Reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) err
 		r.postHooks = append([]hook.PostHook{internalhook.NewDependentResourceWatcher(c, mgr.GetRESTMapper())}, r.postHooks...)
 	}
 	return nil
-}
-
-// parsePredicateSelector parses the selector in the WatchOptions and creates a predicate
-// that is used to filter resources based on the specified selector
-func parsePredicateSelector(selector metav1.LabelSelector) (ctrlpredicate.Predicate, error) {
-	// If a selector has been specified in watches.yaml, add it to the watch's predicates.
-	if !reflect.ValueOf(selector).IsZero() {
-		p, err := ctrlpredicate.LabelSelectorPredicate(selector)
-		if err != nil {
-			return nil, fmt.Errorf("error constructing predicate from watches selector: %v", err)
-		}
-		return p, nil
-	}
-	return nil, nil
 }
 
 func ensureDeployedRelease(u *updater.Updater, rel *release.Release) {

@@ -22,14 +22,6 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/operator-framework/helm-operator-plugins/internal/flags"
-	"github.com/operator-framework/helm-operator-plugins/internal/metrics"
-	"github.com/operator-framework/helm-operator-plugins/internal/version"
-	"github.com/operator-framework/helm-operator-plugins/pkg/annotation"
-	helmmgr "github.com/operator-framework/helm-operator-plugins/pkg/manager"
-	"github.com/operator-framework/helm-operator-plugins/pkg/reconciler"
-	"github.com/operator-framework/helm-operator-plugins/pkg/watches"
-
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -41,6 +33,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 	crmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
+
+	"github.com/operator-framework/helm-operator-plugins/internal/flags"
+	"github.com/operator-framework/helm-operator-plugins/internal/metrics"
+	"github.com/operator-framework/helm-operator-plugins/internal/version"
+	"github.com/operator-framework/helm-operator-plugins/pkg/annotation"
+	helmmgr "github.com/operator-framework/helm-operator-plugins/pkg/manager"
+	"github.com/operator-framework/helm-operator-plugins/pkg/reconciler"
+	"github.com/operator-framework/helm-operator-plugins/pkg/watches"
 )
 
 var log = logf.Log.WithName("cmd")
@@ -176,7 +176,6 @@ func run(cmd *cobra.Command, f *flags.Flags) {
 	}
 
 	for _, w := range ws {
-
 		r, err := reconciler.New(
 			reconciler.WithChart(*w.Chart),
 			reconciler.WithGroupVersionKind(w.GroupVersionKind),
@@ -190,7 +189,7 @@ func run(cmd *cobra.Command, f *flags.Flags) {
 			reconciler.WithUninstallAnnotations(annotation.DefaultUninstallAnnotations...),
 		)
 		if err != nil {
-			log.Error(err, "unable to creste helm reconciler", "controller", "Helm")
+			log.Error(err, "unable to create helm reconciler", "controller", "Helm")
 			os.Exit(1)
 		}
 
