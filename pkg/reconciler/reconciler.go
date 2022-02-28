@@ -42,6 +42,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	ctrlpredicate "sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
@@ -71,7 +72,7 @@ type Reconciler struct {
 	log                     logr.Logger
 	gvk                     *schema.GroupVersionKind
 	chrt                    *chart.Chart
-	selector                *metav1.LabelSelector
+	selectorPredicate       predicate.Predicate
 	overrideValues          map[string]string
 	skipDependentWatches    bool
 	maxConcurrentReconciles int
@@ -419,7 +420,11 @@ func WithValueMapper(m values.Mapper) Option {
 // predicate that is used to filter resources based on the specified selector
 func WithSelector(s metav1.LabelSelector) Option {
 	return func(r *Reconciler) error {
-		r.selector = &s
+		p, err := ctrlpredicate.LabelSelectorPredicate(s)
+		if err != nil {
+			return err
+		}
+		r.selectorPredicate = p
 		return nil
 	}
 }
@@ -819,12 +824,8 @@ func (r *Reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) err
 	obj.SetGroupVersionKind(*r.gvk)
 
 	var preds []ctrlpredicate.Predicate
-	if r.selector != nil {
-		p, err := ctrlpredicate.LabelSelectorPredicate(*r.selector)
-		if err != nil {
-			return fmt.Errorf("error constructing predicate from watches selector: %v", err)
-		}
-		preds = append(preds, p)
+	if r.selectorPredicate != nil {
+		preds = append(preds, r.selectorPredicate)
 	}
 
 	if err := c.Watch(
