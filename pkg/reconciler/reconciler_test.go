@@ -43,6 +43,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -379,6 +380,29 @@ var _ = Describe("Reconciler", func() {
 				Expect(WithValueTranslator(translator)(r)).To(Succeed())
 				Expect(r.valueTranslator).NotTo(BeNil())
 				Expect(r.valueTranslator.Translate(context.Background(), &unstructured.Unstructured{})).To(Equal(chartutil.Values{"translated": true}))
+			})
+		})
+		var _ = Describe("WithSelector", func() {
+			It("should set the reconciler selector", func() {
+				objUnlabeled := &unstructured.Unstructured{}
+
+				objLabeled := &unstructured.Unstructured{}
+				objLabeled.SetLabels(map[string]string{"foo": "bar"})
+
+				selector := metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}
+				Expect(WithSelector(selector)(r)).To(Succeed())
+				Expect(r.selectorPredicate).NotTo(BeNil())
+
+				Expect(r.selectorPredicate.Create(event.CreateEvent{Object: objLabeled})).To(BeTrue())
+				Expect(r.selectorPredicate.Update(event.UpdateEvent{ObjectOld: objUnlabeled, ObjectNew: objLabeled})).To(BeTrue())
+				Expect(r.selectorPredicate.Delete(event.DeleteEvent{Object: objLabeled})).To(BeTrue())
+				Expect(r.selectorPredicate.Generic(event.GenericEvent{Object: objLabeled})).To(BeTrue())
+
+				Expect(r.selectorPredicate.Create(event.CreateEvent{Object: objUnlabeled})).To(BeFalse())
+				Expect(r.selectorPredicate.Update(event.UpdateEvent{ObjectOld: objLabeled, ObjectNew: objUnlabeled})).To(BeFalse())
+				Expect(r.selectorPredicate.Update(event.UpdateEvent{ObjectOld: objUnlabeled, ObjectNew: objUnlabeled})).To(BeFalse())
+				Expect(r.selectorPredicate.Delete(event.DeleteEvent{Object: objUnlabeled})).To(BeFalse())
+				Expect(r.selectorPredicate.Generic(event.GenericEvent{Object: objUnlabeled})).To(BeFalse())
 			})
 		})
 	})
@@ -1219,27 +1243,6 @@ var _ = Describe("Reconciler", func() {
 					})
 				})
 			})
-		})
-	})
-
-	var _ = Describe("Test predicate selector", func() {
-		It("verifying when a valid selector is passed", func() {
-			selectorPass := metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					"testKey": "testValue",
-				},
-			}
-
-			passPredicate, err := parsePredicateSelector(selectorPass)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(passPredicate).NotTo(BeNil())
-		})
-
-		It("verifying there is no error when no predicate is passed", func() {
-			noSelector := metav1.LabelSelector{}
-			nilPredicate, err := parsePredicateSelector(noSelector)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(nilPredicate).To(BeNil())
 		})
 	})
 })
