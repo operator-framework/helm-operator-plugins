@@ -19,7 +19,7 @@ package reconciler
 import (
 	"testing"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -44,7 +44,7 @@ var (
 	chrt = testutil.MustLoadChart("../../pkg/internal/testdata/test-chart-1.2.0.tgz")
 )
 
-var _ = BeforeSuite(func(done Done) {
+var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 	testenv = &envtest.Environment{}
 
@@ -55,9 +55,7 @@ var _ = BeforeSuite(func(done Done) {
 	crd := testutil.BuildTestCRD(gvk)
 	_, err = envtest.InstallCRDs(cfg, envtest.CRDInstallOptions{CRDs: []*apiextv1.CustomResourceDefinition{&crd}})
 	Expect(err).To(BeNil())
-
-	close(done)
-}, 60)
+})
 
 var _ = AfterSuite(func() {
 	Expect(testenv.Stop()).To(Succeed())

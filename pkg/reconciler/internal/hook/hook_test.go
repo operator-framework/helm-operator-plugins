@@ -20,7 +20,7 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	sdkhandler "github.com/operator-framework/operator-lib/handler"
 	"helm.sh/helm/v3/pkg/release"

@@ -19,8 +19,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/operator-framework/helm-operator-plugins/hack/generate/samples/internal/hybrid"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/operator-framework/helm-operator-plugins/hack/generate/samples/internal/hybrid"
 )
 
 func main() {
