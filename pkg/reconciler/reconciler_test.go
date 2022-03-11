@@ -348,7 +348,7 @@ var _ = Describe("Reconciler", func() {
 				Expect(WithPreHook(preHook)(r)).To(Succeed())
 				Expect(len(r.extensions)).To(Equal(nExtensions + 1))
 				hook := r.extensions[nExtensions].(extension.BeginReconciliationExtension)
-				Expect(hook.BeginReconcile(context.TODO(), nil, nil)).To(Succeed())
+				Expect(hook.BeginReconcile(context.TODO(), nil)).To(Succeed())
 				Expect(called).To(BeTrue())
 			})
 		})
@@ -363,7 +363,7 @@ var _ = Describe("Reconciler", func() {
 				Expect(WithPostHook(postHook)(r)).To(Succeed())
 				Expect(len(r.extensions)).To(Equal(nExtensions + 1))
 				hook := r.extensions[nExtensions].(extension.EndReconciliationExtension)
-				Expect(hook.EndReconcile(context.TODO(), nil, nil)).To(Succeed())
+				Expect(hook.EndReconcile(context.TODO(), nil)).To(Succeed())
 				Expect(called).To(BeTrue())
 			})
 		})
@@ -502,7 +502,7 @@ var _ = Describe("Reconciler", func() {
 				r.extensions = append(r.extensions, failingPreReconciliationExt)
 				r.extensions = append(r.extensions, succeedingPreReconciliationExt)
 
-				err := r.extBeginReconcile(ctx, nil, &unstructured.Unstructured{})
+				err := r.extBeginReconcile(ctx, &unstructured.Unstructured{})
 				Expect(err).To(HaveOccurred())
 				Expect(failingPreReconciliationExtCalled).To(BeTrue())
 				Expect(succeedingPreReconciliationExtCalled).To(BeFalse())
@@ -1432,7 +1432,7 @@ func (e *testBeginReconcileExtension) Name() string {
 	return "test-extension"
 }
 
-func (e *testBeginReconcileExtension) BeginReconcile(ctx context.Context, reconciliationContext *extension.Context, obj *unstructured.Unstructured) error {
+func (e *testBeginReconcileExtension) BeginReconcile(ctx context.Context, obj *unstructured.Unstructured) error {
 	return e.f()
 }
 

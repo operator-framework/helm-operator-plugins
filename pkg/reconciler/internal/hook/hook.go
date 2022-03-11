@@ -63,9 +63,9 @@ func (d *dependentResourceWatcher) Name() string {
 	return "internal-dependent-resource-watcher"
 }
 
-func (d *dependentResourceWatcher) EndReconcile(ctx context.Context, reconciliationContext *extension.Context, owner *unstructured.Unstructured) error {
+func (d *dependentResourceWatcher) EndReconcile(ctx context.Context, owner *unstructured.Unstructured) error {
 	log := logr.FromContextOrDiscard(ctx)
-	rel := reconciliationContext.GetHelmRelease()
+	rel := extension.HelmReleaseFromContext(ctx)
 
 	// using predefined functions for filtering events
 	dependentPredicate := predicate.DependentPredicateFuncs()

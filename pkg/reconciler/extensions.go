@@ -21,13 +21,13 @@ func (es extensions) forEach(f func(e extension.ReconcilerExtension) error) erro
 	return err
 }
 
-func (r *Reconciler) extBeginReconcile(ctx context.Context, reconciliationContext *extension.Context, obj *unstructured.Unstructured) error {
+func (r *Reconciler) extBeginReconcile(ctx context.Context, obj *unstructured.Unstructured) error {
 	return r.extensions.forEach(func(ext extension.ReconcilerExtension) error {
 		e, ok := ext.(extension.BeginReconciliationExtension)
 		if !ok {
 			return nil
 		}
-		err := e.BeginReconcile(ctx, reconciliationContext, obj)
+		err := e.BeginReconcile(ctx, obj)
 		if err != nil {
 			return fmt.Errorf("extension %s failed during begin-reconcile phase: %v", ext.Name(), err)
 		}
@@ -35,14 +35,14 @@ func (r *Reconciler) extBeginReconcile(ctx context.Context, reconciliationContex
 	})
 }
 
-func (r *Reconciler) extEndReconcile(ctx context.Context, reconciliationContext *extension.Context, obj *unstructured.Unstructured) error {
+func (r *Reconciler) extEndReconcile(ctx context.Context, obj *unstructured.Unstructured) error {
 	return r.extensions.forEach(func(ext extension.ReconcilerExtension) error {
 		e, ok := ext.(extension.EndReconciliationExtension)
 		if !ok {
 			return nil
 		}
 
-		err := e.EndReconcile(ctx, reconciliationContext, obj)
+		err := e.EndReconcile(ctx, obj)
 		if err != nil {
 			return fmt.Errorf("extension %s failed during end-reconcile phase: %v", ext.Name(), err)
 		}

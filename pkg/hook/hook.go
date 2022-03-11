@@ -56,12 +56,12 @@ func (h PreHookFunc) Name() string {
 	return "pre-hook"
 }
 
-func (h PreHookFunc) BeginReconcile(ctx context.Context, reconciliationContext *extension.Context, obj *unstructured.Unstructured) error {
+func (h PreHookFunc) BeginReconcile(ctx context.Context, obj *unstructured.Unstructured) error {
 	log := logr.FromContextOrDiscard(ctx)
 	return h(ctx, obj, log)
 }
 
-func (h PreHookFunc) EndReconcile(ctx context.Context, reconciliationContext *extension.Context, obj *unstructured.Unstructured) error {
+func (h PreHookFunc) EndReconcile(ctx context.Context, obj *unstructured.Unstructured) error {
 	return nil
 }
 
@@ -73,13 +73,13 @@ func (h PostHookFunc) Name() string {
 	return "post-hook"
 }
 
-func (f PostHookFunc) BeginReconcile(ctx context.Context, reconciliationContext *extension.Context, obj *unstructured.Unstructured) error {
+func (f PostHookFunc) BeginReconcile(ctx context.Context, obj *unstructured.Unstructured) error {
 	return nil
 }
 
-func (f PostHookFunc) EndReconcile(ctx context.Context, reconciliationContext *extension.Context, obj *unstructured.Unstructured) error {
+func (f PostHookFunc) EndReconcile(ctx context.Context, obj *unstructured.Unstructured) error {
 	log := logr.FromContextOrDiscard(ctx)
-	return f(ctx, obj, reconciliationContext.GetHelmRelease(), reconciliationContext.GetHelmValues(), log)
+	return f(ctx, obj, extension.HelmReleaseFromContext(ctx), extension.HelmValuesFromContext(ctx), log)
 }
 
 var _ extension.ReconcilerExtension = (*PostHookFunc)(nil)

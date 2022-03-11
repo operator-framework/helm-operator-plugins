@@ -19,56 +19,92 @@ type ReconcilerExtension interface {
 
 // BeginReconciliationExtension defines the extension point to execute at the beginning of a reconciliation flow.
 type BeginReconciliationExtension interface {
-	BeginReconcile(ctx context.Context, reconciliationContext *Context, obj *unstructured.Unstructured) error
+	BeginReconcile(ctx context.Context, obj *unstructured.Unstructured) error
 }
 
 // EndReconciliationExtension defiens the extension point to execute at the end of a reconciliation flow.
 type EndReconciliationExtension interface {
-	EndReconcile(ctx context.Context, reconciliationContext *Context, obj *unstructured.Unstructured) error
+	EndReconcile(ctx context.Context, obj *unstructured.Unstructured) error
 }
 
 // NoOpReconcilerExtension implements all extension methods as no-ops and can be used for convenience
 // when only a subset of the available methods needs to be implemented.
 type NoOpReconcilerExtension struct{}
 
-func (e NoOpReconcilerExtension) BeginReconcile(ctx context.Context, reconciliationContext *Context, obj *unstructured.Unstructured) error {
+func (e NoOpReconcilerExtension) BeginReconcile(ctx context.Context, obj *unstructured.Unstructured) error {
 	return nil
 }
 
-func (e NoOpReconcilerExtension) EndReconcile(ctx context.Context, reconciliationContext *Context, obj *unstructured.Unstructured) error {
+func (e NoOpReconcilerExtension) EndReconcile(ctx context.Context, obj *unstructured.Unstructured) error {
 	return nil
 }
 
-// Context can be used for providing extension methods will more context about the reconciliation flow.
-// This contains data objects which can be useful for specific extensions but might not be required for all.
+type helmReleaseType int
+
+var helmReleaseKey helmReleaseType
+
+type helmValuesType int
+
+var helmValuesKey helmValuesType
+
+type kubernetesConfigType int
+
+var kubernetesConfigKey kubernetesConfigType
+
 type Context struct {
 	KubernetesConfig *rest.Config
 	HelmRelease      *release.Release
 	HelmValues       chartutil.Values
 }
 
-// GetHelmRelease is a nil-safe getter retrieving the Helm release information from a reconciliation context, if available.
-// Returns an empty Helm release if the release information is not available at the time the extension point is called.
-func (c *Context) GetHelmRelease() release.Release {
-	if c == nil || c.HelmRelease == nil {
+func newContextWithValues(ctx context.Context, vals ...interface{}) context.Context {
+	if len(vals)%2 == 1 {
+		// Uneven number of vals, which is supposed to consist of key-value pairs.
+		// Add trailing nil value to fix it.
+		vals = append(vals, nil)
+	}
+	for i := 0; i < len(vals); i += 2 {
+		k := vals[i]
+		v := vals[i+1]
+		ctx = context.WithValue(ctx, k, v)
+	}
+	return ctx
+}
+
+func NewContext(ctx context.Context, reconciliationContext *Context) context.Context {
+	if reconciliationContext == nil {
+		return ctx
+	}
+	return newContextWithValues(ctx,
+		helmReleaseKey, reconciliationContext.HelmRelease,
+		helmValuesKey, reconciliationContext.HelmValues,
+		kubernetesConfigKey, reconciliationContext.KubernetesConfig,
+	)
+}
+
+func HelmReleaseFromContext(ctx context.Context) release.Release {
+	v, ok := ctx.Value(helmReleaseKey).(*release.Release)
+	if !ok {
 		return release.Release{}
 	}
-	return *c.HelmRelease
+	if v == nil {
+		return release.Release{}
+	}
+	return *v
 }
 
-// GetHelmValues is a nil-safe getter retrieving the Helm values information from a reconciliation context, if available.
-// Returns nil if the Helm value are not available at the time the extension point is called.
-func (c *Context) GetHelmValues() chartutil.Values {
-	if c == nil {
+func KubernetesConfigFromContext(ctx context.Context) *rest.Config {
+	v, ok := ctx.Value(kubernetesConfigKey).(*rest.Config)
+	if !ok {
 		return nil
 	}
-	return c.HelmValues
+	return v
 }
 
-// GetKubernetesConfig is a nil-safe getter for retrieving the Kubernetes config from a reconciliation context, if available.
-func (c *Context) GetKubernetesConfig() *rest.Config {
-	if c == nil {
+func HelmValuesFromContext(ctx context.Context) chartutil.Values {
+	v, ok := ctx.Value(helmValuesKey).(chartutil.Values)
+	if !ok {
 		return nil
 	}
-	return c.KubernetesConfig
+	return v
 }

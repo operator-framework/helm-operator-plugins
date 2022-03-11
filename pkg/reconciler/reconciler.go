@@ -516,9 +516,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.
 	}
 	u.UpdateStatus(updater.EnsureCondition(conditions.Initialized(corev1.ConditionTrue, "", "")))
 
-	reconciliationContext := extension.Context{}
-
-	err = r.extBeginReconcile(ctx, &reconciliationContext, obj)
+	err = r.extBeginReconcile(ctx, obj)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -528,7 +526,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		err = r.extEndReconcile(ctx, &reconciliationContext, obj)
+		err = r.extEndReconcile(ctx, obj)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -577,10 +575,10 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.
 		return ctrl.Result{}, fmt.Errorf("unexpected release state: %s", state)
 	}
 
-	reconciliationContext.HelmRelease = rel
-	reconciliationContext.HelmValues = vals
+	reconciliationContext := extension.Context{HelmRelease: rel, HelmValues: vals}
+	ctx = extension.NewContext(ctx, &reconciliationContext)
 
-	err = r.extEndReconcile(ctx, &reconciliationContext, obj)
+	err = r.extEndReconcile(ctx, obj)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
