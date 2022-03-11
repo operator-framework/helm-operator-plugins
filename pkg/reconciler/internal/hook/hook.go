@@ -17,11 +17,11 @@ limitations under the License.
 package hook
 
 import (
+	"context"
 	"sync"
 
 	"github.com/go-logr/logr"
 	sdkhandler "github.com/operator-framework/operator-lib/handler"
-	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/releaseutil"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -33,12 +33,12 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/operator-framework/helm-operator-plugins/internal/sdk/controllerutil"
-	"github.com/operator-framework/helm-operator-plugins/pkg/hook"
+	"github.com/operator-framework/helm-operator-plugins/pkg/extension"
 	"github.com/operator-framework/helm-operator-plugins/pkg/internal/predicate"
 	"github.com/operator-framework/helm-operator-plugins/pkg/manifestutil"
 )
 
-func NewDependentResourceWatcher(c controller.Controller, rm meta.RESTMapper) hook.PostHook {
+func NewDependentResourceWatcher(c controller.Controller, rm meta.RESTMapper) extension.ReconcilerExtension {
 	return &dependentResourceWatcher{
 		controller: c,
 		restMapper: rm,
@@ -53,9 +53,20 @@ type dependentResourceWatcher struct {
 
 	m       sync.Mutex
 	watches map[schema.GroupVersionKind]struct{}
+
+	extension.NoOpReconcilerExtension
 }
 
-func (d *dependentResourceWatcher) Exec(owner *unstructured.Unstructured, rel release.Release, log logr.Logger) error {
+var _ extension.EndReconciliationExtension = (*dependentResourceWatcher)(nil)
+
+func (d *dependentResourceWatcher) Name() string {
+	return "internal-dependent-resource-watcher"
+}
+
+func (d *dependentResourceWatcher) EndReconcile(ctx context.Context, reconciliationContext *extension.Context, owner *unstructured.Unstructured) error {
+	log := logr.FromContextOrDiscard(ctx)
+	rel := reconciliationContext.GetHelmRelease()
+
 	// using predefined functions for filtering events
 	dependentPredicate := predicate.DependentPredicateFuncs()
 

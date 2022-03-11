@@ -52,6 +52,7 @@ import (
 	"github.com/operator-framework/helm-operator-plugins/internal/sdk/controllerutil"
 	"github.com/operator-framework/helm-operator-plugins/pkg/annotation"
 	helmclient "github.com/operator-framework/helm-operator-plugins/pkg/client"
+	"github.com/operator-framework/helm-operator-plugins/pkg/extension"
 	"github.com/operator-framework/helm-operator-plugins/pkg/hook"
 	"github.com/operator-framework/helm-operator-plugins/pkg/internal/status"
 	"github.com/operator-framework/helm-operator-plugins/pkg/internal/testutil"
@@ -339,26 +340,30 @@ var _ = Describe("Reconciler", func() {
 		var _ = Describe("WithPreHook", func() {
 			It("should set a reconciler prehook", func() {
 				called := false
-				preHook := hook.PreHookFunc(func(*unstructured.Unstructured, chartutil.Values, logr.Logger) error {
+				preHook := hook.PreHookFunc(func(context.Context, *unstructured.Unstructured, logr.Logger) error {
 					called = true
 					return nil
 				})
+				nExtensions := len(r.extensions)
 				Expect(WithPreHook(preHook)(r)).To(Succeed())
-				Expect(r.preHooks).To(HaveLen(1))
-				Expect(r.preHooks[0].Exec(nil, nil, logr.Discard())).To(Succeed())
+				Expect(len(r.extensions)).To(Equal(nExtensions + 1))
+				hook := r.extensions[nExtensions].(extension.BeginReconciliationExtension)
+				Expect(hook.BeginReconcile(context.TODO(), nil, nil)).To(Succeed())
 				Expect(called).To(BeTrue())
 			})
 		})
 		var _ = Describe("WithPostHook", func() {
 			It("should set a reconciler posthook", func() {
 				called := false
-				postHook := hook.PostHookFunc(func(*unstructured.Unstructured, release.Release, logr.Logger) error {
+				postHook := hook.PostHookFunc(func(context.Context, *unstructured.Unstructured, release.Release, chartutil.Values, logr.Logger) error {
 					called = true
 					return nil
 				})
+				nExtensions := len(r.extensions)
 				Expect(WithPostHook(postHook)(r)).To(Succeed())
-				Expect(r.postHooks).To(HaveLen(1))
-				Expect(r.postHooks[0].Exec(nil, release.Release{}, logr.Discard())).To(Succeed())
+				Expect(len(r.extensions)).To(Equal(nExtensions + 1))
+				hook := r.extensions[nExtensions].(extension.EndReconciliationExtension)
+				Expect(hook.EndReconcile(context.TODO(), nil, nil)).To(Succeed())
 				Expect(called).To(BeTrue())
 			})
 		})
@@ -475,6 +480,33 @@ var _ = Describe("Reconciler", func() {
 				Expect(err).To(BeNil())
 			})
 			cancel()
+		})
+
+		When("an extension fails", func() {
+			It("subsequent extensions are not executed", func() {
+				var (
+					failingPreReconciliationExtCalled    bool
+					succeedingPreReconciliationExtCalled bool
+				)
+
+				failingPreReconciliationExt := &testBeginReconcileExtension{f: func() error {
+					failingPreReconciliationExtCalled = true
+					return errors.New("error!")
+				}}
+
+				succeedingPreReconciliationExt := &testBeginReconcileExtension{f: func() error {
+					succeedingPreReconciliationExtCalled = true
+					return nil
+				}}
+
+				r.extensions = append(r.extensions, failingPreReconciliationExt)
+				r.extensions = append(r.extensions, succeedingPreReconciliationExt)
+
+				err := r.extBeginReconcile(ctx, nil, &unstructured.Unstructured{})
+				Expect(err).To(HaveOccurred())
+				Expect(failingPreReconciliationExtCalled).To(BeTrue())
+				Expect(succeedingPreReconciliationExtCalled).To(BeFalse())
+			})
 		})
 
 		When("requested CR is not found", func() {
@@ -1354,15 +1386,15 @@ func verifyNoRelease(ctx context.Context, cl client.Client, ns string, name stri
 func verifyHooksCalled(ctx context.Context, r *Reconciler, req reconcile.Request) {
 	buf := &bytes.Buffer{}
 	By("setting up a pre and post hook", func() {
-		preHook := hook.PreHookFunc(func(*unstructured.Unstructured, chartutil.Values, logr.Logger) error {
+		preHook := func(context.Context, *unstructured.Unstructured, logr.Logger) error {
 			return errors.New("pre hook foobar")
-		})
-		postHook := hook.PostHookFunc(func(*unstructured.Unstructured, release.Release, logr.Logger) error {
+		}
+		postHook := func(context.Context, *unstructured.Unstructured, release.Release, chartutil.Values, logr.Logger) error {
 			return errors.New("post hook foobar")
-		})
+		}
 		r.log = zap.New(zap.WriteTo(buf))
-		r.preHooks = append(r.preHooks, preHook)
-		r.postHooks = append(r.postHooks, postHook)
+		r.extensions = append(r.extensions, hook.PreHookFunc(hook.WrapPreHookFunc(preHook)))
+		r.extensions = append(r.extensions, hook.PostHookFunc(hook.WrapPostHookFunc(postHook)))
 	})
 	By("successfully reconciling a request", func() {
 		res, err := r.Reconcile(ctx, req)
@@ -1390,3 +1422,18 @@ func verifyEvent(ctx context.Context, cl client.Reader, obj metav1.Object, event
 	Reason: %q
 	Message: %q`, eventType, reason, message))
 }
+
+type testBeginReconcileExtension struct {
+	f func() error
+	extension.NoOpReconcilerExtension
+}
+
+func (e *testBeginReconcileExtension) Name() string {
+	return "test-extension"
+}
+
+func (e *testBeginReconcileExtension) BeginReconcile(ctx context.Context, reconciliationContext *extension.Context, obj *unstructured.Unstructured) error {
+	return e.f()
+}
+
+var _ extension.ReconcilerExtension = (*testBeginReconcileExtension)(nil)
