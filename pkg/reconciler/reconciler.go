@@ -69,15 +69,16 @@ type Reconciler struct {
 	preHooks           []hook.PreHook
 	postHooks          []hook.PostHook
 
-	log                     logr.Logger
-	gvk                     *schema.GroupVersionKind
-	chrt                    *chart.Chart
-	selectorPredicate       predicate.Predicate
-	overrideValues          map[string]string
-	skipDependentWatches    bool
-	maxConcurrentReconciles int
-	reconcilePeriod         time.Duration
-	maxHistory              int
+	log                              logr.Logger
+	gvk                              *schema.GroupVersionKind
+	chrt                             *chart.Chart
+	selectorPredicate                predicate.Predicate
+	overrideValues                   map[string]string
+	skipDependentWatches             bool
+	maxConcurrentReconciles          int
+	reconcilePeriod                  time.Duration
+	maxHistory                       int
+	skipPrimaryGVKSchemeRegistration bool
 
 	annotSetupOnce       sync.Once
 	annotations          map[string]struct{}
@@ -131,7 +132,9 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	controllerName := fmt.Sprintf("%v-controller", strings.ToLower(r.gvk.Kind))
 
 	r.addDefaults(mgr, controllerName)
-	r.setupScheme(mgr)
+	if !r.skipPrimaryGVKSchemeRegistration {
+		r.setupScheme(mgr)
+	}
 
 	c, err := controller.New(controllerName, mgr, controller.Options{Reconciler: r, MaxConcurrentReconciles: r.maxConcurrentReconciles})
 	if err != nil {
@@ -253,6 +256,52 @@ func WithOverrideValues(overrides map[string]string) Option {
 func SkipDependentWatches(skip bool) Option {
 	return func(r *Reconciler) error {
 		r.skipDependentWatches = skip
+		return nil
+	}
+}
+
+// SkipPrimaryGVKSchemeRegistration is an Option that allows to disable the default behaviour of
+// registering unstructured.Unstructured as underlying type for the GVK scheme.
+//
+// Disabling this built-in registration is necessary when building operators
+// for which it is desired to have the underlying GVK scheme backed by a
+// custom struct type.
+//
+// Example for using a custom type for the GVK scheme instead of unstructured.Unstructured:
+//
+//   // Define custom type for GVK scheme.
+//   //+kubebuilder:object:root=true
+//   type Custom struct {
+//     // [...]
+//   }
+//
+//   // Register custom type along with common meta types in scheme.
+//   scheme := runtime.NewScheme()
+//   scheme.AddKnownTypes(SchemeGroupVersion, &Custom{})
+//   metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
+//
+//   // Create new manager using the controller-runtime, injecting above scheme.
+//   options := ctrl.Options{
+//     Scheme = scheme,
+//     // [...]
+//   }
+//   mgr, err := ctrl.NewManager(config, options)
+//
+//   // Create reconciler with generic scheme registration being disabled.
+//   r, err := reconciler.New(
+//     reconciler.WithChart(chart),
+//     reconciler.SkipPrimaryGVKSchemeRegistration(true),
+//     // [...]
+//   )
+//
+//   // Setup reconciler with above manager.
+//   err = r.SetupWithManager(mgr)
+//
+// By default, skipping of the generic scheme setup is disabled, which means that
+// unstructured.Unstructured is used for the GVK scheme.
+func SkipPrimaryGVKSchemeRegistration(skip bool) Option {
+	return func(r *Reconciler) error {
+		r.skipPrimaryGVKSchemeRegistration = skip
 		return nil
 	}
 }
