@@ -25,7 +25,6 @@ import (
 	"regexp"
 	"strings"
 
-	. "github.com/onsi/ginkgo"
 	kbtestutils "sigs.k8s.io/kubebuilder/v3/test/e2e/utils"
 )
 
@@ -186,16 +185,4 @@ func UncommentCode(filename, target, prefix string) error {
 	// false positive
 	// nolint:gosec
 	return ioutil.WriteFile(filename, out.Bytes(), 0644)
-}
-
-// WrapWarnOutput is a one-liner to wrap an error from a command that returns (string, error) in a warning.
-func WrapWarnOutput(_ string, err error) {
-	if err != nil {
-		fmt.Fprintf(GinkgoWriter, "warning: %s", err)
-	}
-}
-
-// WrapWarn is a one-liner to wrap an error from a command that returns (error) in a warning.
-func WrapWarn(err error) {
-	WrapWarnOutput("", err)
 }
