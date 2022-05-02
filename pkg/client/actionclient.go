@@ -140,7 +140,7 @@ func (c *actionClient) Install(name, namespace string, chrt *chart.Chart, vals m
 			// Only return an error about a rollback failure if the failure was
 			// caused by something other than the release not being found.
 			_, uninstallErr := c.Uninstall(name)
-			if !errors.Is(uninstallErr, driver.ErrReleaseNotFound) {
+			if uninstallErr != nil && !errors.Is(uninstallErr, driver.ErrReleaseNotFound) {
 				return nil, fmt.Errorf("uninstall failed: %v: original install error: %w", uninstallErr, err)
 			}
 		}
