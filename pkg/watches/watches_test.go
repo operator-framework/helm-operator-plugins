@@ -340,7 +340,11 @@ func verifyEqualWatches(expectedWatch, obtainedWatch []Watch) {
 		Expect(expectedWatch[i].OverrideValues).To(BeEquivalentTo(obtainedWatch[i].OverrideValues))
 		Expect(expectedWatch[i].MaxConcurrentReconciles).To(BeEquivalentTo(obtainedWatch[i].MaxConcurrentReconciles))
 		Expect(expectedWatch[i].ReconcilePeriod).To(BeEquivalentTo(obtainedWatch[i].ReconcilePeriod))
-		Expect(expectedWatch[i].Selector).To(BeEquivalentTo(obtainedWatch[i].Selector))
+		if expectedWatch[i].Selector == nil {
+			Expect(&v1.LabelSelector{}).To(BeEquivalentTo(obtainedWatch[i].Selector))
+		} else {
+			Expect(expectedWatch[i].Selector).To(BeEquivalentTo(obtainedWatch[i].Selector))
+		}
 	}
 }
 
