@@ -748,7 +748,7 @@ func (r *Reconciler) doInstall(actionClient helmclient.ActionInterface, u *updat
 	log.Info("Release installed", "name", rel.Name, "version", rel.Version)
 
 	// If log verbosity is higher, output Helm Release Manifest
-	if log.V(1).Enabled() {
+	if log.V(4).Enabled() {
 		fmt.Println(rel.Manifest)
 	}
 
