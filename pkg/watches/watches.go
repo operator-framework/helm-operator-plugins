@@ -98,11 +98,6 @@ func LoadReader(reader io.Reader) ([]Watch, error) {
 			w.WatchDependentResources = &trueVal
 		}
 
-		// make sure we do not have a nil LabelSelector. Instead just make it default to empty
-		if w.Selector == nil {
-			w.Selector = &metav1.LabelSelector{}
-		}
-
 		w.OverrideValues, err = expandOverrideValues(w.OverrideValues)
 		if err != nil {
 			return nil, fmt.Errorf("failed to expand override values")
