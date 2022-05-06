@@ -747,7 +747,7 @@ func (r *Reconciler) doInstall(actionClient helmclient.ActionInterface, u *updat
 
 	log.Info("Release installed", "name", rel.Name, "version", rel.Version)
 
-	// If log verbosity is higher, output Helm Release Manifest
+	// If log verbosity is higher, output Helm Release Manifest that was installed
 	if log.V(4).Enabled() {
 		fmt.Println(rel.Manifest)
 	}
@@ -780,6 +780,11 @@ func (r *Reconciler) doUpgrade(actionClient helmclient.ActionInterface, u *updat
 	r.reportOverrideEvents(obj)
 
 	log.Info("Release upgraded", "name", rel.Name, "version", rel.Version)
+
+	// If log verbosity is higher, output upgraded Helm Release Manifest
+	if log.V(4).Enabled() {
+		fmt.Println(rel.Manifest)
+	}
 	return rel, nil
 }
 
@@ -829,6 +834,11 @@ func (r *Reconciler) doUninstall(actionClient helmclient.ActionInterface, u *upd
 		return err
 	} else {
 		log.Info("Release uninstalled", "name", resp.Release.Name, "version", resp.Release.Version)
+
+		// If log verbosity is higher, output Helm Release Manifest that was uninstalled
+		if log.V(4).Enabled() {
+			fmt.Println(resp.Release.Manifest)
+		}
 	}
 	u.Update(updater.RemoveFinalizer(uninstallFinalizer))
 	u.UpdateStatus(
