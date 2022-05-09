@@ -103,10 +103,6 @@ func LoadReader(reader io.Reader) ([]Watch, error) {
 			return nil, fmt.Errorf("failed to expand override values")
 		}
 
-		if w.Selector == nil {
-			w.Selector = &metav1.LabelSelector{}
-		}
-
 		watches[i] = w
 	}
 	return watches, nil
