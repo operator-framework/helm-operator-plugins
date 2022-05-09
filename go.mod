@@ -130,6 +130,7 @@ require (
 	github.com/prometheus/procfs v0.6.0 // indirect
 	github.com/rubenv/sql-migrate v0.0.0-20200616145509-8d140a17f351 // indirect
 	github.com/russross/blackfriday v1.5.2 // indirect
+	github.com/sergi/go-diff v1.2.0
 	github.com/shopspring/decimal v1.2.0 // indirect
 	github.com/spf13/cast v1.3.1 // indirect
 	github.com/weppos/publicsuffix-go v0.13.0 // indirect

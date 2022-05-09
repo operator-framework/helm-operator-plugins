@@ -51,6 +51,7 @@ import (
 	helmclient "github.com/operator-framework/helm-operator-plugins/pkg/client"
 	"github.com/operator-framework/helm-operator-plugins/pkg/hook"
 	"github.com/operator-framework/helm-operator-plugins/pkg/reconciler/internal/conditions"
+	"github.com/operator-framework/helm-operator-plugins/pkg/reconciler/internal/diff"
 	internalhook "github.com/operator-framework/helm-operator-plugins/pkg/reconciler/internal/hook"
 	"github.com/operator-framework/helm-operator-plugins/pkg/reconciler/internal/updater"
 	internalvalues "github.com/operator-framework/helm-operator-plugins/pkg/reconciler/internal/values"
@@ -749,7 +750,7 @@ func (r *Reconciler) doInstall(actionClient helmclient.ActionInterface, u *updat
 
 	// If log verbosity is higher, output Helm Release Manifest that was installed
 	if log.V(4).Enabled() {
-		fmt.Println(rel.Manifest)
+		fmt.Println(diff.Generate("", rel.Manifest))
 	}
 
 	return rel, nil
@@ -769,6 +770,12 @@ func (r *Reconciler) doUpgrade(actionClient helmclient.ActionInterface, u *updat
 		}
 	}
 
+	// Get the current release so we can compare the new release in the diff if the diff is being logged.
+	curRel, err := actionClient.Get(obj.GetName())
+	if err != nil {
+		return nil, fmt.Errorf("could not get the current Helm Release: %w", err)
+	}
+
 	rel, err := actionClient.Upgrade(obj.GetName(), obj.GetNamespace(), r.chrt, vals, opts...)
 	if err != nil {
 		u.UpdateStatus(
@@ -783,7 +790,7 @@ func (r *Reconciler) doUpgrade(actionClient helmclient.ActionInterface, u *updat
 
 	// If log verbosity is higher, output upgraded Helm Release Manifest
 	if log.V(4).Enabled() {
-		fmt.Println(rel.Manifest)
+		fmt.Println(diff.Generate(curRel.Manifest, rel.Manifest))
 	}
 	return rel, nil
 }
@@ -837,7 +844,7 @@ func (r *Reconciler) doUninstall(actionClient helmclient.ActionInterface, u *upd
 
 		// If log verbosity is higher, output Helm Release Manifest that was uninstalled
 		if log.V(4).Enabled() {
-			fmt.Println(resp.Release.Manifest)
+			fmt.Println(diff.Generate(resp.Release.Manifest, ""))
 		}
 	}
 	u.Update(updater.RemoveFinalizer(uninstallFinalizer))
