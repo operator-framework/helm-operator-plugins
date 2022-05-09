@@ -128,6 +128,14 @@ func run(cmd *cobra.Command, f *flags.Flags) {
 	// Set default manager options
 	options = f.ToManagerOptions(options)
 
+	// Log manager option flags
+	log.Info("Setting manager options:",
+		"MetricsBindAddress", options.MetricsBindAddress,
+		"HealthProbeAddress", options.HealthProbeBindAddress,
+		"LeaderElection", options.LeaderElection,
+		"LeaderElectionId", options.LeaderElectionID,
+		"LeaderElectionNamespace", options.LeaderElectionNamespace)
+
 	if options.NewClient == nil {
 		options.NewClient = helmmgr.NewCachingClientFunc()
 	}
