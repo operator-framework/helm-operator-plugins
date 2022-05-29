@@ -17,6 +17,7 @@ package v1
 import (
 	"errors"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"strings"
 
 	"github.com/iancoleman/strcase"
@@ -39,12 +40,18 @@ const (
 	helmChartVersionFlag = "helm-chart-version"
 
 	defaultCrdVersion = "v1"
+	legacyCrdVersion  = "v1beta1"
 
 	// defaultGroup is the Kubernetes CRD API Group used for fetched charts when the --group flag is not specified
 	defaultGroup = "charts"
 	// defaultVersion is the Kubernetes CRD API Version used for fetched charts when the --version flag is not specified
 	defaultVersion = "v1alpha1"
 )
+
+const warnMessageRemovalV1beta1 = "The v1beta1 API version for CRDs and Webhooks are deprecated and are no longer offered since " +
+	"the Kubernetes release 1.22. This flag no longer required to exist in future releases. Also, we would like to " +
+	"recommend you no longer use these API versions." +
+	"More info: https://kubernetes.io/docs/reference/using-api/deprecation-guide/#v1-22"
 
 type createAPIOptions struct {
 	// CRDVersion is the version of the `apiextensions.k8s.io` API which will be used to generate the CRD.
@@ -119,11 +126,21 @@ func (p *createAPISubcommand) BindFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&p.options.chartOptions.Version, helmChartVersionFlag, "", "helm chart version (default: latest)")
 
 	fs.StringVar(&p.options.CRDVersion, crdVersionFlag, defaultCrdVersion, "crd version to generate")
+	// (not required raise an error in this case)
+	// nolint:errcheck,gosec
+	fs.MarkDeprecated(crdVersionFlag, warnMessageRemovalV1beta1)
 }
 
 func (p *createAPISubcommand) InjectConfig(c config.Config) error {
 	p.config = c
 
+	return nil
+}
+
+func (p *createAPISubcommand) PreScaffold(machinery.Filesystem) error {
+	if p.options.CRDVersion == legacyCrdVersion {
+		logrus.Warn(warnMessageRemovalV1beta1)
+	}
 	return nil
 }
 
