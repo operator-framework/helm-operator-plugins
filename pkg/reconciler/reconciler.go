@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -30,6 +31,7 @@ import (
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chartutil"
 	"helm.sh/helm/v3/pkg/release"
+	"helm.sh/helm/v3/pkg/releaseutil"
 	"helm.sh/helm/v3/pkg/storage/driver"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -37,9 +39,12 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -50,15 +55,20 @@ import (
 	"github.com/operator-framework/helm-operator-plugins/pkg/annotation"
 	helmclient "github.com/operator-framework/helm-operator-plugins/pkg/client"
 	"github.com/operator-framework/helm-operator-plugins/pkg/hook"
+	"github.com/operator-framework/helm-operator-plugins/pkg/internal/manifestutil"
 	"github.com/operator-framework/helm-operator-plugins/pkg/reconciler/internal/conditions"
 	"github.com/operator-framework/helm-operator-plugins/pkg/reconciler/internal/diff"
 	internalhook "github.com/operator-framework/helm-operator-plugins/pkg/reconciler/internal/hook"
 	"github.com/operator-framework/helm-operator-plugins/pkg/reconciler/internal/updater"
 	internalvalues "github.com/operator-framework/helm-operator-plugins/pkg/reconciler/internal/values"
 	"github.com/operator-framework/helm-operator-plugins/pkg/values"
+	apiutilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
-const uninstallFinalizer = "uninstall-helm-release"
+const (
+	uninstallFinalizer          = "uninstall-helm-release"
+	helmUninstallWaitAnnotation = "helm.sdk.operatorframework.io/uninstall-wait"
+)
 
 // Reconciler reconciles a Helm object
 type Reconciler struct {
@@ -831,8 +841,9 @@ func (r *Reconciler) doUninstall(actionClient helmclient.ActionInterface, u *upd
 	}
 
 	resp, err := actionClient.Uninstall(obj.GetName(), opts...)
+	wait := hasAnnotation(helmUninstallWaitAnnotation, obj, log)
 	if errors.Is(err, driver.ErrReleaseNotFound) {
-		log.Info("Release not found, removing finalizer")
+		log.Info("Release not found")
 	} else if err != nil {
 		u.UpdateStatus(
 			updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionTrue, conditions.ReasonReconcileError, err)),
@@ -846,7 +857,50 @@ func (r *Reconciler) doUninstall(actionClient helmclient.ActionInterface, u *upd
 		if log.V(4).Enabled() {
 			fmt.Println(diff.Generate(resp.Release.Manifest, ""))
 		}
+
+		if !wait {
+			updater.EnsureCondition(conditions.Deployed(corev1.ConditionFalse, conditions.ReasonUninstallSuccessful, ""))
+		}
 	}
+
+	if wait {
+		updater.EnsureCondition(conditions.Deployed(corev1.ConditionFalse, conditions.ReasonUninstallSuccessful, "Waiting until all resources are deleted."))
+	}
+
+	if wait && resp.Release != nil && resp.Release.Manifest != "" {
+		log.Info("Uninstall wait")
+		config, err := config.GetConfig()
+		if err != nil {
+			log.Error(err, "Failed to get REST config")
+			updater.EnsureCondition(conditions.ReleaseFailed(corev1.ConditionTrue, conditions.ReasonUninstallError, err.Error()))
+			return err
+		}
+		restMapper, err := apiutil.NewDynamicRESTMapper(config)
+		if err != nil {
+			log.Error(err, "Failed to get RESTMapper")
+			updater.EnsureCondition(conditions.ReleaseFailed(corev1.ConditionTrue, conditions.ReasonUninstallError, err.Error()))
+			return err
+		}
+		isAllResourcesDeleted := false
+		for !isAllResourcesDeleted {
+			isAllResourcesDeleted, err = CleanupRelease(helmclient.NewActionConfigGetter(config, restMapper, log), obj, resp.Release.Manifest, log)
+			if err != nil {
+				log.Error(err, "Failed to cleanup release")
+				updater.EnsureCondition(conditions.ReleaseFailed(corev1.ConditionTrue, conditions.ReasonUninstallError, err.Error()))
+				return err
+			}
+			if !isAllResourcesDeleted {
+				log.Info("Waiting until all resources are deleted")
+
+				// wait for a little bit of time before looping again
+				time.Sleep(time.Second * 5)
+			}
+		}
+
+		updater.EnsureCondition(conditions.ReleaseFailed(corev1.ConditionFalse, conditions.ReasonUninstallSuccessful, ""))
+	}
+
+	log.Info("Removing finalizer")
 	u.Update(updater.RemoveFinalizer(uninstallFinalizer))
 	u.UpdateStatus(
 		updater.EnsureCondition(conditions.ReleaseFailed(corev1.ConditionFalse, "", "")),
@@ -854,6 +908,72 @@ func (r *Reconciler) doUninstall(actionClient helmclient.ActionInterface, u *upd
 		updater.RemoveDeployedRelease(),
 	)
 	return nil
+}
+
+// CleanupRelease deletes resources if they are not deleted already.
+// Return true if all the resources are deleted, false otherwise.
+func CleanupRelease(actionConfig helmclient.ActionConfigGetter, obj client.Object, manifest string, log logr.Logger) (bool, error) {
+	ac, err := actionConfig.ActionConfigFor(obj)
+	if err != nil {
+		return false, fmt.Errorf("failed to get action config: %w", err)
+	}
+	dc, err := ac.RESTClientGetter.ToDiscoveryClient()
+	if err != nil {
+		return false, fmt.Errorf("failed to get Kubernetes discovery client: %w", err)
+	}
+	apiVersions, err := action.GetVersionSet(dc)
+	if err != nil && !discovery.IsGroupDiscoveryFailedError(err) {
+		return false, fmt.Errorf("failed to get apiVersions from Kubernetes: %w", err)
+	}
+	manifests := releaseutil.SplitManifests(manifest)
+	_, files, err := releaseutil.SortManifests(manifests, apiVersions, releaseutil.UninstallOrder)
+	if err != nil {
+		return false, fmt.Errorf("failed to sort manifests: %w", err)
+	}
+	// do not delete resources that are annotated with the Helm resource policy 'keep'
+	_, filesToDelete := manifestutil.FilterManifestsToKeep(files)
+	var builder strings.Builder
+	for _, file := range filesToDelete {
+		builder.WriteString("\n---\n" + file.Content)
+	}
+	resources, err := ac.KubeClient.Build(strings.NewReader(builder.String()), false)
+	if err != nil {
+		return false, fmt.Errorf("failed to build resources from manifests: %w", err)
+	}
+	if resources == nil || len(resources) <= 0 {
+		return true, nil
+	}
+	for _, resource := range resources {
+		err = resource.Get()
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				continue // resource is already delete, check the next one.
+			}
+			return false, fmt.Errorf("failed to get resource: %w", err)
+		}
+		// found at least one resource that is not deleted so just delete everything again.
+		_, errs := ac.KubeClient.Delete(resources)
+		if len(errs) > 0 {
+			return false, fmt.Errorf("failed to delete resources: %v", apiutilerrors.NewAggregate(errs))
+		}
+		return false, nil
+	}
+	return true, nil
+}
+
+func hasAnnotation(anno string, o *unstructured.Unstructured, log logr.Logger) bool {
+	boolStr := o.GetAnnotations()[anno]
+	if boolStr == "" {
+		return false
+	}
+	value := false
+	if i, err := strconv.ParseBool(boolStr); err != nil {
+		log.Info("Could not parse annotation as a boolean",
+			"annotation", anno, "value informed", boolStr)
+	} else {
+		value = i
+	}
+	return value
 }
 
 func (r *Reconciler) validate() error {
