@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubeclock "k8s.io/apimachinery/pkg/util/clock"
+	kubeclock "k8s.io/utils/clock/testing"
 )
 
 var (
@@ -48,6 +48,8 @@ func initConditions(init ...Condition) Conditions {
 	}
 
 	// Use an incrementing clock for the rest of the test
+	// This is deprecated but should be fine to use for now until we have a better solution
+	// nolint
 	clock = &kubeclock.IntervalClock{
 		Time:     initTime,
 		Duration: clockInterval,
