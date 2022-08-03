@@ -71,6 +71,13 @@ fix:
 lint:
 	fetch golangci-lint 1.45.2 && golangci-lint run
 
+.PHONY: fix
+fix: ## Fixup files in the repo.
+	go mod tidy
+	go fmt ./...
+	make lint
+	golangci-lint run --fix
+
 .PHONY: release
 release: GORELEASER_ARGS ?= --snapshot --rm-dist --skip-sign
 release:

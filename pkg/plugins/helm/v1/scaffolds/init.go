@@ -19,6 +19,7 @@ package scaffolds
 
 import (
 	"os"
+	kustomizev2alpha "sigs.k8s.io/kubebuilder/v3/pkg/plugins/common/kustomize/v2-alpha"
 
 	"github.com/operator-framework/helm-operator-plugins/internal/version"
 	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/helm/v1/chartutil"
@@ -29,12 +30,7 @@ import (
 	"sigs.k8s.io/kubebuilder/v3/pkg/plugins"
 )
 
-const (
-	// kustomizeVersion is the sigs.k8s.io/kustomize version to be used in the project
-	kustomizeVersion = "v3.8.7"
-
-	imageName = "controller:latest"
-)
+const imageName = "controller:latest"
 
 // helmOperatorVersion is set to the version of helm-operator at compile-time.
 var helmOperatorVersion = mustGetScaffoldVersion()
@@ -79,7 +75,7 @@ func (s *initScaffolder) Scaffold() error {
 		&templates.GitIgnore{},
 		&templates.Makefile{
 			Image:               imageName,
-			KustomizeVersion:    kustomizeVersion,
+			KustomizeVersion:    kustomizev2alpha.KustomizeVersion,
 			HelmOperatorVersion: helmOperatorVersion,
 		},
 		&templates.Watches{},
