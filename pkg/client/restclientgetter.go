@@ -48,7 +48,7 @@ type restClientGetter struct {
 }
 
 func (c *restClientGetter) ToRESTConfig() (*rest.Config, error) {
-	return c.restConfig, nil
+	return rest.CopyConfig(c.restConfig), nil
 }
 
 func (c *restClientGetter) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
