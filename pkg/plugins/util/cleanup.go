@@ -79,7 +79,7 @@ func UpdateKustomizationsCreateAPI() error {
 func UpdateKustomizationsInit() error {
 
 	defaultKFile := filepath.Join("config", "default", "kustomization.yaml")
-	log.Info("\ndata defaultKFile %s\n", defaultKFile)
+
 	if err := ReplaceInFile(defaultKFile,
 		`# [WEBHOOK] To enable webhook, uncomment all the sections with [WEBHOOK] prefix including the one in
 # crd/kustomization.yaml
