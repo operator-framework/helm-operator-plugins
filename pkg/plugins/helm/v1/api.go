@@ -119,6 +119,7 @@ func (p *createAPISubcommand) BindFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&p.options.chartOptions.Version, helmChartVersionFlag, "", "helm chart version (default: latest)")
 
 	fs.StringVar(&p.options.CRDVersion, crdVersionFlag, defaultCrdVersion, "crd version to generate")
+	_ = fs.MarkDeprecated(crdVersionFlag, util.WarnMessageRemovalV1beta1)
 }
 
 func (p *createAPISubcommand) InjectConfig(c config.Config) error {
