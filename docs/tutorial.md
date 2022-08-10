@@ -32,6 +32,8 @@ The `init` command generates the RBAC rules in `config/rbac/role.yaml` based on 
 **Note:**
 This creates a project structure that is compatible with both Helm and Go APIs. To learn more about the project directory structure, see the [project layout][[project_layout]] doc.
 
+Hybrid-Helm has not been tested against webhooks and cert manager. Hence, there is no scaffolding for webhooks and cert manager. Go APIs support Webhooks in general. If users, would like to experiment doing so, they can refer to [Operator SDK](https://sdk.operatorframework.io/docs/building-operators/golang/webhook/) or [Kubebuilder](https://book.kubebuilder.io/reference/webhook-overview.html?highlight=webhook#webhook) documentation.
+
 ## Create a new Helm API
 
 Use the following command to create a new Helm API:

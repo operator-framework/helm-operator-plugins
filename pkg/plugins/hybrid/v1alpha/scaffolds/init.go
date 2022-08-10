@@ -25,6 +25,7 @@ import (
 	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/hybrid/v1alpha/scaffolds/internal/templates"
 	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/hybrid/v1alpha/scaffolds/internal/templates/hack"
 	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/hybrid/v1alpha/scaffolds/internal/templates/rbac"
+	utils "github.com/operator-framework/helm-operator-plugins/pkg/plugins/util"
 	"github.com/spf13/afero"
 	"sigs.k8s.io/kubebuilder/v3/pkg/config"
 	"sigs.k8s.io/kubebuilder/v3/pkg/machinery"
@@ -75,6 +76,10 @@ func (s *initScaffolder) InjectFS(fs machinery.Filesystem) {
 // Scaffold implements scaffolder
 func (s *initScaffolder) Scaffold() error {
 	fmt.Println("Writing scaffolds for you to edit...")
+
+	if err := utils.UpdateKustomizationsInit(); err != nil {
+		return fmt.Errorf("error updating kustomization.yaml files: %v", err)
+	}
 
 	// Initialize the machinery.Scaffold that will write the files to disk
 	scaffold := machinery.NewScaffold(s.fs,
