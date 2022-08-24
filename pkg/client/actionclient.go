@@ -22,30 +22,21 @@ import (
 	"errors"
 	"fmt"
 
-	sdkhandler "github.com/operator-framework/operator-lib/handler"
 	"gomodules.xyz/jsonpatch/v2"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
-	"helm.sh/helm/v3/pkg/kube"
 	helmkube "helm.sh/helm/v3/pkg/kube"
-	"helm.sh/helm/v3/pkg/postrender"
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/storage/driver"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/cli-runtime/pkg/resource"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/yaml"
-
-	"github.com/operator-framework/helm-operator-plugins/internal/sdk/controllerutil"
-	"github.com/operator-framework/helm-operator-plugins/pkg/manifestutil"
 )
 
 type ActionClientGetter interface {
@@ -90,20 +81,28 @@ func (hcg *actionClientGetter) ActionClientFor(obj client.Object) (ActionInterfa
 	if err != nil {
 		return nil, err
 	}
-	postRenderer := createPostRenderer(rm, actionConfig.KubeClient, obj)
-	return &actionClient{actionConfig, postRenderer}, nil
+	postRenderer := DefaultPostRendererFunc(rm, actionConfig.KubeClient, obj)
+	return &actionClient{
+		conf:               actionConfig,
+		defaultInstallOpts: []InstallOption{WithInstallPostRenderer(postRenderer)},
+		defaultUpgradeOpts: []UpgradeOption{WithUpgradePostRenderer(postRenderer)},
+	}, nil
 }
 
 type actionClient struct {
-	conf         *action.Configuration
-	postRenderer postrender.PostRenderer
+	conf *action.Configuration
+
+	defaultGetOpts       []GetOption
+	defaultInstallOpts   []InstallOption
+	defaultUpgradeOpts   []UpgradeOption
+	defaultUninstallOpts []UninstallOption
 }
 
 var _ ActionInterface = &actionClient{}
 
 func (c *actionClient) Get(name string, opts ...GetOption) (*release.Release, error) {
 	get := action.NewGet(c.conf)
-	for _, o := range opts {
+	for _, o := range concat(c.defaultGetOpts, opts...) {
 		if err := o(get); err != nil {
 			return nil, err
 		}
@@ -113,8 +112,7 @@ func (c *actionClient) Get(name string, opts ...GetOption) (*release.Release, er
 
 func (c *actionClient) Install(name, namespace string, chrt *chart.Chart, vals map[string]interface{}, opts ...InstallOption) (*release.Release, error) {
 	install := action.NewInstall(c.conf)
-	install.PostRenderer = c.postRenderer
-	for _, o := range opts {
+	for _, o := range concat(c.defaultInstallOpts, opts...) {
 		if err := o(install); err != nil {
 			return nil, err
 		}
@@ -151,8 +149,7 @@ func (c *actionClient) Install(name, namespace string, chrt *chart.Chart, vals m
 
 func (c *actionClient) Upgrade(name, namespace string, chrt *chart.Chart, vals map[string]interface{}, opts ...UpgradeOption) (*release.Release, error) {
 	upgrade := action.NewUpgrade(c.conf)
-	upgrade.PostRenderer = c.postRenderer
-	for _, o := range opts {
+	for _, o := range concat(c.defaultUpgradeOpts, opts...) {
 		if err := o(upgrade); err != nil {
 			return nil, err
 		}
@@ -182,7 +179,7 @@ func (c *actionClient) Upgrade(name, namespace string, chrt *chart.Chart, vals m
 
 func (c *actionClient) Uninstall(name string, opts ...UninstallOption) (*release.UninstallReleaseResponse, error) {
 	uninstall := action.NewUninstall(c.conf)
-	for _, o := range opts {
+	for _, o := range concat(c.defaultUninstallOpts, opts...) {
 		if err := o(uninstall); err != nil {
 			return nil, err
 		}
@@ -305,56 +302,9 @@ func createJSONMergePatch(existingJSON, expectedJSON []byte) ([]byte, error) {
 	return json.Marshal(patchOps)
 }
 
-func createPostRenderer(rm meta.RESTMapper, kubeClient kube.Interface, owner client.Object) postrender.PostRenderer {
-	return &ownerPostRenderer{rm, kubeClient, owner}
-}
-
-type ownerPostRenderer struct {
-	rm         meta.RESTMapper
-	kubeClient kube.Interface
-	owner      client.Object
-}
-
-func (pr *ownerPostRenderer) Run(in *bytes.Buffer) (*bytes.Buffer, error) {
-	resourceList, err := pr.kubeClient.Build(in, false)
-	if err != nil {
-		return nil, err
-	}
-	out := bytes.Buffer{}
-
-	err = resourceList.Visit(func(r *resource.Info, err error) error {
-		if err != nil {
-			return err
-		}
-		objMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(r.Object)
-		if err != nil {
-			return err
-		}
-		u := &unstructured.Unstructured{Object: objMap}
-		useOwnerRef, err := controllerutil.SupportsOwnerReference(pr.rm, pr.owner, u)
-		if err != nil {
-			return err
-		}
-		if useOwnerRef && !manifestutil.HasResourcePolicyKeep(u.GetAnnotations()) {
-			ownerRef := metav1.NewControllerRef(pr.owner, pr.owner.GetObjectKind().GroupVersionKind())
-			ownerRefs := append(u.GetOwnerReferences(), *ownerRef)
-			u.SetOwnerReferences(ownerRefs)
-		} else {
-			if err := sdkhandler.SetOwnerAnnotations(pr.owner, u); err != nil {
-				return err
-			}
-		}
-		outData, err := yaml.Marshal(u.Object)
-		if err != nil {
-			return err
-		}
-		if _, err := out.WriteString("---\n" + string(outData)); err != nil {
-			return err
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return &out, nil
+func concat[T any](s1 []T, s2 ...T) []T {
+	out := make([]T, 0, len(s1)+len(s2))
+	out = append(out, s1...)
+	out = append(out, s2...)
+	return out
 }

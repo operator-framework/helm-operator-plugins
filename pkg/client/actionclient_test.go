@@ -17,7 +17,6 @@ limitations under the License.
 package client
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"strconv"
@@ -27,7 +26,6 @@ import (
 	. "github.com/onsi/gomega"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chartutil"
-	"helm.sh/helm/v3/pkg/kube"
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/releaseutil"
 	"helm.sh/helm/v3/pkg/storage/driver"
@@ -40,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/yaml"
@@ -141,7 +140,7 @@ var _ = Describe("ActionClient", func() {
 						Expect(err).To(BeNil())
 						Expect(rel).NotTo(BeNil())
 					})
-					verifyRelease(cl, obj.GetNamespace(), rel)
+					verifyRelease(cl, obj, rel)
 				})
 				It("should uninstall a failed install", func() {
 					By("failing to install the release", func() {
@@ -209,7 +208,7 @@ var _ = Describe("ActionClient", func() {
 						Expect(err).To(BeNil())
 						Expect(rel).NotTo(BeNil())
 					})
-					verifyRelease(cl, obj.GetNamespace(), rel)
+					verifyRelease(cl, obj, rel)
 				})
 				When("using an option function that returns an error", func() {
 					It("should fail", func() {
@@ -253,7 +252,7 @@ var _ = Describe("ActionClient", func() {
 						Expect(err).To(BeNil())
 						Expect(rel).NotTo(BeNil())
 					})
-					verifyRelease(cl, obj.GetNamespace(), rel)
+					verifyRelease(cl, obj, rel)
 				})
 				It("should rollback a failed upgrade", func() {
 					By("failing to install the release", func() {
@@ -265,7 +264,7 @@ var _ = Describe("ActionClient", func() {
 					tmp := *installedRelease
 					rollbackRelease := &tmp
 					rollbackRelease.Version = installedRelease.Version + 2
-					verifyRelease(cl, obj.GetNamespace(), rollbackRelease)
+					verifyRelease(cl, obj, rollbackRelease)
 				})
 				When("using an option function that returns an error", func() {
 					It("should fail", func() {
@@ -305,7 +304,7 @@ var _ = Describe("ActionClient", func() {
 						err := ac.Reconcile(installedRelease)
 						Expect(err).To(BeNil())
 					})
-					verifyRelease(cl, obj.GetNamespace(), installedRelease)
+					verifyRelease(cl, obj, installedRelease)
 				})
 				It("should re-create deleted resources", func() {
 					By("deleting the manifest resources", func() {
@@ -319,7 +318,7 @@ var _ = Describe("ActionClient", func() {
 						err := ac.Reconcile(installedRelease)
 						Expect(err).To(BeNil())
 					})
-					verifyRelease(cl, obj.GetNamespace(), installedRelease)
+					verifyRelease(cl, obj, installedRelease)
 				})
 				It("should patch changed resources", func() {
 					By("changing manifest resources", func() {
@@ -344,7 +343,7 @@ var _ = Describe("ActionClient", func() {
 						err := ac.Reconcile(installedRelease)
 						Expect(err).To(BeNil())
 					})
-					verifyRelease(cl, obj.GetNamespace(), installedRelease)
+					verifyRelease(cl, obj, installedRelease)
 				})
 			})
 		})
@@ -516,34 +515,6 @@ var _ = Describe("ActionClient", func() {
 			Expect(patchType).To(Equal(apitypes.StrategicMergePatchType))
 		})
 	})
-
-	var _ = Describe("ownerPostRenderer", func() {
-		var (
-			pr    ownerPostRenderer
-			owner client.Object
-		)
-
-		BeforeEach(func() {
-			rm, err := apiutil.NewDynamicRESTMapper(cfg)
-			Expect(err).To(BeNil())
-
-			owner = newTestUnstructured([]interface{}{
-				map[string]interface{}{
-					"name": "test1",
-				},
-			})
-			pr = ownerPostRenderer{
-				owner:      owner,
-				rm:         rm,
-				kubeClient: kube.New(newRESTClientGetter(cfg, rm, owner.GetNamespace())),
-			}
-		})
-
-		It("fails on invalid input", func() {
-			_, err := pr.Run(bytes.NewBufferString("test"))
-			Expect(err).NotTo(BeNil())
-		})
-	})
 })
 
 func manifestToObjects(manifest string) []client.Object {
@@ -557,10 +528,10 @@ func manifestToObjects(manifest string) []client.Object {
 	return objs
 }
 
-func verifyRelease(cl client.Client, ns string, rel *release.Release) {
+func verifyRelease(cl client.Client, owner client.Object, rel *release.Release) {
 	By("verifying release secret exists at release version", func() {
 		releaseSecrets := &v1.SecretList{}
-		err := cl.List(context.TODO(), releaseSecrets, client.InNamespace(ns), client.MatchingLabels{"owner": "helm", "name": rel.Name})
+		err := cl.List(context.TODO(), releaseSecrets, client.InNamespace(owner.GetNamespace()), client.MatchingLabels{"owner": "helm", "name": rel.Name})
 		Expect(err).To(BeNil())
 		Expect(releaseSecrets.Items).To(HaveLen(rel.Version))
 		Expect(releaseSecrets.Items[rel.Version-1].Type).To(Equal(v1.SecretType("helm.sh/release.v1")))
@@ -578,6 +549,17 @@ func verifyRelease(cl client.Client, ns string, rel *release.Release) {
 			key := client.ObjectKeyFromObject(obj)
 			err := cl.Get(context.TODO(), key, obj)
 			Expect(err).To(BeNil())
+			Expect(obj.GetOwnerReferences()).To(HaveLen(1))
+			Expect(obj.GetOwnerReferences()[0]).To(Equal(
+				metav1.OwnerReference{
+					APIVersion:         owner.GetObjectKind().GroupVersionKind().GroupVersion().String(),
+					Kind:               owner.GetObjectKind().GroupVersionKind().Kind,
+					Name:               owner.GetName(),
+					UID:                owner.GetUID(),
+					Controller:         pointer.Bool(true),
+					BlockOwnerDeletion: pointer.Bool(true),
+				}),
+			)
 		}
 	})
 }
