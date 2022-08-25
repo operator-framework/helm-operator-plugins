@@ -20,8 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/client-go/kubernetes"
-
 	"github.com/go-logr/logr"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/kube"
@@ -30,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -39,7 +38,7 @@ type ActionConfigGetter interface {
 	ActionConfigFor(obj client.Object) (*action.Configuration, error)
 }
 
-func NewActionConfigGetter(cfg *rest.Config, rm meta.RESTMapper, log logr.Logger) (ActionConfigGetter, error) {
+func NewActionConfigGetter(cfg *rest.Config, rm meta.RESTMapper, log logr.Logger, opts ...ActionConfigGetterOption) (ActionConfigGetter, error) {
 	rcg := newRESTClientGetter(cfg, rm, "")
 	// Setup the debug log function that Helm will use
 	debugLog := func(format string, v ...interface{}) {
@@ -56,29 +55,78 @@ func NewActionConfigGetter(cfg *rest.Config, rm meta.RESTMapper, log logr.Logger
 		return nil, fmt.Errorf("creating kubernetes client set: %w", err)
 	}
 
-	return &actionConfigGetter{
+	acg := &actionConfigGetter{
 		kubeClient:       kc,
 		kubeClientSet:    kcs,
 		debugLog:         debugLog,
 		restClientGetter: rcg.restClientGetter,
-	}, nil
+	}
+	for _, o := range opts {
+		o(acg)
+	}
+	if acg.objectToClientNamespace == nil {
+		acg.objectToClientNamespace = getObjectNamespace
+	}
+	if acg.objectToStorageNamespace == nil {
+		acg.objectToStorageNamespace = getObjectNamespace
+	}
+	return acg, nil
 }
 
 var _ ActionConfigGetter = &actionConfigGetter{}
+
+type ActionConfigGetterOption func(getter *actionConfigGetter)
+
+type ObjectToStringMapper func(client.Object) (string, error)
+
+func ClientNamespaceMapper(m ObjectToStringMapper) ActionConfigGetterOption {
+	return func(getter *actionConfigGetter) {
+		getter.objectToClientNamespace = m
+	}
+}
+
+func StorageNamespaceMapper(m ObjectToStringMapper) ActionConfigGetterOption {
+	return func(getter *actionConfigGetter) {
+		getter.objectToStorageNamespace = m
+	}
+}
+
+func DisableStorageOwnerRefInjection(v bool) ActionConfigGetterOption {
+	return func(getter *actionConfigGetter) {
+		getter.disableStorageOwnerRefInjection = v
+	}
+}
+
+func getObjectNamespace(obj client.Object) (string, error) {
+	return obj.GetNamespace(), nil
+}
 
 type actionConfigGetter struct {
 	kubeClient       *kube.Client
 	kubeClientSet    kubernetes.Interface
 	debugLog         func(string, ...interface{})
 	restClientGetter *restClientGetter
+
+	objectToClientNamespace         ObjectToStringMapper
+	objectToStorageNamespace        ObjectToStringMapper
+	disableStorageOwnerRefInjection bool
 }
 
 func (acg *actionConfigGetter) ActionConfigFor(obj client.Object) (*action.Configuration, error) {
-	ownerRef := metav1.NewControllerRef(obj, obj.GetObjectKind().GroupVersionKind())
-	d := driver.NewSecrets(&ownerRefSecretClient{
-		SecretInterface: acg.kubeClientSet.CoreV1().Secrets(obj.GetNamespace()),
-		refs:            []metav1.OwnerReference{*ownerRef},
-	})
+	storageNs, err := acg.objectToStorageNamespace(obj)
+	if err != nil {
+		return nil, fmt.Errorf("get storage namespace from object: %v", err)
+	}
+
+	secretClient := acg.kubeClientSet.CoreV1().Secrets(storageNs)
+	if !acg.disableStorageOwnerRefInjection {
+		ownerRef := metav1.NewControllerRef(obj, obj.GetObjectKind().GroupVersionKind())
+		secretClient = &ownerRefSecretClient{
+			SecretInterface: secretClient,
+			refs:            []metav1.OwnerReference{*ownerRef},
+		}
+	}
+	d := driver.NewSecrets(secretClient)
 
 	// Also, use the debug log for the storage driver
 	d.Log = acg.debugLog
@@ -87,10 +135,13 @@ func (acg *actionConfigGetter) ActionConfigFor(obj client.Object) (*action.Confi
 	s := storage.Init(d)
 
 	kubeClient := *acg.kubeClient
-	kubeClient.Namespace = obj.GetNamespace()
+	kubeClient.Namespace, err = acg.objectToClientNamespace(obj)
+	if err != nil {
+		return nil, fmt.Errorf("get client namespace from object: %v", err)
+	}
 
 	return &action.Configuration{
-		RESTClientGetter: acg.restClientGetter.ForNamespace(obj.GetNamespace()),
+		RESTClientGetter: acg.restClientGetter.ForNamespace(kubeClient.Namespace),
 		Releases:         s,
 		KubeClient:       &kubeClient,
 		Log:              acg.debugLog,
