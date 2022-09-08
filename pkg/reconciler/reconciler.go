@@ -132,7 +132,10 @@ func (r *Reconciler) setupAnnotationMaps() {
 func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	controllerName := fmt.Sprintf("%v-controller", strings.ToLower(r.gvk.Kind))
 
-	r.addDefaults(mgr, controllerName)
+	if err := r.addDefaults(mgr, controllerName); err != nil {
+		return err
+	}
+
 	if !r.skipPrimaryGVKSchemeRegistration {
 		r.setupScheme(mgr)
 	}
@@ -270,33 +273,33 @@ func SkipDependentWatches(skip bool) Option {
 //
 // Example for using a custom type for the GVK scheme instead of unstructured.Unstructured:
 //
-//   // Define custom type for GVK scheme.
-//   //+kubebuilder:object:root=true
-//   type Custom struct {
-//     // [...]
-//   }
+//	// Define custom type for GVK scheme.
+//	//+kubebuilder:object:root=true
+//	type Custom struct {
+//	  // [...]
+//	}
 //
-//   // Register custom type along with common meta types in scheme.
-//   scheme := runtime.NewScheme()
-//   scheme.AddKnownTypes(SchemeGroupVersion, &Custom{})
-//   metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
+//	// Register custom type along with common meta types in scheme.
+//	scheme := runtime.NewScheme()
+//	scheme.AddKnownTypes(SchemeGroupVersion, &Custom{})
+//	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 //
-//   // Create new manager using the controller-runtime, injecting above scheme.
-//   options := ctrl.Options{
-//     Scheme = scheme,
-//     // [...]
-//   }
-//   mgr, err := ctrl.NewManager(config, options)
+//	// Create new manager using the controller-runtime, injecting above scheme.
+//	options := ctrl.Options{
+//	  Scheme = scheme,
+//	  // [...]
+//	}
+//	mgr, err := ctrl.NewManager(config, options)
 //
-//   // Create reconciler with generic scheme registration being disabled.
-//   r, err := reconciler.New(
-//     reconciler.WithChart(chart),
-//     reconciler.SkipPrimaryGVKSchemeRegistration(true),
-//     // [...]
-//   )
+//	// Create reconciler with generic scheme registration being disabled.
+//	r, err := reconciler.New(
+//	  reconciler.WithChart(chart),
+//	  reconciler.SkipPrimaryGVKSchemeRegistration(true),
+//	  // [...]
+//	)
 //
-//   // Setup reconciler with above manager.
-//   err = r.SetupWithManager(mgr)
+//	// Setup reconciler with above manager.
+//	err = r.SetupWithManager(mgr)
 //
 // By default, skipping of the generic scheme setup is disabled, which means that
 // unstructured.Unstructured is used for the GVK scheme.
@@ -435,16 +438,16 @@ func WithPostHook(h hook.PostHook) Option {
 // If you wish to, you can convert the Unstructured that is passed to your Translator to your own
 // Custom Resource struct like this:
 //
-//   import "k8s.io/apimachinery/pkg/runtime"
-//   foo := your.Foo{}
-//   if err = runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, &foo); err != nil {
-//     return nil, err
-//   }
-//   // work with the type-safe foo
+//	import "k8s.io/apimachinery/pkg/runtime"
+//	foo := your.Foo{}
+//	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, &foo); err != nil {
+//	  return nil, err
+//	}
+//	// work with the type-safe foo
 //
 // Alternatively, your translator can also work similarly to a Mapper, by accessing the spec with:
 //
-//   u.Object["spec"].(map[string]interface{})
+//	u.Object["spec"].(map[string]interface{})
 func WithValueTranslator(t values.Translator) Option {
 	return func(r *Reconciler) error {
 		r.valueTranslator = t
@@ -866,7 +869,7 @@ func (r *Reconciler) validate() error {
 	return nil
 }
 
-func (r *Reconciler) addDefaults(mgr ctrl.Manager, controllerName string) {
+func (r *Reconciler) addDefaults(mgr ctrl.Manager, controllerName string) error {
 	if r.client == nil {
 		r.client = mgr.GetClient()
 	}
@@ -874,7 +877,10 @@ func (r *Reconciler) addDefaults(mgr ctrl.Manager, controllerName string) {
 		r.log = ctrl.Log.WithName("controllers").WithName("Helm")
 	}
 	if r.actionClientGetter == nil {
-		actionConfigGetter := helmclient.NewActionConfigGetter(mgr.GetConfig(), mgr.GetRESTMapper(), r.log)
+		actionConfigGetter, err := helmclient.NewActionConfigGetter(mgr.GetConfig(), mgr.GetRESTMapper(), r.log)
+		if err != nil {
+			return fmt.Errorf("creating action config getter: %w", err)
+		}
 		r.actionClientGetter = helmclient.NewActionClientGetter(actionConfigGetter)
 	}
 	if r.eventRecorder == nil {
@@ -886,6 +892,7 @@ func (r *Reconciler) addDefaults(mgr ctrl.Manager, controllerName string) {
 	if r.valueMapper == nil {
 		r.valueMapper = internalvalues.DefaultMapper
 	}
+	return nil
 }
 
 func (r *Reconciler) setupScheme(mgr ctrl.Manager) {

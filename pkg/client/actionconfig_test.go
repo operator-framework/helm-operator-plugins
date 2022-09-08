@@ -29,7 +29,9 @@ import (
 var _ = Describe("ActionConfig", func() {
 	var _ = Describe("NewActionConfigGetter", func() {
 		It("should return a valid ActionConfigGetter", func() {
-			Expect(NewActionConfigGetter(nil, nil, logr.Discard())).NotTo(BeNil())
+			acg, err := NewActionConfigGetter(cfg, nil, logr.Discard())
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(acg).NotTo(BeNil())
 		})
 	})
 
@@ -42,7 +44,8 @@ var _ = Describe("ActionConfig", func() {
 			rm, err := apiutil.NewDiscoveryRESTMapper(cfg)
 			Expect(err).To(BeNil())
 
-			acg := NewActionConfigGetter(cfg, rm, logr.Discard())
+			acg, err := NewActionConfigGetter(cfg, rm, logr.Discard())
+			Expect(err).ShouldNot(HaveOccurred())
 			ac, err := acg.ActionConfigFor(obj)
 			Expect(err).To(BeNil())
 			Expect(ac).NotTo(BeNil())

@@ -59,7 +59,8 @@ var _ = Describe("ActionClient", func() {
 	})
 	var _ = Describe("NewActionClientGetter", func() {
 		It("should return a valid ActionConfigGetter", func() {
-			actionConfigGetter := NewActionConfigGetter(cfg, rm, logr.Discard())
+			actionConfigGetter, err := NewActionConfigGetter(cfg, rm, logr.Discard())
+			Expect(err).ShouldNot(HaveOccurred())
 			Expect(NewActionClientGetter(actionConfigGetter)).NotTo(BeNil())
 		})
 	})
@@ -85,7 +86,9 @@ var _ = Describe("ActionClient", func() {
 			obj = testutil.BuildTestCR(gvk)
 		})
 		It("should return a valid ActionClient", func() {
-			acg := NewActionClientGetter(NewActionConfigGetter(cfg, rm, logr.Discard()))
+			actionConfGetter, err := NewActionConfigGetter(cfg, rm, logr.Discard())
+			Expect(err).ShouldNot(HaveOccurred())
+			acg := NewActionClientGetter(actionConfGetter)
 			ac, err := acg.ActionClientFor(obj)
 			Expect(err).To(BeNil())
 			Expect(ac).NotTo(BeNil())
@@ -102,8 +105,8 @@ var _ = Describe("ActionClient", func() {
 		BeforeEach(func() {
 			obj = testutil.BuildTestCR(gvk)
 
-			var err error
-			actionConfigGetter := NewActionConfigGetter(cfg, rm, logr.Discard())
+			actionConfigGetter, err := NewActionConfigGetter(cfg, rm, logr.Discard())
+			Expect(err).ShouldNot(HaveOccurred())
 			acg := NewActionClientGetter(actionConfigGetter)
 			ac, err = acg.ActionClientFor(obj)
 			Expect(err).To(BeNil())
