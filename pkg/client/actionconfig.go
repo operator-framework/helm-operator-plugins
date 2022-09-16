@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/client-go/kubernetes"
+
 	"github.com/go-logr/logr"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/kube"
@@ -30,7 +32,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -38,64 +39,61 @@ type ActionConfigGetter interface {
 	ActionConfigFor(obj client.Object) (*action.Configuration, error)
 }
 
-func NewActionConfigGetter(cfg *rest.Config, rm meta.RESTMapper, log logr.Logger) ActionConfigGetter {
-	return &actionConfigGetter{
-		cfg:        cfg,
-		restMapper: rm,
-		log:        log,
+func NewActionConfigGetter(cfg *rest.Config, rm meta.RESTMapper, log logr.Logger) (ActionConfigGetter, error) {
+	rcg := newRESTClientGetter(cfg, rm, "")
+	// Setup the debug log function that Helm will use
+	debugLog := func(format string, v ...interface{}) {
+		if log.GetSink() != nil {
+			log.V(1).Info(fmt.Sprintf(format, v...))
+		}
 	}
+
+	kc := kube.New(rcg)
+	kc.Log = debugLog
+
+	kcs, err := kc.Factory.KubernetesClientSet()
+	if err != nil {
+		return nil, fmt.Errorf("creating kubernetes client set: %w", err)
+	}
+
+	return &actionConfigGetter{
+		kubeClient:       kc,
+		kubeClientSet:    kcs,
+		debugLog:         debugLog,
+		restClientGetter: rcg.restClientGetter,
+	}, nil
 }
 
 var _ ActionConfigGetter = &actionConfigGetter{}
 
 type actionConfigGetter struct {
-	cfg        *rest.Config
-	restMapper meta.RESTMapper
-	log        logr.Logger
+	kubeClient       *kube.Client
+	kubeClientSet    kubernetes.Interface
+	debugLog         func(string, ...interface{})
+	restClientGetter *restClientGetter
 }
 
 func (acg *actionConfigGetter) ActionConfigFor(obj client.Object) (*action.Configuration, error) {
-	// Create a RESTClientGetter
-	rcg := newRESTClientGetter(acg.cfg, acg.restMapper, obj.GetNamespace())
-
-	// Setup the debug log function that Helm will use
-	debugLog := func(format string, v ...interface{}) {
-		if acg.log.GetSink() != nil {
-			acg.log.V(1).Info(fmt.Sprintf(format, v...))
-		}
-	}
-
-	// Create a client that helm will use to manage release resources.
-	// The passed object is used as an owner reference on every
-	// object the client creates.
-	kc := kube.New(rcg)
-	kc.Log = debugLog
-
-	// Create the Kubernetes Secrets client. The passed object is
-	// also used as an owner reference in the release secrets
-	// created by this client.
-	kcs, err := cmdutil.NewFactory(rcg).KubernetesClientSet()
-	if err != nil {
-		return nil, err
-	}
-
 	ownerRef := metav1.NewControllerRef(obj, obj.GetObjectKind().GroupVersionKind())
 	d := driver.NewSecrets(&ownerRefSecretClient{
-		SecretInterface: kcs.CoreV1().Secrets(obj.GetNamespace()),
+		SecretInterface: acg.kubeClientSet.CoreV1().Secrets(obj.GetNamespace()),
 		refs:            []metav1.OwnerReference{*ownerRef},
 	})
 
 	// Also, use the debug log for the storage driver
-	d.Log = debugLog
+	d.Log = acg.debugLog
 
 	// Initialize the storage backend
 	s := storage.Init(d)
 
+	kubeClient := *acg.kubeClient
+	kubeClient.Namespace = obj.GetNamespace()
+
 	return &action.Configuration{
-		RESTClientGetter: rcg,
+		RESTClientGetter: acg.restClientGetter.ForNamespace(obj.GetNamespace()),
 		Releases:         s,
-		KubeClient:       kc,
-		Log:              debugLog,
+		KubeClient:       &kubeClient,
+		Log:              acg.debugLog,
 	}, nil
 }
 
