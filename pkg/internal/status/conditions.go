@@ -27,7 +27,7 @@ import (
 
 // clock is used to set status condition timestamps.
 // This variable makes it easier to test conditions.
-var clock kubeclock.Clock = &kubeclock.RealClock{}
+var clock kubeclock.PassiveClock = &kubeclock.RealClock{}
 
 // ConditionType is the type of the condition and is typically a CamelCased
 // word or short phrase.
