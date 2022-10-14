@@ -17,7 +17,7 @@ package chartutil
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"ioutil"
 	"os"
 	"path/filepath"
 

@@ -19,7 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"ioutil"
 	"os"
 	"text/template"
 

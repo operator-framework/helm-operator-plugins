@@ -17,7 +17,7 @@ package util
 
 import (
 	"errors"
-	"io/ioutil"
+	"ioutil"
 	"os"
 	"regexp"
 	"strings"
