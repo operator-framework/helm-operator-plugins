@@ -16,7 +16,6 @@ package watches
 
 import (
 	"bytes"
-	"io/ioutil"
 	"os"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -316,7 +315,7 @@ var _ = Describe("Load", func() {
 			},
 		}
 
-		f, err := ioutil.TempFile("", "osdk-test-load")
+		f, err := os.CreateTemp("", "osdk-test-load")
 		Expect(err).NotTo(HaveOccurred())
 
 		defer removeFile(f)

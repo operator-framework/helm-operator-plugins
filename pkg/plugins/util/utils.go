@@ -17,7 +17,6 @@ package util
 
 import (
 	"errors"
-	"io/ioutil"
 	"os"
 	"regexp"
 	"strings"
@@ -32,7 +31,7 @@ func ReplaceInFile(path, old, new string) error {
 	if err != nil {
 		return err
 	}
-	b, err := ioutil.ReadFile(path)
+	b, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
@@ -40,7 +39,7 @@ func ReplaceInFile(path, old, new string) error {
 		return errors.New("unable to find the content to be replaced")
 	}
 	s := strings.Replace(string(b), old, new, -1)
-	err = ioutil.WriteFile(path, []byte(s), info.Mode())
+	err = os.WriteFile(path, []byte(s), info.Mode())
 	if err != nil {
 		return err
 	}
@@ -56,7 +55,7 @@ func ReplaceRegexInFile(path, match, replace string) error {
 	if err != nil {
 		return err
 	}
-	b, err := ioutil.ReadFile(path)
+	b, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
@@ -64,7 +63,7 @@ func ReplaceRegexInFile(path, match, replace string) error {
 	if s == string(b) {
 		return errors.New("unable to find the content to be replaced")
 	}
-	err = ioutil.WriteFile(path, []byte(s), info.Mode())
+	err = os.WriteFile(path, []byte(s), info.Mode())
 	if err != nil {
 		return err
 	}
@@ -73,7 +72,7 @@ func ReplaceRegexInFile(path, match, replace string) error {
 
 // InsertCode searches target content in the file and insert `toInsert` after the target.
 func InsertCode(filename, target, code string) error {
-	contents, err := ioutil.ReadFile(filename)
+	contents, err := os.ReadFile(filename)
 	if err != nil {
 		return err
 	}
@@ -81,5 +80,5 @@ func InsertCode(filename, target, code string) error {
 	out := string(contents[:idx+len(target)]) + code + string(contents[idx+len(target):])
 	// false positive
 	// nolint:gosec
-	return ioutil.WriteFile(filename, []byte(out), 0644)
+	return os.WriteFile(filename, []byte(out), 0644)
 }

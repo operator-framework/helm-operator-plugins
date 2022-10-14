@@ -19,7 +19,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -95,7 +94,7 @@ func ReplaceInFile(path, old, new string) error {
 	if err != nil {
 		return err
 	}
-	b, err := ioutil.ReadFile(path)
+	b, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
@@ -103,7 +102,7 @@ func ReplaceInFile(path, old, new string) error {
 		return errors.New("unable to find the content to be replaced")
 	}
 	s := strings.Replace(string(b), old, new, -1)
-	err = ioutil.WriteFile(path, []byte(s), info.Mode())
+	err = os.WriteFile(path, []byte(s), info.Mode())
 	if err != nil {
 		return err
 	}
@@ -122,7 +121,7 @@ func ReplaceRegexInFile(path, match, replace string) error {
 	if err != nil {
 		return err
 	}
-	b, err := ioutil.ReadFile(path)
+	b, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
@@ -130,7 +129,7 @@ func ReplaceRegexInFile(path, match, replace string) error {
 	if s == string(b) {
 		return errors.New("unable to find the content to be replaced")
 	}
-	err = ioutil.WriteFile(path, []byte(s), info.Mode())
+	err = os.WriteFile(path, []byte(s), info.Mode())
 	if err != nil {
 		return err
 	}
@@ -142,7 +141,7 @@ func ReplaceRegexInFile(path, match, replace string) error {
 // todo(camilamacedo86): this func exists in upstream/kb but there the error is not thrown. We need to
 // push this change. See: https://github.com/kubernetes-sigs/kubebuilder/blob/master/test/e2e/utils/util.go
 func UncommentCode(filename, target, prefix string) error {
-	content, err := ioutil.ReadFile(filename)
+	content, err := os.ReadFile(filename)
 	if err != nil {
 		return err
 	}
@@ -184,5 +183,5 @@ func UncommentCode(filename, target, prefix string) error {
 	}
 	// false positive
 	// nolint:gosec
-	return ioutil.WriteFile(filename, out.Bytes(), 0644)
+	return os.WriteFile(filename, out.Bytes(), 0644)
 }
