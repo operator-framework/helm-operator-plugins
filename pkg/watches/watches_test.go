@@ -315,7 +315,7 @@ var _ = Describe("Load", func() {
 			},
 		}
 
-		f, err := os.TempFile("", "osdk-test-load")
+		f, err := os.CreateTemp("", "osdk-test-load")
 		Expect(err).NotTo(HaveOccurred())
 
 		defer removeFile(f)
