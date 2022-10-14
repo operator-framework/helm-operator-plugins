@@ -38,7 +38,7 @@ var (
 	)
 )
 
-//RegisterBuildInfo registers buildInfo Collector to be included in metrics collection
+// RegisterBuildInfo registers buildInfo Collector to be included in metrics collection
 func RegisterBuildInfo(r prometheus.Registerer) {
 	buildInfo.Set(1)
 	r.MustRegister(buildInfo)

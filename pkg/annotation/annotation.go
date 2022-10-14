@@ -21,23 +21,22 @@ limitations under the License.
 //
 // To disable hooks based on annotations the InstallDisableHooks is passed to the reconciler as an option.
 //
-//    r, err := reconciler.New(
-//	    reconciler.WithChart(*w.Chart),
-//	    reconciler.WithGroupVersionKind(w.GroupVersionKind),
-//	    reconciler.WithInstallAnnotations(annotation.InstallDisableHook{}),
-//	  )
+//	   r, err := reconciler.New(
+//		    reconciler.WithChart(*w.Chart),
+//		    reconciler.WithGroupVersionKind(w.GroupVersionKind),
+//		    reconciler.WithInstallAnnotations(annotation.InstallDisableHook{}),
+//		  )
 //
 // If the reconciler detects an annotation named "helm.sdk.operatorframework.io/install-disable-hooks"
 // on the watched custom resource it sets the install.DisableHooks option to the annotations value. For more information
 // take a look at the InstallDisableHooks.InstallOption method.
 //
-//   kind: OperatorHelmKind
-//   apiVersion: test.example.com/v1
-//   metadata:
-//     name: nginx-sample
-//     annotations:
-//       "helm.sdk.operatorframework.io/install-disable-hooks": true
-//
+//	kind: OperatorHelmKind
+//	apiVersion: test.example.com/v1
+//	metadata:
+//	  name: nginx-sample
+//	  annotations:
+//	    "helm.sdk.operatorframework.io/install-disable-hooks": true
 package annotation
 
 import (

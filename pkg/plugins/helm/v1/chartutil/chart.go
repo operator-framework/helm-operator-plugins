@@ -85,15 +85,15 @@ func NewChart(name string) (*chart.Chart, error) {
 // If opts.Repo is not specified, the following chart reference formats are supported:
 //
 //   - <repoName>/<chartName>: Fetch the helm chart named chartName from the helm
-//                             chart repository named repoName, as specified in the
-//                             $HELM_HOME/repositories/repositories.yaml file.
+//     chart repository named repoName, as specified in the
+//     $HELM_HOME/repositories/repositories.yaml file.
 //
 //   - <url>: Fetch the helm chart archive at the specified URL.
 //
 // If opts.Repo is specified, only one chart reference format is supported:
 //
 //   - <chartName>: Fetch the helm chart named chartName in the helm chart repository
-//                  specified by opts.Repo
+//     specified by opts.Repo
 //
 // If opts.Version is not set, it will fetch the latest available version of the helm
 // chart. Otherwise, it will fetch the specified version.
@@ -151,7 +151,7 @@ func downloadChart(destDir string, opts Options) (string, error) {
 
 // ScaffoldChart scaffolds the provided chart.Chart to a known directory relative to projectDir
 //
-// It also fetches the dependencies and reloads the chart.Chart
+// # It also fetches the dependencies and reloads the chart.Chart
 //
 // It returns the reloaded chart, the relative path, or an error.
 func ScaffoldChart(chrt *chart.Chart, projectDir string) (*chart.Chart, string, error) {
