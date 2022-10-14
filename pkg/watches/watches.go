@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"ioutil"
 	"os"
 	"text/template"
 
@@ -63,7 +62,7 @@ func Load(path string) ([]Watch, error) {
 }
 
 func LoadReader(reader io.Reader) ([]Watch, error) {
-	b, err := ioutil.ReadAll(reader)
+	b, err := os.ReadAll(reader)
 	if err != nil {
 		return nil, err
 	}

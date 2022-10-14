@@ -17,7 +17,6 @@ package chartutil
 import (
 	"bytes"
 	"fmt"
-	"ioutil"
 	"os"
 	"path/filepath"
 
@@ -52,7 +51,7 @@ type Options struct {
 // NewChart creates a new helm chart for the project from helm's default template.
 // It returns a chart.Chart that references the newly created chart or an error.
 func NewChart(name string) (*chart.Chart, error) {
-	tmpDir, err := ioutil.TempDir("", "osdk-helm-chart")
+	tmpDir, err := os.TempDir("", "osdk-helm-chart")
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +100,7 @@ func NewChart(name string) (*chart.Chart, error) {
 // opts.Version is not used when opts.Chart itself refers to a specific version, for
 // example when it is a local path or a URL.
 func LoadChart(opts Options) (*chart.Chart, error) {
-	tmpDir, err := ioutil.TempDir("", "osdk-helm-chart")
+	tmpDir, err := os.TempDir("", "osdk-helm-chart")
 	if err != nil {
 		return nil, err
 	}
