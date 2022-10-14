@@ -69,7 +69,7 @@ fix:
 # Run various checks against code
 .PHONY: lint
 lint:
-	fetch golangci-lint 1.45.2 && golangci-lint run
+	fetch golangci-lint 1.48.0 && golangci-lint run
 
 .PHONY: fix
 fix: ## Fixup files in the repo.
