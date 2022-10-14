@@ -59,23 +59,20 @@ test-sanity: generate fix lint ## Test repo formatting, linting, etc.
 build:
 	CGO_ENABLED=0 mkdir -p $(BUILD_DIR) && go build $(GO_BUILD_ARGS) -o $(BUILD_DIR) ./
 
-# Run go fmt and go mod tidy, and check for clean git tree
-.PHONY: fix
-fix:
-	go mod tidy
-	go fmt ./...
-	git diff --exit-code
+.PHONY: setup-lint
+setup-lint: ## Setup the lint
+	fetch golangci-lint 1.45.2
 
 # Run various checks against code
 .PHONY: lint
-lint:
-	fetch golangci-lint 1.48.0 && golangci-lint run
+lint: setup-lint
+	golangci-lint run
+
 
 .PHONY: fix
-fix: ## Fixup files in the repo.
+fix: setup-lint ## Fixup files in the repo.
 	go mod tidy
 	go fmt ./...
-	make lint
 	golangci-lint run --fix
 
 .PHONY: release
