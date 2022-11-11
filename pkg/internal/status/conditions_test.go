@@ -41,16 +41,14 @@ func init() {
 
 func initConditions(init ...Condition) Conditions {
 	// Use the same initial time for all initial conditions
-	clock = kubeclock.NewFakeClock(initTime)
+	clock = kubeclock.NewFakePassiveClock(initTime)
 	conditions := Conditions{}
 	for _, c := range init {
 		conditions.SetCondition(c)
 	}
 
 	// Use an incrementing clock for the rest of the test
-	// This is deprecated but should be fine to use for now until we have a better solution
-	// nolint
-	clock = &kubeclock.IntervalClock{
+	clock = &kubeclock.SimpleIntervalClock{
 		Time:     initTime,
 		Duration: clockInterval,
 	}
