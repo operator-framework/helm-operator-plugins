@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"time"
 
 	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo/v2"
@@ -37,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apitypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -61,7 +63,178 @@ var _ = Describe("ActionClient", func() {
 		It("should return a valid ActionConfigGetter", func() {
 			actionConfigGetter, err := NewActionConfigGetter(cfg, rm, logr.Discard())
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(NewActionClientGetter(actionConfigGetter)).NotTo(BeNil())
+			acg, err := NewActionClientGetter(actionConfigGetter)
+			Expect(err).To(BeNil())
+			Expect(acg).NotTo(BeNil())
+		})
+
+		When("options are specified", func() {
+			expectErr := errors.New("expect this error")
+
+			var (
+				actionConfigGetter ActionConfigGetter
+				obj                client.Object
+			)
+			BeforeEach(func() {
+				var err error
+				actionConfigGetter, err = NewActionConfigGetter(cfg, rm, logr.Discard())
+				Expect(err).ShouldNot(HaveOccurred())
+				obj = testutil.BuildTestCR(gvk)
+			})
+
+			It("should get clients with custom get options", func() {
+				expectVersion := rand.Int()
+				acg, err := NewActionClientGetter(actionConfigGetter, AppendGetOptions(
+					func(get *action.Get) error {
+						get.Version = expectVersion
+						return nil
+					},
+					func(get *action.Get) error {
+						Expect(get.Version).To(Equal(expectVersion))
+						return expectErr
+					},
+				))
+				Expect(err).To(BeNil())
+				Expect(acg).NotTo(BeNil())
+
+				ac, err := acg.ActionClientFor(obj)
+				Expect(err).To(BeNil())
+				Expect(ac).NotTo(BeNil())
+
+				_, err = ac.Get(obj.GetName())
+				Expect(err).To(MatchError(expectErr))
+			})
+			It("should get clients with custom install options", func() {
+				acg, err := NewActionClientGetter(actionConfigGetter, AppendInstallOptions(
+					func(install *action.Install) error {
+						install.Description = mockTestDesc
+						return nil
+					},
+					func(install *action.Install) error {
+						Expect(install.Description).To(Equal(mockTestDesc))
+						return expectErr
+					},
+				))
+				Expect(err).To(BeNil())
+				Expect(acg).NotTo(BeNil())
+
+				ac, err := acg.ActionClientFor(obj)
+				Expect(err).To(BeNil())
+				Expect(ac).NotTo(BeNil())
+
+				_, err = ac.Install(obj.GetName(), obj.GetNamespace(), &chrt, chartutil.Values{})
+				Expect(err).To(MatchError(expectErr))
+			})
+			It("should get clients with custom upgrade options", func() {
+				acg, err := NewActionClientGetter(actionConfigGetter, AppendUpgradeOptions(
+					func(upgrade *action.Upgrade) error {
+						upgrade.Description = mockTestDesc
+						return nil
+					},
+					func(upgrade *action.Upgrade) error {
+						Expect(upgrade.Description).To(Equal(mockTestDesc))
+						return expectErr
+					},
+				))
+				Expect(err).To(BeNil())
+				Expect(acg).NotTo(BeNil())
+
+				ac, err := acg.ActionClientFor(obj)
+				Expect(err).To(BeNil())
+				Expect(ac).NotTo(BeNil())
+
+				_, err = ac.Upgrade(obj.GetName(), obj.GetNamespace(), &chrt, chartutil.Values{})
+				Expect(err).To(MatchError(expectErr))
+			})
+			It("should get clients with custom uninstall options", func() {
+				acg, err := NewActionClientGetter(actionConfigGetter, AppendUninstallOptions(
+					func(uninstall *action.Uninstall) error {
+						uninstall.Description = mockTestDesc
+						return nil
+					},
+					func(uninstall *action.Uninstall) error {
+						Expect(uninstall.Description).To(Equal(mockTestDesc))
+						return expectErr
+					},
+				))
+				Expect(err).To(BeNil())
+				Expect(acg).NotTo(BeNil())
+
+				ac, err := acg.ActionClientFor(obj)
+				Expect(err).To(BeNil())
+				Expect(ac).NotTo(BeNil())
+
+				_, err = ac.Uninstall(obj.GetName())
+				Expect(err).To(MatchError(expectErr))
+			})
+			It("should get clients with custom install failure uninstall options", func() {
+				acg, err := NewActionClientGetter(actionConfigGetter, AppendInstallFailureUninstallOptions(
+					func(uninstall *action.Uninstall) error {
+						uninstall.Description = mockTestDesc
+						return nil
+					},
+					func(uninstall *action.Uninstall) error {
+						Expect(uninstall.Description).To(Equal(mockTestDesc))
+						return expectErr
+					},
+				))
+				Expect(err).To(BeNil())
+				Expect(acg).NotTo(BeNil())
+
+				ac, err := acg.ActionClientFor(obj)
+				Expect(err).To(BeNil())
+				Expect(ac).NotTo(BeNil())
+
+				_, err = ac.Install(obj.GetName(), obj.GetNamespace(), &chrt, chartutil.Values{}, func(install *action.Install) error {
+					// Force the installatiom to fail by using an impossibly short wait.
+					// When the installation fails, the failure uninstall logic is attempted.
+					install.Wait = true
+					install.Timeout = time.Nanosecond * 1
+					return nil
+				})
+				Expect(err).To(MatchError(ContainSubstring(expectErr.Error())))
+
+				// Uninstall the chart to cleanup for other tests.
+				_, err = ac.Uninstall(obj.GetName())
+				Expect(err).To(BeNil())
+			})
+			It("should get clients with custom upgrade failure rollback options", func() {
+				expectMaxHistory := rand.Int()
+				acg, err := NewActionClientGetter(actionConfigGetter, AppendUpgradeFailureRollbackOptions(
+					func(rollback *action.Rollback) error {
+						rollback.MaxHistory = expectMaxHistory
+						return nil
+					},
+					func(rollback *action.Rollback) error {
+						Expect(rollback.MaxHistory).To(Equal(expectMaxHistory))
+						return expectErr
+					},
+				))
+				Expect(err).To(BeNil())
+				Expect(acg).NotTo(BeNil())
+
+				ac, err := acg.ActionClientFor(obj)
+				Expect(err).To(BeNil())
+				Expect(ac).NotTo(BeNil())
+
+				// Install the chart so that we can try an upgrade.
+				rel, err := ac.Install(obj.GetName(), obj.GetNamespace(), &chrt, chartutil.Values{})
+				Expect(err).To(BeNil())
+				Expect(rel).NotTo(BeNil())
+
+				_, err = ac.Upgrade(obj.GetName(), obj.GetNamespace(), &chrt, chartutil.Values{}, func(upgrade *action.Upgrade) error {
+					// Force the upgrade to fail by using an impossibly short wait.
+					// When the upgrade fails, the rollback logic is attempted.
+					upgrade.Wait = true
+					upgrade.Timeout = time.Nanosecond * 1
+					return nil
+				})
+				Expect(err).To(MatchError(ContainSubstring(expectErr.Error())))
+
+				// Uninstall the chart to cleanup for other tests.
+				_, err = ac.Uninstall(obj.GetName())
+				Expect(err).To(BeNil())
+			})
 		})
 	})
 
@@ -88,7 +261,8 @@ var _ = Describe("ActionClient", func() {
 		It("should return a valid ActionClient", func() {
 			actionConfGetter, err := NewActionConfigGetter(cfg, rm, logr.Discard())
 			Expect(err).ShouldNot(HaveOccurred())
-			acg := NewActionClientGetter(actionConfGetter)
+			acg, err := NewActionClientGetter(actionConfGetter)
+			Expect(err).To(BeNil())
 			ac, err := acg.ActionClientFor(obj)
 			Expect(err).To(BeNil())
 			Expect(ac).NotTo(BeNil())
@@ -107,7 +281,8 @@ var _ = Describe("ActionClient", func() {
 
 			actionConfigGetter, err := NewActionConfigGetter(cfg, rm, logr.Discard())
 			Expect(err).ShouldNot(HaveOccurred())
-			acg := NewActionClientGetter(actionConfigGetter)
+			acg, err := NewActionClientGetter(actionConfigGetter)
+			Expect(err).To(BeNil())
 			ac, err = acg.ActionClientFor(obj)
 			Expect(err).To(BeNil())
 

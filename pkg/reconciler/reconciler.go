@@ -881,7 +881,10 @@ func (r *Reconciler) addDefaults(mgr ctrl.Manager, controllerName string) error 
 		if err != nil {
 			return fmt.Errorf("creating action config getter: %w", err)
 		}
-		r.actionClientGetter = helmclient.NewActionClientGetter(actionConfigGetter)
+		r.actionClientGetter, err = helmclient.NewActionClientGetter(actionConfigGetter)
+		if err != nil {
+			return fmt.Errorf("creating action client getter: %v", err)
+		}
 	}
 	if r.eventRecorder == nil {
 		r.eventRecorder = mgr.GetEventRecorderFor(controllerName)
