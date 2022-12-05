@@ -1,7 +1,7 @@
 # helm-operator
 
-![Build Status](https://github.com/operator-framework/helm-operator-plugins/workflows/CI/badge.svg?branch=master)
-[![Coverage Status](https://coveralls.io/repos/github/operator-framework/helm-operator-plugins/badge.svg?branch=master)](https://coveralls.io/github/operator-framework/helm-operator-plugins?branch=master)
+![Build Status](https://github.com/operator-framework/helm-operator-plugins/workflows/CI/badge.svg?branch=main)
+[![Coverage Status](https://coveralls.io/repos/github/operator-framework/helm-operator-plugins/badge.svg?branch=main)](https://coveralls.io/github/operator-framework/helm-operator-plugins?branch=main)
 
 Reimplementation of the helm operator to enrich the Helm operator's reconciliation with custom Go code to create a 
 hybrid operator.
