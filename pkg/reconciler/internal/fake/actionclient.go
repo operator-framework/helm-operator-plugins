@@ -52,12 +52,14 @@ type ActionClient struct {
 	Installs   []InstallCall
 	Upgrades   []UpgradeCall
 	Uninstalls []UninstallCall
+	Rollbacks  []RollbackCall
 	Reconciles []ReconcileCall
 
 	HandleGet       func() (*release.Release, error)
 	HandleInstall   func() (*release.Release, error)
 	HandleUpgrade   func() (*release.Release, error)
 	HandleUninstall func() (*release.UninstallReleaseResponse, error)
+	HandleRollback  func() error
 	HandleReconcile func() error
 }
 
@@ -68,6 +70,9 @@ func NewActionClient() ActionClient {
 	uninstFunc := func(err error) func() (*release.UninstallReleaseResponse, error) {
 		return func() (*release.UninstallReleaseResponse, error) { return nil, err }
 	}
+	rbFunc := func(err error) func() error {
+		return func() error { return err }
+	}
 	recFunc := func(err error) func() error {
 		return func() error { return err }
 	}
@@ -76,12 +81,14 @@ func NewActionClient() ActionClient {
 		Installs:   make([]InstallCall, 0),
 		Upgrades:   make([]UpgradeCall, 0),
 		Uninstalls: make([]UninstallCall, 0),
+		Rollbacks:  make([]RollbackCall, 0),
 		Reconciles: make([]ReconcileCall, 0),
 
 		HandleGet:       relFunc(errors.New("get not implemented")),
 		HandleInstall:   relFunc(errors.New("install not implemented")),
 		HandleUpgrade:   relFunc(errors.New("upgrade not implemented")),
 		HandleUninstall: uninstFunc(errors.New("uninstall not implemented")),
+		HandleRollback:  rbFunc(errors.New("rollback not implemented")),
 		HandleReconcile: recFunc(errors.New("reconcile not implemented")),
 	}
 }
@@ -114,6 +121,11 @@ type UninstallCall struct {
 	Opts []client.UninstallOption
 }
 
+type RollbackCall struct {
+	Name string
+	Opts []client.RollbackOption
+}
+
 type ReconcileCall struct {
 	Release *release.Release
 }
@@ -136,6 +148,11 @@ func (c *ActionClient) Upgrade(name, namespace string, chrt *chart.Chart, vals m
 func (c *ActionClient) Uninstall(name string, opts ...client.UninstallOption) (*release.UninstallReleaseResponse, error) {
 	c.Uninstalls = append(c.Uninstalls, UninstallCall{name, opts})
 	return c.HandleUninstall()
+}
+
+func (c *ActionClient) Rollback(name string, opts ...client.RollbackOption) error {
+	c.Rollbacks = append(c.Rollbacks, RollbackCall{name, opts})
+	return c.HandleRollback()
 }
 
 func (c *ActionClient) Reconcile(rel *release.Release) error {

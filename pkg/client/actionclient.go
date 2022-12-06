@@ -54,6 +54,7 @@ type ActionInterface interface {
 	Install(name, namespace string, chrt *chart.Chart, vals map[string]interface{}, opts ...InstallOption) (*release.Release, error)
 	Upgrade(name, namespace string, chrt *chart.Chart, vals map[string]interface{}, opts ...UpgradeOption) (*release.Release, error)
 	Uninstall(name string, opts ...UninstallOption) (*release.UninstallReleaseResponse, error)
+	Rollback(name string, opts ...RollbackOption) error
 	Reconcile(rel *release.Release) error
 }
 
@@ -247,6 +248,10 @@ func (c *actionClient) Upgrade(name, namespace string, chrt *chart.Chart, vals m
 		return nil, err
 	}
 	return rel, nil
+}
+
+func (c *actionClient) Rollback(name string, opts ...RollbackOption) error {
+	return c.rollback(name, concat(c.upgradeFailureRollbackOpts, opts...)...)
 }
 
 func (c *actionClient) rollback(name string, opts ...RollbackOption) error {
