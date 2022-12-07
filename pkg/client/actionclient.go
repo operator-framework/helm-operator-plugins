@@ -94,6 +94,13 @@ func AppendUninstallOptions(opts ...UninstallOption) ActionClientGetterOption {
 	}
 }
 
+func AppendRollbackOptions(opts ...RollbackOption) ActionClientGetterOption {
+	return func(getter *actionClientGetter) error {
+		getter.defaultRollbackOpts = append(getter.defaultRollbackOpts, opts...)
+		return nil
+	}
+}
+
 func AppendInstallFailureUninstallOptions(opts ...UninstallOption) ActionClientGetterOption {
 	return func(getter *actionClientGetter) error {
 		getter.installFailureUninstallOpts = append(getter.installFailureUninstallOpts, opts...)
@@ -124,6 +131,7 @@ type actionClientGetter struct {
 	defaultInstallOpts   []InstallOption
 	defaultUpgradeOpts   []UpgradeOption
 	defaultUninstallOpts []UninstallOption
+	defaultRollbackOpts  []RollbackOption
 
 	installFailureUninstallOpts []UninstallOption
 	upgradeFailureRollbackOpts  []RollbackOption
@@ -151,6 +159,7 @@ func (hcg *actionClientGetter) ActionClientFor(obj client.Object) (ActionInterfa
 		defaultInstallOpts:   append([]InstallOption{WithInstallPostRenderer(postRenderer)}, hcg.defaultInstallOpts...),
 		defaultUpgradeOpts:   append([]UpgradeOption{WithUpgradePostRenderer(postRenderer)}, hcg.defaultUpgradeOpts...),
 		defaultUninstallOpts: hcg.defaultUninstallOpts,
+		defaultRollbackOpts:  hcg.defaultRollbackOpts,
 
 		installFailureUninstallOpts: hcg.installFailureUninstallOpts,
 		upgradeFailureRollbackOpts:  hcg.upgradeFailureRollbackOpts,
@@ -164,6 +173,7 @@ type actionClient struct {
 	defaultInstallOpts   []InstallOption
 	defaultUpgradeOpts   []UpgradeOption
 	defaultUninstallOpts []UninstallOption
+	defaultRollbackOpts  []RollbackOption
 
 	installFailureUninstallOpts []UninstallOption
 	upgradeFailureRollbackOpts  []RollbackOption
@@ -251,7 +261,7 @@ func (c *actionClient) Upgrade(name, namespace string, chrt *chart.Chart, vals m
 }
 
 func (c *actionClient) Rollback(name string, opts ...RollbackOption) error {
-	return c.rollback(name, concat(c.upgradeFailureRollbackOpts, opts...)...)
+	return c.rollback(name, concat(c.defaultRollbackOpts, opts...)...)
 }
 
 func (c *actionClient) rollback(name string, opts ...RollbackOption) error {
