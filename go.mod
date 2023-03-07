@@ -10,7 +10,7 @@ require (
 	github.com/kr/text v0.2.0
 	github.com/onsi/ginkgo/v2 v2.7.0
 	github.com/onsi/gomega v1.24.2
-	github.com/operator-framework/operator-lib v0.11.1-0.20230126194151-7fc7204a9445
+	github.com/operator-framework/operator-lib v0.11.1-0.20230306195046-28cadc6b6055
 	github.com/prometheus/client_golang v1.14.0
 	github.com/sergi/go-diff v1.2.0
 	github.com/sirupsen/logrus v1.9.0
@@ -25,7 +25,7 @@ require (
 	k8s.io/apimachinery v0.26.2
 	k8s.io/cli-runtime v0.26.2
 	k8s.io/client-go v0.26.2
-	k8s.io/utils v0.0.0-20221128185143-99ec85e7a448
+	k8s.io/utils v0.0.0-20230220204549-a5ecb0141aa5
 	sigs.k8s.io/controller-runtime v0.14.5
 	sigs.k8s.io/kubebuilder/v3 v3.9.0
 	sigs.k8s.io/yaml v1.3.0
