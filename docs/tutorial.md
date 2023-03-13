@@ -30,7 +30,7 @@ operator-sdk init --plugins=hybrid.helm.sdk.operatorframework.io --project-versi
 The `init` command generates the RBAC rules in `config/rbac/role.yaml` based on the resources that would be deployed by the chart's default manifests. Be sure to double check that the rules generated in `config/rbac/role.yaml` meet the operator's permission requirements.
 
 **Note:**
-This creates a project structure that is compatible with both Helm and Go APIs. To learn more about the project directory structure, see the [project layout][[project_layout]] doc.
+This creates a project structure that is compatible with both Helm and Go APIs. To learn more about the project directory structure, see the [project layout][project_layout] doc.
 
 Hybrid-Helm has not been tested against webhooks and cert manager. Hence, there is no scaffolding for webhooks and cert manager. Go APIs support Webhooks in general. If users, would like to experiment doing so, they can refer to [Operator SDK](https://sdk.operatorframework.io/docs/building-operators/golang/webhook/) or [Kubebuilder](https://book.kubebuilder.io/reference/webhook-overview.html?highlight=webhook#webhook) documentation.
 
@@ -374,6 +374,6 @@ make undeploy
 [rbac]: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
 [rbac_marker]: https://book.kubebuilder.io/reference/markers/rbac.html
 [rbac_bug]: https://github.com/operator-framework/helm-operator-plugins/issues/142
-[project_layout]: docs/project_layout.md
+[project_layout]: /docs/project_layout.md
 [c-r_manager]: https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/manager#Manager
 [memcached_sample_rbac]: https://github.com/varshaprasad96/hybrid-memcached-example/blob/main/config/rbac/role.yaml
