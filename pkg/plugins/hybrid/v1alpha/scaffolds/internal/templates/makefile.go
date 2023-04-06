@@ -109,6 +109,23 @@ all: build
 help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
+##@ Build
+.PHONY: build
+build: manifests generate fmt vet ## Build manager binary.
+	go build -o bin/manager main.go
+
+.PHONY: run
+run: manifests generate fmt vet ## Run against the configured Kubernetes cluster in ~/.kube/config
+	go run ./main.go
+
+.PHONY: docker-build
+docker-build: ## Build docker image with the manager.
+	docker build -t ${IMG} .
+
+.PHONY: docker-push
+docker-push: ## Push docker image with the manager.
+	docker push ${IMG}
+
 ##@ Development
 
 .PHONY: manifests
@@ -130,21 +147,6 @@ vet: ## Run go vet against code.
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./... -coverprofile cover.out
-
-
-##@ Build
-.PHONY: run
-run: manifests generate fmt vet ## Run against the configured Kubernetes cluster in ~/.kube/config
-	helm-operator
-	$(HELM_OPERATOR) run
-	
-.PHONY: docker-build
-docker-build: test ## Build docker image with the manager.
-	docker build -t ${IMG}
-
-.PHONY: docker-push
-docker-push: ## Push docker image with the manager.
-	docker push ${IMG}
 
 ##@ Deployment
 
