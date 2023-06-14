@@ -61,7 +61,7 @@ build:
 
 .PHONY: setup-lint
 setup-lint: ## Setup the lint
-	fetch golangci-lint 1.48.0
+	fetch golangci-lint 1.51.2
 
 # Run various checks against code
 .PHONY: lint
