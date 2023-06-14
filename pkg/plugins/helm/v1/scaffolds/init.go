@@ -19,7 +19,7 @@ package scaffolds
 
 import (
 	"os"
-	kustomizev2alpha "sigs.k8s.io/kubebuilder/v3/pkg/plugins/common/kustomize/v2-alpha"
+	kustomizev2 "sigs.k8s.io/kubebuilder/v3/pkg/plugins/common/kustomize/v2"
 
 	"github.com/operator-framework/helm-operator-plugins/internal/version"
 	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/helm/v1/chartutil"
@@ -75,7 +75,7 @@ func (s *initScaffolder) Scaffold() error {
 		&templates.GitIgnore{},
 		&templates.Makefile{
 			Image:               imageName,
-			KustomizeVersion:    kustomizev2alpha.KustomizeVersion,
+			KustomizeVersion:    kustomizev2.KustomizeVersion,
 			HelmOperatorVersion: helmOperatorVersion,
 		},
 		&templates.Watches{},

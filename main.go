@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"log"
 	"runtime"
-	kustomizev2alpha "sigs.k8s.io/kubebuilder/v3/pkg/plugins/common/kustomize/v2-alpha"
+	kustomizev2 "sigs.k8s.io/kubebuilder/v3/pkg/plugins/common/kustomize/v2"
 
 	"github.com/spf13/cobra"
 	"sigs.k8s.io/kubebuilder/v3/pkg/cli"
@@ -65,7 +65,7 @@ func getVersion() string {
 
 func getHybridPlugin() plugin.Bundle {
 	hybridBundle, _ := plugin.NewBundle("hybrid", plugin.Version{Number: 1, Stage: stage.Alpha},
-		kustomizev2alpha.Plugin{},
+		kustomizev2.Plugin{},
 		pluginv1alpha.Plugin{},
 	)
 	return hybridBundle

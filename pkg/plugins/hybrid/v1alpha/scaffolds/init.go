@@ -32,7 +32,7 @@ import (
 	"sigs.k8s.io/kubebuilder/v3/pkg/plugin/util"
 	"sigs.k8s.io/kubebuilder/v3/pkg/plugins"
 
-	kustomizev2alpha "sigs.k8s.io/kubebuilder/v3/pkg/plugins/common/kustomize/v2-alpha"
+	kustomizev2 "sigs.k8s.io/kubebuilder/v3/pkg/plugins/common/kustomize/v2"
 	golangv3 "sigs.k8s.io/kubebuilder/v3/pkg/plugins/golang/v3/scaffolds"
 )
 
@@ -125,7 +125,7 @@ func (s *initScaffolder) Scaffold() error {
 		&rbac.ManagerRole{},
 		&templates.Makefile{
 			Image:                    imageName,
-			KustomizeVersion:         kustomizev2alpha.KustomizeVersion,
+			KustomizeVersion:         kustomizev2.KustomizeVersion,
 			HybridOperatorVersion:    hybridOperatorVersion,
 			ControllerToolsVersion:   golangv3.ControllerToolsVersion,
 			ControllerRuntimeVersion: golangv3.ControllerRuntimeVersion,
