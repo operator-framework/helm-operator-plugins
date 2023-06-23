@@ -18,6 +18,7 @@ package updater
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/api/errors"
 
 	"helm.sh/helm/v3/pkg/release"
 	corev1 "k8s.io/api/core/v1"
@@ -53,13 +54,20 @@ func (u *Updater) UpdateStatus(fs ...UpdateStatusFunc) {
 	u.updateStatusFuncs = append(u.updateStatusFuncs, fs...)
 }
 
+func isRetryableUpdateError(err error) bool {
+	return !errors.IsConflict(err) && !errors.IsNotFound(err)
+}
+
 func (u *Updater) Apply(ctx context.Context, obj *unstructured.Unstructured) error {
 	backoff := retry.DefaultRetry
 
 	// Always update the status first. During uninstall, if
 	// we remove the finalizer, updating the status will fail
-	// because the object and its status will be garbage-collected
-	if err := retry.RetryOnConflict(backoff, func() error {
+	// because the object and its status will be garbage-collected.
+	//
+	// In case of a Conflict error, the update cannot be retried,
+	// and the reconciliation loop needs to be restarted anew.
+	if err := retry.OnError(backoff, isRetryableUpdateError, func() error {
 		st := statusFor(obj)
 		needsStatusUpdate := false
 		for _, f := range u.updateStatusFuncs {
@@ -78,7 +86,7 @@ func (u *Updater) Apply(ctx context.Context, obj *unstructured.Unstructured) err
 		return err
 	}
 
-	if err := retry.RetryOnConflict(backoff, func() error {
+	if err := retry.OnError(backoff, isRetryableUpdateError, func() error {
 		needsUpdate := false
 		for _, f := range u.updateFuncs {
 			needsUpdate = f(obj) || needsUpdate
