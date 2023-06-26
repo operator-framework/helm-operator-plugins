@@ -141,9 +141,6 @@ func run(cmd *cobra.Command, f *flags.Flags) {
 	}
 	log.Info("Setting manager options", "Options", optionsLog)
 
-	if options.NewClient == nil {
-		options.NewClient = helmmgr.NewCachingClientFunc()
-	}
 	helmmgr.ConfigureWatchNamespaces(&options, log)
 
 	mgr, err := manager.New(cfg, options)

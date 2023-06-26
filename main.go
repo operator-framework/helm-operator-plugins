@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"log"
 	"runtime"
+
 	kustomizev2 "sigs.k8s.io/kubebuilder/v3/pkg/plugins/common/kustomize/v2"
 
 	"github.com/spf13/cobra"
@@ -31,7 +32,7 @@ import (
 	"github.com/operator-framework/helm-operator-plugins/internal/cmd/hybrid-operator/run"
 	"github.com/operator-framework/helm-operator-plugins/internal/version"
 	pluginv1alpha "github.com/operator-framework/helm-operator-plugins/pkg/plugins/hybrid/v1alpha"
-	golangv3 "sigs.k8s.io/kubebuilder/v3/pkg/plugins/golang/v3"
+	golangv4 "sigs.k8s.io/kubebuilder/v3/pkg/plugins/golang/v4"
 )
 
 func main() {
@@ -43,7 +44,7 @@ func main() {
 		cli.WithVersion(getVersion()),
 		cli.WithPlugins(
 			getHybridPlugin(),
-			golangv3.Plugin{},
+			golangv4.Plugin{},
 		),
 		cli.WithDefaultProjectVersion(config.Version),
 		cli.WithDefaultPlugins(config.Version, getHybridPlugin()),
@@ -64,9 +65,9 @@ func getVersion() string {
 }
 
 func getHybridPlugin() plugin.Bundle {
-	hybridBundle, _ := plugin.NewBundle("hybrid", plugin.Version{Number: 1, Stage: stage.Alpha},
-		kustomizev2.Plugin{},
-		pluginv1alpha.Plugin{},
-	)
+	hybridBundle, _ := plugin.NewBundleWithOptions(plugin.WithName("hybrid"),
+		plugin.WithVersion(plugin.Version{Number: 1, Stage: stage.Alpha}),
+		plugin.WithPlugins(kustomizev2.Plugin{}, pluginv1alpha.Plugin{}))
+
 	return hybridBundle
 }

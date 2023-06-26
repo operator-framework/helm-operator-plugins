@@ -50,7 +50,11 @@ var _ = Describe("restClientGetter", func() {
 	When("the config is valid", func() {
 		BeforeEach(func() {
 			var err error
-			rm, err = apiutil.NewDynamicRESTMapper(cfg)
+
+			httpClient, err := rest.HTTPClientFor(cfg)
+			Expect(err).NotTo(HaveOccurred())
+
+			rm, err = apiutil.NewDynamicRESTMapper(cfg, httpClient)
 			Expect(err).To(BeNil())
 
 			rcg = newRESTClientGetter(cfg, rm, "test-ns")

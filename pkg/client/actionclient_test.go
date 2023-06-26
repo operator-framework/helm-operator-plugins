@@ -40,6 +40,7 @@ import (
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/client-go/rest"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
@@ -56,7 +57,11 @@ var _ = Describe("ActionClient", func() {
 	)
 	BeforeEach(func() {
 		var err error
-		rm, err = apiutil.NewDynamicRESTMapper(cfg)
+
+		httpClient, err := rest.HTTPClientFor(cfg)
+		Expect(err).NotTo(HaveOccurred())
+
+		rm, err = apiutil.NewDynamicRESTMapper(cfg, httpClient)
 		Expect(err).To(BeNil())
 	})
 	var _ = Describe("NewActionClientGetter", func() {

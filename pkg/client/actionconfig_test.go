@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/cli-runtime/pkg/resource"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
@@ -45,7 +46,11 @@ var _ = Describe("ActionConfig", func() {
 
 		BeforeEach(func() {
 			var err error
-			rm, err = apiutil.NewDiscoveryRESTMapper(cfg)
+
+			httpClient, err := rest.HTTPClientFor(cfg)
+			Expect(err).NotTo(HaveOccurred())
+
+			rm, err = apiutil.NewDiscoveryRESTMapper(cfg, httpClient)
 			Expect(err).To(BeNil())
 		})
 
@@ -171,7 +176,10 @@ metadata:
 			obj = testutil.BuildTestCR(gvk)
 		})
 		It("should return a valid action.Configuration", func() {
-			rm, err := apiutil.NewDiscoveryRESTMapper(cfg)
+			httpClient, err := rest.HTTPClientFor(cfg)
+			Expect(err).NotTo(HaveOccurred())
+
+			rm, err := apiutil.NewDiscoveryRESTMapper(cfg, httpClient)
 			Expect(err).To(BeNil())
 
 			acg, err := NewActionConfigGetter(cfg, rm, logr.Discard())

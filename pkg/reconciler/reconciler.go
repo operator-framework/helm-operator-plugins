@@ -913,7 +913,7 @@ func (r *Reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) err
 	}
 
 	if err := c.Watch(
-		&source.Kind{Type: obj},
+		source.Kind(mgr.GetCache(), obj),
 		&sdkhandler.InstrumentedEnqueueRequestForObject{},
 		preds...,
 	); err != nil {
@@ -928,17 +928,14 @@ func (r *Reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) err
 	})
 
 	if err := c.Watch(
-		&source.Kind{Type: secret},
-		&handler.EnqueueRequestForOwner{
-			OwnerType:    obj,
-			IsController: true,
-		},
+		source.Kind(mgr.GetCache(), secret),
+		handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), obj, handler.OnlyControllerOwner()),
 	); err != nil {
 		return err
 	}
 
 	if !r.skipDependentWatches {
-		r.postHooks = append([]hook.PostHook{internalhook.NewDependentResourceWatcher(c, mgr.GetRESTMapper())}, r.postHooks...)
+		r.postHooks = append([]hook.PostHook{internalhook.NewDependentResourceWatcher(c, mgr.GetRESTMapper(), mgr.GetCache(), *mgr.GetScheme())}, r.postHooks...)
 	}
 	return nil
 }

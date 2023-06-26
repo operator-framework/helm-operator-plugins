@@ -143,9 +143,6 @@ func run(cmd *cobra.Command, f *flags.Flags) {
 	}
 	log.Info("Setting manager options", "Options", optionsLog)
 
-	if options.NewClient == nil {
-		options.NewClient = helmmgr.NewCachingClientFunc()
-	}
 	namespace, found := os.LookupEnv(helmmgr.WatchNamespaceEnvVar)
 	log = log.WithValues("Namespace", namespace)
 	if found {
