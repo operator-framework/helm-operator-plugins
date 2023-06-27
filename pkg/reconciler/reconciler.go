@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	errs "github.com/pkg/errors"
 	"strings"
 	"sync"
 	"time"
@@ -553,6 +554,18 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.
 		return ctrl.Result{}, err
 	}
 
+	// The finalizer must be present on the CR before we can do anything. Otherwise, if the reconciliation fails,
+	// there might be resources created by the chart that will not be garbage-collected
+	// (cluster-scoped resources or resources in other namespaces, which are not bound by an owner reference).
+	// This is a safety measure to ensure that the chart is fully uninstalled before the CR is deleted.
+	if obj.GetDeletionTimestamp() == nil && !controllerutil.ContainsFinalizer(obj, uninstallFinalizer) {
+		log.V(1).Info("Adding uninstall finalizer.")
+		obj.SetFinalizers(append(obj.GetFinalizers(), uninstallFinalizer))
+		if err := r.client.Update(ctx, obj); err != nil {
+			return ctrl.Result{}, errs.Wrapf(err, "failed to add uninstall finalizer to %s/%s", req.NamespacedName.Namespace, req.NamespacedName.Name)
+		}
+	}
+
 	u := updater.New(r.client)
 	defer func() {
 		applyErr := u.Apply(ctx, obj)
@@ -570,14 +583,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.
 			updater.EnsureConditionUnknown(conditions.TypeReleaseFailed),
 			updater.EnsureDeployedRelease(nil),
 		)
-		// NOTE: If obj has the uninstall finalizer, that means a release WAS deployed at some point
-		//   in the past, but we don't know if it still is because we don't have an actionClient to check.
-		//   So the question is, what do we do with the finalizer? We could:
-		//      - Leave it in place. This would make the CR impossible to delete without either resolving this error, or
-		//        manually uninstalling the release, deleting the finalizer, and deleting the CR.
-		//      - Remove the finalizer. This would make it possible to delete the CR, but it would leave around any
-		//        release resources that are not owned by the CR (those in the cluster scope or in other namespaces).
-		//
+		// When it is impossible to obtain an actionClient, we cannot proceed with the reconciliation. Question is
+		// what to do with the finalizer?
 		// The decision made for now is to leave the finalizer in place, so that the user can intervene and try to
 		// resolve the issue, instead of the operator silently leaving some dangling resources hanging around after the
 		// CR is deleted.
@@ -984,7 +991,6 @@ func ensureDeployedRelease(u *updater.Updater, rel *release.Release) {
 	if rel.Info != nil && len(rel.Info.Notes) > 0 {
 		message = rel.Info.Notes
 	}
-	u.Update(updater.EnsureFinalizer(uninstallFinalizer))
 	u.UpdateStatus(
 		updater.EnsureCondition(conditions.Deployed(corev1.ConditionTrue, reason, message)),
 		updater.EnsureDeployedRelease(rel),

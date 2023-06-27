@@ -59,7 +59,10 @@ var _ = Describe("Updater", func() {
 	When("the object does not exist", func() {
 		It("should fail", func() {
 			Expect(client.Delete(context.TODO(), obj)).To(Succeed())
-			u.Update(EnsureFinalizer(testFinalizer))
+			u.Update(func(u *unstructured.Unstructured) bool {
+				u.SetAnnotations(map[string]string{"foo": "bar"})
+				return true
+			})
 			err := u.Apply(context.TODO(), obj)
 			Expect(err).NotTo(BeNil())
 			Expect(apierrors.IsNotFound(err)).To(BeTrue())
@@ -68,12 +71,15 @@ var _ = Describe("Updater", func() {
 
 	When("an update is a change", func() {
 		It("should apply an update function", func() {
-			u.Update(EnsureFinalizer(testFinalizer))
+			u.Update(func(u *unstructured.Unstructured) bool {
+				u.SetAnnotations(map[string]string{"foo": "bar"})
+				return true
+			})
 			resourceVersion := obj.GetResourceVersion()
 
 			Expect(u.Apply(context.TODO(), obj)).To(Succeed())
 			Expect(client.Get(context.TODO(), types.NamespacedName{Namespace: "testNamespace", Name: "testDeployment"}, obj)).To(Succeed())
-			Expect(obj.GetFinalizers()).To(Equal([]string{testFinalizer}))
+			Expect(obj.GetAnnotations()["foo"]).To(Equal("bar"))
 			Expect(obj.GetResourceVersion()).NotTo(Equal(resourceVersion))
 		})
 
@@ -86,25 +92,6 @@ var _ = Describe("Updater", func() {
 			Expect((obj.Object["status"].(map[string]interface{}))["conditions"]).To(HaveLen(1))
 			Expect(obj.GetResourceVersion()).NotTo(Equal(resourceVersion))
 		})
-	})
-})
-
-var _ = Describe("EnsureFinalizer", func() {
-	var obj *unstructured.Unstructured
-
-	BeforeEach(func() {
-		obj = &unstructured.Unstructured{}
-	})
-
-	It("should add finalizer if not present", func() {
-		Expect(EnsureFinalizer(testFinalizer)(obj)).To(BeTrue())
-		Expect(obj.GetFinalizers()).To(Equal([]string{testFinalizer}))
-	})
-
-	It("should not add duplicate finalizer", func() {
-		obj.SetFinalizers([]string{testFinalizer})
-		Expect(EnsureFinalizer(testFinalizer)(obj)).To(BeFalse())
-		Expect(obj.GetFinalizers()).To(Equal([]string{testFinalizer}))
 	})
 })
 
