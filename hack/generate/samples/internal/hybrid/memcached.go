@@ -90,7 +90,7 @@ func (mh *Memcached) Run() {
 	// pkg.CheckError("creating helm api", err)
 
 	err = mh.ctx.CreateAPI(
-		"--plugins", "base.go.kubebuilder.io/v3",
+		"--plugins", "base.go.kubebuilder.io/v4",
 		"--group", mh.ctx.Group,
 		"--version", mh.ctx.Version,
 		"--kind", mh.ctx.Kind,
