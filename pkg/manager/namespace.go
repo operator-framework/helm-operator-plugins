@@ -33,17 +33,20 @@ const (
 
 func ConfigureWatchNamespaces(options *manager.Options, log logr.Logger) {
 	namespaces := lookupEnv()
+	var watchNamespaces []string
 	if len(namespaces) != 0 {
 		log.Info("watching namespaces", "namespaces", namespaces)
-		options.NewCache = func(config *rest.Config, opts cache.Options) (cache.Cache, error) {
-			return cache.New(config, cache.Options{
-				Namespaces: namespaces,
-			})
-		}
-		return
+		watchNamespaces = namespaces
+	} else {
+		log.Info("watching all namespaces")
+		watchNamespaces = []string{v1.NamespaceAll}
 	}
-	log.Info("watching all namespaces")
-	options.Namespace = v1.NamespaceAll
+
+	options.NewCache = func(config *rest.Config, opts cache.Options) (cache.Cache, error) {
+		return cache.New(config, cache.Options{
+			Namespaces: watchNamespaces,
+		})
+	}
 }
 
 func lookupEnv() []string {
