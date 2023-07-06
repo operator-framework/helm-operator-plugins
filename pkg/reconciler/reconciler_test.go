@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -1330,8 +1331,14 @@ var _ = Describe("Reconciler", func() {
 })
 
 func getManagerOrFail() manager.Manager {
+	// Since the dependent resource watcher accepts a scheme, everytime
+	// a new manager needs to have a new scheme in tests to avoid race
+	// conditions.
+	sch := runtime.NewScheme()
+	Expect(clientgoscheme.AddToScheme(sch)).NotTo(HaveOccurred())
 	mgr, err := manager.New(cfg, manager.Options{
 		MetricsBindAddress: "0",
+		Scheme:             sch,
 	})
 	Expect(err).To(BeNil())
 	return mgr

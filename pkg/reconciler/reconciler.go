@@ -935,7 +935,7 @@ func (r *Reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) err
 	}
 
 	if !r.skipDependentWatches {
-		r.postHooks = append([]hook.PostHook{internalhook.NewDependentResourceWatcher(c, mgr.GetRESTMapper(), mgr.GetCache(), *mgr.GetScheme())}, r.postHooks...)
+		r.postHooks = append([]hook.PostHook{internalhook.NewDependentResourceWatcher(c, mgr.GetRESTMapper(), mgr.GetCache(), mgr.GetScheme())}, r.postHooks...)
 	}
 	return nil
 }

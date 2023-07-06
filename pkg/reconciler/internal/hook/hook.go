@@ -39,7 +39,7 @@ import (
 	"github.com/operator-framework/helm-operator-plugins/pkg/manifestutil"
 )
 
-func NewDependentResourceWatcher(c controller.Controller, rm meta.RESTMapper, cache cache.Cache, scheme runtime.Scheme) hook.PostHook {
+func NewDependentResourceWatcher(c controller.Controller, rm meta.RESTMapper, cache cache.Cache, scheme *runtime.Scheme) hook.PostHook {
 	return &dependentResourceWatcher{
 		controller: c,
 		restMapper: rm,

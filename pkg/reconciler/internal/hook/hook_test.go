@@ -47,7 +47,7 @@ var _ = Describe("Hook", func() {
 			cache cache.Cache
 			owner *unstructured.Unstructured
 			rel   *release.Release
-			sch   runtime.Scheme
+			sch   *runtime.Scheme
 			log   logr.Logger
 			ctx   context.Context
 		)
@@ -57,7 +57,7 @@ var _ = Describe("Hook", func() {
 			c = &fake.Controller{}
 			log = logr.Discard()
 			cache = &informertest.FakeInformers{}
-			sch = *runtime.NewScheme()
+			sch = runtime.NewScheme()
 			ctx = context.Background()
 
 			// Since this is a fake informer and controller, no need to wait for sync.
@@ -126,8 +126,8 @@ var _ = Describe("Hook", func() {
 				drw = internalhook.NewDependentResourceWatcher(c, rm, cache, sch)
 				Expect(drw.Exec(owner, *rel, log)).To(Succeed())
 				Expect(c.WatchCalls).To(HaveLen(2))
-				Expect(c.WatchCalls[0].Handler).To(BeAssignableToTypeOf(handler.EnqueueRequestForOwner(&sch, rm, owner, handler.OnlyControllerOwner())))
-				Expect(c.WatchCalls[1].Handler).To(BeAssignableToTypeOf(handler.EnqueueRequestForOwner(&sch, rm, owner, handler.OnlyControllerOwner())))
+				Expect(c.WatchCalls[0].Handler).To(BeAssignableToTypeOf(handler.EnqueueRequestForOwner(sch, rm, owner, handler.OnlyControllerOwner())))
+				Expect(c.WatchCalls[1].Handler).To(BeAssignableToTypeOf(handler.EnqueueRequestForOwner(sch, rm, owner, handler.OnlyControllerOwner())))
 			})
 
 			Context("when the owner is cluster-scoped", func() {
@@ -149,8 +149,8 @@ var _ = Describe("Hook", func() {
 					drw = internalhook.NewDependentResourceWatcher(c, rm, cache, sch)
 					Expect(drw.Exec(owner, *rel, log)).To(Succeed())
 					Expect(c.WatchCalls).To(HaveLen(2))
-					Expect(c.WatchCalls[0].Handler).To(BeAssignableToTypeOf(handler.EnqueueRequestForOwner(&sch, rm, owner, handler.OnlyControllerOwner())))
-					Expect(c.WatchCalls[1].Handler).To(BeAssignableToTypeOf(handler.EnqueueRequestForOwner(&sch, rm, owner, handler.OnlyControllerOwner())))
+					Expect(c.WatchCalls[0].Handler).To(BeAssignableToTypeOf(handler.EnqueueRequestForOwner(sch, rm, owner, handler.OnlyControllerOwner())))
+					Expect(c.WatchCalls[1].Handler).To(BeAssignableToTypeOf(handler.EnqueueRequestForOwner(sch, rm, owner, handler.OnlyControllerOwner())))
 
 				})
 				It("should watch cluster-scoped resources with ownerRef handler", func() {
@@ -160,8 +160,8 @@ var _ = Describe("Hook", func() {
 					drw = internalhook.NewDependentResourceWatcher(c, rm, cache, sch)
 					Expect(drw.Exec(owner, *rel, log)).To(Succeed())
 					Expect(c.WatchCalls).To(HaveLen(2))
-					Expect(c.WatchCalls[0].Handler).To(BeAssignableToTypeOf(handler.EnqueueRequestForOwner(&sch, rm, owner, handler.OnlyControllerOwner())))
-					Expect(c.WatchCalls[1].Handler).To(BeAssignableToTypeOf(handler.EnqueueRequestForOwner(&sch, rm, owner, handler.OnlyControllerOwner())))
+					Expect(c.WatchCalls[0].Handler).To(BeAssignableToTypeOf(handler.EnqueueRequestForOwner(sch, rm, owner, handler.OnlyControllerOwner())))
+					Expect(c.WatchCalls[1].Handler).To(BeAssignableToTypeOf(handler.EnqueueRequestForOwner(sch, rm, owner, handler.OnlyControllerOwner())))
 				})
 				It("should watch resource policy keep resources with annotation handler", func() {
 					rel = &release.Release{
@@ -197,7 +197,7 @@ var _ = Describe("Hook", func() {
 					drw = internalhook.NewDependentResourceWatcher(c, rm, cache, sch)
 					Expect(drw.Exec(owner, *rel, log)).To(Succeed())
 					Expect(c.WatchCalls).To(HaveLen(1))
-					Expect(c.WatchCalls[0].Handler).To(BeAssignableToTypeOf(handler.EnqueueRequestForOwner(&sch, rm, owner, handler.OnlyControllerOwner())))
+					Expect(c.WatchCalls[0].Handler).To(BeAssignableToTypeOf(handler.EnqueueRequestForOwner(sch, rm, owner, handler.OnlyControllerOwner())))
 				})
 				It("should watch cluster-scoped resources with annotation handler", func() {
 					rel = &release.Release{
@@ -235,8 +235,8 @@ var _ = Describe("Hook", func() {
 					drw = internalhook.NewDependentResourceWatcher(c, rm, cache, sch)
 					Expect(drw.Exec(owner, *rel, log)).To(Succeed())
 					Expect(c.WatchCalls).To(HaveLen(2))
-					Expect(c.WatchCalls[0].Handler).To(BeAssignableToTypeOf(handler.EnqueueRequestForOwner(&sch, rm, owner, handler.OnlyControllerOwner())))
-					Expect(c.WatchCalls[1].Handler).To(BeAssignableToTypeOf(handler.EnqueueRequestForOwner(&sch, rm, owner, handler.OnlyControllerOwner())))
+					Expect(c.WatchCalls[0].Handler).To(BeAssignableToTypeOf(handler.EnqueueRequestForOwner(sch, rm, owner, handler.OnlyControllerOwner())))
+					Expect(c.WatchCalls[1].Handler).To(BeAssignableToTypeOf(handler.EnqueueRequestForOwner(sch, rm, owner, handler.OnlyControllerOwner())))
 				})
 				It("should error when unable to list objects", func() {
 					rel = &release.Release{
