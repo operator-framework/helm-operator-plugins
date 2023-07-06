@@ -1332,8 +1332,8 @@ var _ = Describe("Reconciler", func() {
 
 func getManagerOrFail() manager.Manager {
 	// Since the dependent resource watcher accepts a scheme, everytime
-	// a new manager needs to have a new scheme in tests to avoid race
-	// conditions.
+	// a new manager is created it needs to have a new scheme in tests
+	// to avoid race conditions.
 	sch := runtime.NewScheme()
 	Expect(clientgoscheme.AddToScheme(sch)).NotTo(HaveOccurred())
 	mgr, err := manager.New(cfg, manager.Options{

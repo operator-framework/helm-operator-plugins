@@ -36,7 +36,6 @@ var _ = Describe("NewCachingClientBuilder", func() {
 	var ns *unstructured.Unstructured
 	var pod *v1.Pod
 	var cfgMap *v1.ConfigMap
-	// var clientFunc client.NewClientFunc
 
 	BeforeEach(func() {
 		ns = &unstructured.Unstructured{}
@@ -81,7 +80,6 @@ var _ = Describe("NewCachingClientBuilder", func() {
 					Unstructured: true,
 				},
 			})
-			// cl, err = clientFunc(c, cfg, client.Options{}, cfgMap)
 			Expect(err).To(BeNil())
 
 			Expect(cl.Create(context.TODO(), ns)).To(Succeed())
@@ -141,7 +139,6 @@ var _ = Describe("NewCachingClientBuilder", func() {
 		}
 
 		_, err := client.New(&badConfig, client.Options{})
-		// _, err = clientFunc(c, &badConfig, client.Options{})
 		Expect(err).NotTo(BeNil())
 	})
 })
