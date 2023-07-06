@@ -63,8 +63,9 @@ var _ = Describe("ConfigureWatchNamespaces", func() {
 	It("should watch one namespace when WATCH_NAMESPACE is has one namespace", func() {
 		Expect(os.Setenv(WatchNamespaceEnvVar, "watch"))
 		ConfigureWatchNamespaces(&opts, log)
-		Expect(opts.Namespace).To(Equal("watch"))
-		Expect(opts.NewCache).To(BeNil())
+		// With c-r 0.15.0, watching a single namesapce requires a NewCache func
+		// with right options passed to it.
+		Expect(opts.NewCache).NotTo(BeNil())
 	})
 
 	It("should watch multiple namespaces when WATCH_NAMESPACE has multiple namespaces", func() {

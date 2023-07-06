@@ -44,8 +44,8 @@ var (
 func WaitForDeletion(ctx context.Context, cl client.Reader, o client.Object) error {
 	key := client.ObjectKeyFromObject(o)
 
-	return wait.PollImmediateUntil(time.Millisecond*10, func() (bool, error) {
-		err := cl.Get(ctx, key, o)
+	return wait.PollUntilContextCancel(ctx, time.Millisecond*10, true, func(ctx context.Context) (done bool, err error) {
+		err = cl.Get(ctx, key, o)
 		if apierrors.IsNotFound(err) {
 			return true, nil
 		}
@@ -53,7 +53,7 @@ func WaitForDeletion(ctx context.Context, cl client.Reader, o client.Object) err
 			return false, err
 		}
 		return false, nil
-	}, ctx.Done())
+	})
 }
 
 func SupportsOwnerReference(restMapper meta.RESTMapper, owner, dependent client.Object) (bool, error) {

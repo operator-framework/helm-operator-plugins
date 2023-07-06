@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -62,7 +61,10 @@ var _ = Describe("Controllerutil", func() {
 
 		It("should be cancellable", func() {
 			cancel()
-			Expect(WaitForDeletion(ctx, client, pod)).To(MatchError(wait.ErrWaitTimeout))
+			err := WaitForDeletion(ctx, client, pod)
+			// wait.ErrWaitTimeOut is deprecated. The method will poll till context is alive and
+			// if a cancelled context is passed it would error.
+			Expect(err).To(HaveOccurred())
 		})
 
 		It("should succeed after pod is deleted", func() {
