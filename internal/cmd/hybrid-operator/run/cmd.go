@@ -85,8 +85,11 @@ func run(cmd *cobra.Command, f *flags.Flags) {
 	)
 
 	if f.ManagerConfigPath != "" {
-		cfgLoader := ctrl.ConfigFile().AtPath(f.ManagerConfigPath)
-		if options, err = options.AndFrom(cfgLoader); err != nil {
+		// TODO: option to load from config file is deprecated. This will also be removed from here when
+		// componentConfig option is removed.
+		// Refer: https://github.com/kubernetes-sigs/controller-runtime/issues/895
+		cfgLoader := ctrl.ConfigFile().AtPath(f.ManagerConfigPath) //nolint:staticcheck
+		if options, err = options.AndFrom(cfgLoader); err != nil { //nolint:staticcheck
 			log.Error(err, "Unable to load the manager config file")
 			os.Exit(1)
 		}
@@ -228,5 +231,4 @@ func exitIfUnsupported(options manager.Options) {
 		%s set in manager options`, strings.Join(keys, ", ")), "unsupported fields")
 		os.Exit(1)
 	}
-	return
 }
