@@ -25,12 +25,15 @@ import (
 	"gomodules.xyz/jsonpatch/v2"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
+	"helm.sh/helm/v3/pkg/kube"
 	helmkube "helm.sh/helm/v3/pkg/kube"
+	"helm.sh/helm/v3/pkg/postrender"
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/storage/driver"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	apitypes "k8s.io/apimachinery/pkg/types"
@@ -99,9 +102,19 @@ func AppendInstallFailureUninstallOptions(opts ...UninstallOption) ActionClientG
 		return nil
 	}
 }
+
 func AppendUpgradeFailureRollbackOptions(opts ...RollbackOption) ActionClientGetterOption {
 	return func(getter *actionClientGetter) error {
 		getter.upgradeFailureRollbackOpts = append(getter.upgradeFailureRollbackOpts, opts...)
+		return nil
+	}
+}
+
+type PostRendererProvider func(rm meta.RESTMapper, kubeClient kube.Interface, obj client.Object) postrender.PostRenderer
+
+func AppendPostRenderers(postRendererFns ...PostRendererProvider) ActionClientGetterOption {
+	return func(getter *actionClientGetter) error {
+		getter.postRendererProviders = append(getter.postRendererProviders, postRendererFns...)
 		return nil
 	}
 }
@@ -126,6 +139,8 @@ type actionClientGetter struct {
 
 	installFailureUninstallOpts []UninstallOption
 	upgradeFailureRollbackOpts  []RollbackOption
+
+	postRendererProviders []PostRendererProvider
 }
 
 var _ ActionClientGetter = &actionClientGetter{}
@@ -139,7 +154,13 @@ func (hcg *actionClientGetter) ActionClientFor(obj client.Object) (ActionInterfa
 	if err != nil {
 		return nil, err
 	}
-	postRenderer := DefaultPostRendererFunc(rm, actionConfig.KubeClient, obj)
+	var chainedPostRenderer = chainedPostRenderer{
+		DefaultPostRendererFunc(rm, actionConfig.KubeClient, obj),
+	}
+	for _, provider := range hcg.postRendererProviders {
+		chainedPostRenderer = append(chainedPostRenderer, provider(rm, actionConfig.KubeClient, obj))
+	}
+
 	return &actionClient{
 		conf: actionConfig,
 
@@ -147,8 +168,8 @@ func (hcg *actionClientGetter) ActionClientFor(obj client.Object) (ActionInterfa
 		// on purpose because we want user-provided defaults to be able to override the
 		// post-renderer that we automatically configure for the client.
 		defaultGetOpts:       hcg.defaultGetOpts,
-		defaultInstallOpts:   append([]InstallOption{WithInstallPostRenderer(postRenderer)}, hcg.defaultInstallOpts...),
-		defaultUpgradeOpts:   append([]UpgradeOption{WithUpgradePostRenderer(postRenderer)}, hcg.defaultUpgradeOpts...),
+		defaultInstallOpts:   append([]InstallOption{WithInstallPostRenderer(chainedPostRenderer)}, hcg.defaultInstallOpts...),
+		defaultUpgradeOpts:   append([]UpgradeOption{WithUpgradePostRenderer(chainedPostRenderer)}, hcg.defaultUpgradeOpts...),
 		defaultUninstallOpts: hcg.defaultUninstallOpts,
 
 		installFailureUninstallOpts: hcg.installFailureUninstallOpts,
