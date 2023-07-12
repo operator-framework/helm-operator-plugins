@@ -41,7 +41,7 @@ func (f *Dockerfile) SetTemplateDefaults() error {
 // `api/` and `controller/` they would have to be added.
 
 const dockerfileTemplate = `# Build the manager binary
-FROM golang:1.19 as builder
+FROM golang:1.20 as builder
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
