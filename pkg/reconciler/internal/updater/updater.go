@@ -19,6 +19,7 @@ package updater
 import (
 	"context"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/util/wait"
 
 	"helm.sh/helm/v3/pkg/release"
 	corev1 "k8s.io/api/core/v1"
@@ -63,6 +64,19 @@ func isRetryableUpdateError(err error) bool {
 	return !errors.IsConflict(err) && !errors.IsNotFound(err)
 }
 
+// retryOnRetryableUpdateError retries the given function until it succeeds,
+// until the given backoff is exhausted, or until the error is not retryable.
+//
+// In case of a Conflict error, the update cannot be retried because the underlying
+// resource has been modified in the meantime, and the reconciliation loop needs
+// to be restarted anew.
+//
+// A NotFound error means that the object has been deleted, and the reconciliation loop
+// needs to be restarted anew as well.
+func retryOnRetryableUpdateError(backoff wait.Backoff, f func() error) error {
+	return retry.OnError(backoff, isRetryableUpdateError, f)
+}
+
 func (u *Updater) Apply(ctx context.Context, obj *unstructured.Unstructured) error {
 	if u.isCanceled {
 		return nil
@@ -73,10 +87,7 @@ func (u *Updater) Apply(ctx context.Context, obj *unstructured.Unstructured) err
 	// Always update the status first. During uninstall, if
 	// we remove the finalizer, updating the status will fail
 	// because the object and its status will be garbage-collected.
-	//
-	// In case of a Conflict error, the update cannot be retried,
-	// and the reconciliation loop needs to be restarted anew.
-	if err := retry.OnError(backoff, isRetryableUpdateError, func() error {
+	if err := retryOnRetryableUpdateError(backoff, func() error {
 		st := statusFor(obj)
 		needsStatusUpdate := false
 		for _, f := range u.updateStatusFuncs {
@@ -95,7 +106,7 @@ func (u *Updater) Apply(ctx context.Context, obj *unstructured.Unstructured) err
 		return err
 	}
 
-	if err := retry.OnError(backoff, isRetryableUpdateError, func() error {
+	if err := retryOnRetryableUpdateError(backoff, func() error {
 		needsUpdate := false
 		for _, f := range u.updateFuncs {
 			needsUpdate = f(obj) || needsUpdate
