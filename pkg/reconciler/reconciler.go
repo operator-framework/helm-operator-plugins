@@ -521,12 +521,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.
 		return ctrl.Result{}, err
 	}
 
-	shouldUpdate := true
 	u := updater.New(r.client)
 	defer func() {
-		if !shouldUpdate {
-			return
-		}
 		applyErr := u.Apply(ctx, obj)
 		if err == nil && !apierrors.IsNotFound(applyErr) {
 			err = applyErr
@@ -574,7 +570,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.
 		if err := r.handleDeletion(ctx, actionClient, obj, log); err != nil {
 			return ctrl.Result{}, err
 		}
-		shouldUpdate = false
+		u.CancelUpdates()
 		return ctrl.Result{}, nil
 	}
 
@@ -687,7 +683,7 @@ func (r *Reconciler) handleDeletion(ctx context.Context, actionClient helmclient
 			return err
 		}
 	} else {
-		log.Info("Resource is already terminated, skipping deletion")
+		log.Info("Resource is already terminated, skipping deletion.")
 	}
 
 	// Since the client is hitting a cache, waiting for the

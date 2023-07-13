@@ -38,6 +38,7 @@ func New(client client.Client) Updater {
 }
 
 type Updater struct {
+	isCanceled        bool
 	client            client.Client
 	updateFuncs       []UpdateFunc
 	updateStatusFuncs []UpdateStatusFunc
@@ -54,11 +55,19 @@ func (u *Updater) UpdateStatus(fs ...UpdateStatusFunc) {
 	u.updateStatusFuncs = append(u.updateStatusFuncs, fs...)
 }
 
+func (u *Updater) CancelUpdates() {
+	u.isCanceled = true
+}
+
 func isRetryableUpdateError(err error) bool {
 	return !errors.IsConflict(err) && !errors.IsNotFound(err)
 }
 
 func (u *Updater) Apply(ctx context.Context, obj *unstructured.Unstructured) error {
+	if u.isCanceled {
+		return nil
+	}
+
 	backoff := retry.DefaultRetry
 
 	// Always update the status first. During uninstall, if
