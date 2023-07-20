@@ -1,6 +1,5 @@
 # Global environment variables for builds.
 env:
-  - CGO_ENABLED=0
   - GO111MODULE=on
   - GOPROXY=https://proxy.golang.org|direct
   - VERSION_PKG=github.com/operator-framework/helm-operator-plugins/internal/version
