@@ -57,7 +57,7 @@ test-sanity: generate fix lint ## Test repo formatting, linting, etc.
 # Build manager binary
 .PHONY: build
 build:
-	CGO_ENABLED=0 mkdir -p $(BUILD_DIR) && go build $(GO_BUILD_ARGS) -o $(BUILD_DIR) ./
+	mkdir -p $(BUILD_DIR) && go build $(GO_BUILD_ARGS) -o $(BUILD_DIR) ./
 
 .PHONY: setup-lint
 setup-lint: ## Setup the lint
