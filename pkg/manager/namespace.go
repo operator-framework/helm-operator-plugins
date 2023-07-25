@@ -22,6 +22,7 @@ import (
 
 	"github.com/go-logr/logr"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
@@ -32,17 +33,20 @@ const (
 
 func ConfigureWatchNamespaces(options *manager.Options, log logr.Logger) {
 	namespaces := lookupEnv()
+	var watchNamespaces []string
 	if len(namespaces) != 0 {
 		log.Info("watching namespaces", "namespaces", namespaces)
-		if len(namespaces) > 1 {
-			options.NewCache = cache.MultiNamespacedCacheBuilder(namespaces)
-		} else {
-			options.Namespace = namespaces[0]
-		}
-		return
+		watchNamespaces = namespaces
+	} else {
+		log.Info("watching all namespaces")
+		watchNamespaces = []string{v1.NamespaceAll}
 	}
-	log.Info("watching all namespaces")
-	options.Namespace = v1.NamespaceAll
+
+	options.NewCache = func(config *rest.Config, opts cache.Options) (cache.Cache, error) {
+		return cache.New(config, cache.Options{
+			Namespaces: watchNamespaces,
+		})
+	}
 }
 
 func lookupEnv() []string {

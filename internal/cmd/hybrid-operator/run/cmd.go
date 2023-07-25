@@ -37,6 +37,7 @@ import (
 	zapf "sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	crmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 var log = logf.Log.WithName("cmd")
@@ -84,8 +85,11 @@ func run(cmd *cobra.Command, f *flags.Flags) {
 	)
 
 	if f.ManagerConfigPath != "" {
-		cfgLoader := ctrl.ConfigFile().AtPath(f.ManagerConfigPath)
-		if options, err = options.AndFrom(cfgLoader); err != nil {
+		// TODO: option to load from config file is deprecated. This will also be removed from here when
+		// componentConfig option is removed.
+		// Refer: https://github.com/kubernetes-sigs/controller-runtime/issues/895
+		cfgLoader := ctrl.ConfigFile().AtPath(f.ManagerConfigPath) //nolint:staticcheck
+		if options, err = options.AndFrom(cfgLoader); err != nil { //nolint:staticcheck
 			log.Error(err, "Unable to load the manager config file")
 			os.Exit(1)
 		}
@@ -141,9 +145,6 @@ func run(cmd *cobra.Command, f *flags.Flags) {
 	}
 	log.Info("Setting manager options", "Options", optionsLog)
 
-	if options.NewClient == nil {
-		options.NewClient = helmmgr.NewCachingClientFunc()
-	}
 	helmmgr.ConfigureWatchNamespaces(&options, log)
 
 	mgr, err := manager.New(cfg, options)
@@ -213,19 +214,21 @@ func run(cmd *cobra.Command, f *flags.Flags) {
 // if any of those fields are not their default values.
 func exitIfUnsupported(options manager.Options) {
 	var keys []string
-	// The below options are webhook-specific, which is not supported by helm.
-	if options.CertDir != "" {
-		keys = append(keys, "certDir")
-	}
-	if options.Host != "" {
-		keys = append(keys, "host")
-	}
-	if options.Port != 0 {
-		keys = append(keys, "port")
-	}
 
-	if len(keys) > 0 {
-		log.Error(fmt.Errorf("%s set in manager options", strings.Join(keys, ", ")), "unsupported fields")
+	if options.WebhookServer != nil {
+		// The below options are webhook-specific, which is not supported by helm.
+		// Adding logs only for the previously supported values through manager.
+		if options.WebhookServer.(*webhook.DefaultServer).Options.CertDir != "" {
+			keys = append(keys, "certDir")
+		}
+		if options.WebhookServer.(*webhook.DefaultServer).Options.Host != "" {
+			keys = append(keys, "host")
+		}
+		if options.WebhookServer.(*webhook.DefaultServer).Options.Port != 0 {
+			keys = append(keys, "port")
+		}
+		log.Error(fmt.Errorf(`options for setting webhook server configuration is not supported. 
+		%s set in manager options`, strings.Join(keys, ", ")), "unsupported fields")
 		os.Exit(1)
 	}
 }

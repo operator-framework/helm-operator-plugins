@@ -9,6 +9,7 @@ import (
 	"helm.sh/helm/v3/pkg/kube"
 	"helm.sh/helm/v3/pkg/postrender"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
@@ -164,7 +165,10 @@ var _ = Describe("ownerPostRenderer", func() {
 	)
 
 	BeforeEach(func() {
-		rm, err := apiutil.NewDynamicRESTMapper(cfg)
+		httpClient, err := rest.HTTPClientFor(cfg)
+		Expect(err).NotTo(HaveOccurred())
+
+		rm, err := apiutil.NewDynamicRESTMapper(cfg, httpClient)
 		Expect(err).To(BeNil())
 
 		owner = newTestDeployment([]corev1.Container{{

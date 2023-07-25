@@ -17,7 +17,8 @@ package v1alpha
 import (
 	"fmt"
 	"path/filepath"
-	golangv3 "sigs.k8s.io/kubebuilder/v3/pkg/plugins/golang/v3/scaffolds"
+
+	golangv4 "sigs.k8s.io/kubebuilder/v3/pkg/plugins/golang/v4/scaffolds"
 
 	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/hybrid/v1alpha/scaffolds"
 	projutil "github.com/operator-framework/helm-operator-plugins/pkg/plugins/util"
@@ -118,7 +119,7 @@ func (p *initSubcommand) Scaffold(fs machinery.Filesystem) error {
 	// Ensure that we are pinning the controller-runtime version
 	// xref: https://github.com/kubernetes-sigs/kubebuilder/issues/997
 	err = util.RunCmd("Get controller runtime", "go", "get",
-		"sigs.k8s.io/controller-runtime@"+golangv3.ControllerRuntimeVersion)
+		"sigs.k8s.io/controller-runtime@"+golangv4.ControllerRuntimeVersion)
 	if err != nil {
 		return err
 	}

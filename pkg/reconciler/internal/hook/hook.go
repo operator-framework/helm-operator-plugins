@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/source"
@@ -38,7 +39,7 @@ import (
 	"github.com/operator-framework/helm-operator-plugins/pkg/manifestutil"
 )
 
-func NewDependentResourceWatcher(c controller.Controller, rm meta.RESTMapper) hook.PostHook {
+func NewDependentResourceWatcher(c controller.Controller, rm meta.RESTMapper, cache cache.Cache, scheme *runtime.Scheme) hook.PostHook {
 	return &dependentResourceWatcher{
 		controller: c,
 		restMapper: rm,
@@ -50,6 +51,8 @@ func NewDependentResourceWatcher(c controller.Controller, rm meta.RESTMapper) ho
 type dependentResourceWatcher struct {
 	controller controller.Controller
 	restMapper meta.RESTMapper
+	cache      cache.Cache
+	scheme     runtime.Scheme
 
 	m       sync.Mutex
 	watches map[schema.GroupVersionKind]struct{}
@@ -93,14 +96,11 @@ func (d *dependentResourceWatcher) Exec(owner *unstructured.Unstructured, rel re
 			}
 
 			if useOwnerRef && !manifestutil.HasResourcePolicyKeep(unstructuredObj.GetAnnotations()) { // Setup watch using owner references.
-				if err := d.controller.Watch(&source.Kind{Type: unstructuredObj}, &handler.EnqueueRequestForOwner{
-					OwnerType:    owner,
-					IsController: true,
-				}, dependentPredicate); err != nil {
+				if err := d.controller.Watch(source.Kind(d.cache, unstructuredObj), handler.EnqueueRequestForOwner(&d.scheme, d.restMapper, owner, handler.OnlyControllerOwner()), dependentPredicate); err != nil {
 					return err
 				}
 			} else { // Setup watch using annotations.
-				if err := d.controller.Watch(&source.Kind{Type: unstructuredObj}, &sdkhandler.EnqueueRequestForAnnotation{
+				if err := d.controller.Watch(source.Kind(d.cache, unstructuredObj), &sdkhandler.EnqueueRequestForAnnotation{
 					Type: owner.GetObjectKind().GroupVersionKind().GroupKind(),
 				}, dependentPredicate); err != nil {
 					return err

@@ -32,8 +32,8 @@ import (
 	"sigs.k8s.io/kubebuilder/v3/pkg/plugin/util"
 	"sigs.k8s.io/kubebuilder/v3/pkg/plugins"
 
-	kustomizev2alpha "sigs.k8s.io/kubebuilder/v3/pkg/plugins/common/kustomize/v2-alpha"
-	golangv3 "sigs.k8s.io/kubebuilder/v3/pkg/plugins/golang/v3/scaffolds"
+	kustomizev2 "sigs.k8s.io/kubebuilder/v3/pkg/plugins/common/kustomize/v2"
+	golangv4 "sigs.k8s.io/kubebuilder/v3/pkg/plugins/golang/v4/scaffolds"
 )
 
 const (
@@ -119,16 +119,16 @@ func (s *initScaffolder) Scaffold() error {
 
 	err = scaffold.Execute(
 		&templates.Main{},
-		&templates.GoMod{ControllerRuntimeVersion: golangv3.ControllerRuntimeVersion},
+		&templates.GoMod{ControllerRuntimeVersion: golangv4.ControllerRuntimeVersion},
 		&templates.GitIgnore{},
 		&templates.Watches{},
 		&rbac.ManagerRole{},
 		&templates.Makefile{
 			Image:                    imageName,
-			KustomizeVersion:         kustomizev2alpha.KustomizeVersion,
+			KustomizeVersion:         kustomizev2.KustomizeVersion,
 			HybridOperatorVersion:    hybridOperatorVersion,
-			ControllerToolsVersion:   golangv3.ControllerToolsVersion,
-			ControllerRuntimeVersion: golangv3.ControllerRuntimeVersion,
+			ControllerToolsVersion:   golangv4.ControllerToolsVersion,
+			ControllerRuntimeVersion: golangv4.ControllerRuntimeVersion,
 		},
 		&templates.Dockerfile{},
 		&templates.DockerIgnore{},
