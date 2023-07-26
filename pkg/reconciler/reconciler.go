@@ -625,7 +625,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.
 		)
 		return ctrl.Result{}, err
 	}
-	u.UpdateStatus(updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionFalse, "", "")))
 
 	for _, h := range r.preHooks {
 		if err := h.Exec(obj, vals, log); err != nil {
@@ -651,7 +650,9 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.
 			return ctrl.Result{}, err
 		}
 	default:
-		return ctrl.Result{}, fmt.Errorf("unexpected release state: %s", state)
+		err := fmt.Errorf("unexpected release state: %s", state)
+		u.UpdateStatus(updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionTrue, conditions.ReasonReconcileError, err)))
+		return ctrl.Result{}, err
 	}
 
 	for _, h := range r.postHooks {
