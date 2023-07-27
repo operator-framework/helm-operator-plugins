@@ -1343,7 +1343,7 @@ var _ = Describe("Reconciler", func() {
 			controllerSetupCalled = true
 			u := &unstructured.Unstructured{}
 			u.SetGroupVersionKind(additionalGVK)
-			return c.Watch(&source.Kind{Type: u}, &sdkhandler.InstrumentedEnqueueRequestForObject{})
+			return c.Watch(source.Kind(mgr.GetCache(), u), &sdkhandler.InstrumentedEnqueueRequestForObject{})
 		}
 
 		It("Registering builder setup function for reconciler works", func() {
