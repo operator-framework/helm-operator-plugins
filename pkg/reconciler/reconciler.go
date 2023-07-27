@@ -80,6 +80,7 @@ type Reconciler struct {
 	reconcilePeriod                  time.Duration
 	maxHistory                       int
 	skipPrimaryGVKSchemeRegistration bool
+	controllerSetupFuncs             []ControllerSetupFunc
 
 	annotSetupOnce       sync.Once
 	annotations          map[string]struct{}
@@ -147,6 +148,13 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	if err := r.setupWatches(mgr, c); err != nil {
 		return err
+	}
+
+	for _, f := range r.controllerSetupFuncs {
+		err = f(c)
+		if err != nil {
+			return fmt.Errorf("failed to execute custom controller setup function: %v", err)
+		}
 	}
 
 	r.log.Info("Watching resource",
@@ -481,6 +489,30 @@ func WithSelector(s metav1.LabelSelector) Option {
 		return nil
 	}
 }
+
+// WithControllerSetupFunc is an Option that allows customizing a controller before it is started.
+// The only supported customization here is adding additional Watch sources to the controller.
+func WithControllerSetupFunc(f ControllerSetupFunc) Option {
+	return func(r *Reconciler) error {
+		r.controllerSetupFuncs = append(r.controllerSetupFuncs, f)
+		return nil
+	}
+}
+
+// ControllerSetup allows restricted access to the Controller using the WithControllerSetupFunc option.
+// Currently the only supposed configuration is adding additional watchers do the controller.
+type ControllerSetup interface {
+	// Watch takes events provided by a Source and uses the EventHandler to
+	// enqueue reconcile.Requests in response to the events.
+	//
+	// Watch may be provided one or more Predicates to filter events before
+	// they are given to the EventHandler.  Events will be passed to the
+	// EventHandler if all provided Predicates evaluate to true.
+	Watch(src source.Source, eventhandler handler.EventHandler, predicates ...predicate.Predicate) error
+}
+
+// ControllerSetupFunc allows configuring a controller's builder.
+type ControllerSetupFunc func(c ControllerSetup) error
 
 // Reconcile reconciles a CR that defines a Helm v3 release.
 //

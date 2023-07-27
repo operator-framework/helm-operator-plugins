@@ -48,6 +48,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 	"sigs.k8s.io/yaml"
 
 	"github.com/operator-framework/helm-operator-plugins/internal/sdk/controllerutil"
@@ -59,6 +60,7 @@ import (
 	"github.com/operator-framework/helm-operator-plugins/pkg/reconciler/internal/conditions"
 	helmfake "github.com/operator-framework/helm-operator-plugins/pkg/reconciler/internal/fake"
 	"github.com/operator-framework/helm-operator-plugins/pkg/values"
+	sdkhandler "github.com/operator-framework/operator-lib/handler"
 )
 
 // custom is used within the reconciler test suite as underlying type for the GVK scheme.
@@ -1327,6 +1329,43 @@ var _ = Describe("Reconciler", func() {
 			parameterizedReconcilerTests(reconcilerTestSuiteOpts{customGVKSchemeSetup: true})
 		})
 
+	})
+
+	var _ = Describe("Test custom controller setup", func() {
+		var (
+			mgr                   manager.Manager
+			r                     *Reconciler
+			err                   error
+			controllerSetupCalled bool
+		)
+		additionalGVK := schema.GroupVersionKind{Group: "example.com", Version: "v1", Kind: "SomeOtherKind"}
+		setupController := func(c ControllerSetup) error {
+			controllerSetupCalled = true
+			u := &unstructured.Unstructured{}
+			u.SetGroupVersionKind(additionalGVK)
+			return c.Watch(&source.Kind{Type: u}, &sdkhandler.InstrumentedEnqueueRequestForObject{})
+		}
+
+		It("Registering builder setup function for reconciler works", func() {
+			mgr = getManagerOrFail()
+			r, err = New(
+				WithGroupVersionKind(gvk),
+				WithChart(chrt),
+				WithInstallAnnotations(annotation.InstallDescription{}),
+				WithUpgradeAnnotations(annotation.UpgradeDescription{}),
+				WithUninstallAnnotations(annotation.UninstallDescription{}),
+				WithOverrideValues(map[string]string{
+					"image.repository": "custom-nginx",
+				}),
+				WithControllerSetupFunc(setupController),
+			)
+			Expect(err).To(BeNil())
+		})
+
+		It("Setting up reconciler with manager causes custom builder setup to be executed", func() {
+			Expect(r.SetupWithManager(mgr)).To(Succeed())
+			Expect(controllerSetupCalled).To(BeTrue())
+		})
 	})
 })
 
