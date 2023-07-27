@@ -21,8 +21,10 @@ import (
 
 	"helm.sh/helm/v3/pkg/release"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -37,6 +39,7 @@ func New(client client.Client) Updater {
 }
 
 type Updater struct {
+	isCanceled        bool
 	client            client.Client
 	updateFuncs       []UpdateFunc
 	updateStatusFuncs []UpdateStatusFunc
@@ -53,13 +56,38 @@ func (u *Updater) UpdateStatus(fs ...UpdateStatusFunc) {
 	u.updateStatusFuncs = append(u.updateStatusFuncs, fs...)
 }
 
+func (u *Updater) CancelUpdates() {
+	u.isCanceled = true
+}
+
+func isRetryableUpdateError(err error) bool {
+	return !errors.IsConflict(err) && !errors.IsNotFound(err)
+}
+
+// retryOnRetryableUpdateError retries the given function until it succeeds,
+// until the given backoff is exhausted, or until the error is not retryable.
+//
+// In case of a Conflict error, the update cannot be retried because the underlying
+// resource has been modified in the meantime, and the reconciliation loop needs
+// to be restarted anew.
+//
+// A NotFound error means that the object has been deleted, and the reconciliation loop
+// needs to be restarted anew as well.
+func retryOnRetryableUpdateError(backoff wait.Backoff, f func() error) error {
+	return retry.OnError(backoff, isRetryableUpdateError, f)
+}
+
 func (u *Updater) Apply(ctx context.Context, obj *unstructured.Unstructured) error {
+	if u.isCanceled {
+		return nil
+	}
+
 	backoff := retry.DefaultRetry
 
 	// Always update the status first. During uninstall, if
 	// we remove the finalizer, updating the status will fail
-	// because the object and its status will be garbage-collected
-	if err := retry.RetryOnConflict(backoff, func() error {
+	// because the object and its status will be garbage-collected.
+	if err := retryOnRetryableUpdateError(backoff, func() error {
 		st := statusFor(obj)
 		needsStatusUpdate := false
 		for _, f := range u.updateStatusFuncs {
@@ -78,7 +106,7 @@ func (u *Updater) Apply(ctx context.Context, obj *unstructured.Unstructured) err
 		return err
 	}
 
-	if err := retry.RetryOnConflict(backoff, func() error {
+	if err := retryOnRetryableUpdateError(backoff, func() error {
 		needsUpdate := false
 		for _, f := range u.updateFuncs {
 			needsUpdate = f(obj) || needsUpdate
