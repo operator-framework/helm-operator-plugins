@@ -20,6 +20,10 @@ import (
 	"github.com/operator-framework/helm-operator-plugins/pkg/manifestutil"
 )
 
+// PostRendererProvider is a function that returns a post-renderer for a given object.
+// obj represents the custom resource that is being reconciled.
+type PostRendererProvider func(rm meta.RESTMapper, kubeClient kube.Interface, obj client.Object) postrender.PostRenderer
+
 // WithInstallPostRenderer sets the post-renderer to use for the install.
 // It overrides any post-renderer that may already be configured or set
 // as a default.

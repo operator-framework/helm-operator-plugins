@@ -25,15 +25,12 @@ import (
 	"gomodules.xyz/jsonpatch/v2"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
-	"helm.sh/helm/v3/pkg/kube"
 	helmkube "helm.sh/helm/v3/pkg/kube"
-	"helm.sh/helm/v3/pkg/postrender"
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/storage/driver"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	apitypes "k8s.io/apimachinery/pkg/types"
@@ -110,8 +107,6 @@ func AppendUpgradeFailureRollbackOptions(opts ...RollbackOption) ActionClientGet
 	}
 }
 
-type PostRendererProvider func(rm meta.RESTMapper, kubeClient kube.Interface, obj client.Object) postrender.PostRenderer
-
 func AppendPostRenderers(postRendererFns ...PostRendererProvider) ActionClientGetterOption {
 	return func(getter *actionClientGetter) error {
 		getter.postRendererProviders = append(getter.postRendererProviders, postRendererFns...)
@@ -154,12 +149,11 @@ func (hcg *actionClientGetter) ActionClientFor(obj client.Object) (ActionInterfa
 	if err != nil {
 		return nil, err
 	}
-	var chainedPostRenderer = chainedPostRenderer{
-		DefaultPostRendererFunc(rm, actionConfig.KubeClient, obj),
-	}
+	var cpr = chainedPostRenderer{}
 	for _, provider := range hcg.postRendererProviders {
-		chainedPostRenderer = append(chainedPostRenderer, provider(rm, actionConfig.KubeClient, obj))
+		cpr = append(cpr, provider(rm, actionConfig.KubeClient, obj))
 	}
+	cpr = append(cpr, DefaultPostRendererFunc(rm, actionConfig.KubeClient, obj))
 
 	return &actionClient{
 		conf: actionConfig,
@@ -168,8 +162,8 @@ func (hcg *actionClientGetter) ActionClientFor(obj client.Object) (ActionInterfa
 		// on purpose because we want user-provided defaults to be able to override the
 		// post-renderer that we automatically configure for the client.
 		defaultGetOpts:       hcg.defaultGetOpts,
-		defaultInstallOpts:   append([]InstallOption{WithInstallPostRenderer(chainedPostRenderer)}, hcg.defaultInstallOpts...),
-		defaultUpgradeOpts:   append([]UpgradeOption{WithUpgradePostRenderer(chainedPostRenderer)}, hcg.defaultUpgradeOpts...),
+		defaultInstallOpts:   append([]InstallOption{WithInstallPostRenderer(cpr)}, hcg.defaultInstallOpts...),
+		defaultUpgradeOpts:   append([]UpgradeOption{WithUpgradePostRenderer(cpr)}, hcg.defaultUpgradeOpts...),
 		defaultUninstallOpts: hcg.defaultUninstallOpts,
 
 		installFailureUninstallOpts: hcg.installFailureUninstallOpts,

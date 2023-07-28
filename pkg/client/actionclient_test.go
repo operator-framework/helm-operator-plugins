@@ -17,8 +17,11 @@ limitations under the License.
 package client
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"strconv"
 	"time"
 
@@ -27,6 +30,8 @@ import (
 	. "github.com/onsi/gomega"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chartutil"
+	"helm.sh/helm/v3/pkg/kube"
+	"helm.sh/helm/v3/pkg/postrender"
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/releaseutil"
 	"helm.sh/helm/v3/pkg/storage/driver"
@@ -36,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -78,11 +84,14 @@ var _ = Describe("ActionClient", func() {
 
 			var (
 				actionConfigGetter ActionConfigGetter
+				cli                kube.Interface
 				obj                client.Object
 			)
 			BeforeEach(func() {
 				var err error
 				actionConfigGetter, err = NewActionConfigGetter(cfg, rm, logr.Discard())
+				Expect(err).ShouldNot(HaveOccurred())
+				cli = kube.New(newRESTClientGetter(cfg, rm, ""))
 				Expect(err).ShouldNot(HaveOccurred())
 				obj = testutil.BuildTestCR(gvk)
 			})
@@ -235,6 +244,42 @@ var _ = Describe("ActionClient", func() {
 					return nil
 				})
 				Expect(err).To(MatchError(ContainSubstring(expectErr.Error())))
+
+				// Uninstall the chart to cleanup for other tests.
+				_, err = ac.Uninstall(obj.GetName())
+				Expect(err).To(BeNil())
+			})
+			It("should get clients with postrenderers", func() {
+
+				acg, err := NewActionClientGetter(actionConfigGetter, AppendPostRenderers(newMockPostRenderer("foo", "bar")))
+				Expect(err).To(BeNil())
+				Expect(acg).NotTo(BeNil())
+
+				ac, err := acg.ActionClientFor(obj)
+				Expect(err).To(BeNil())
+
+				_, err = ac.Install(obj.GetName(), obj.GetNamespace(), &chrt, chartutil.Values{})
+				Expect(err).To(BeNil())
+
+				rel, err := ac.Get(obj.GetName())
+				Expect(err).To(BeNil())
+
+				rl, err := cli.Build(bytes.NewBufferString(rel.Manifest), false)
+				Expect(err).To(BeNil())
+
+				Expect(rl).NotTo(BeEmpty())
+				err = rl.Visit(func(info *resource.Info, err error) error {
+					Expect(err).To(BeNil())
+					Expect(info.Object).NotTo(BeNil())
+					objMeta, err := meta.Accessor(info.Object)
+					Expect(err).To(BeNil())
+					Expect(objMeta.GetAnnotations()).To(HaveKey("foo"))
+					Expect(objMeta.GetAnnotations()["foo"]).To(Equal("bar"))
+					return nil
+				})
+				Expect(err).To(BeNil())
+
+				fmt.Println(rel.Manifest)
 
 				// Uninstall the chart to cleanup for other tests.
 				_, err = ac.Uninstall(obj.GetName())
@@ -806,4 +851,61 @@ func newTestDeployment(containers []v1.Container) *appsv1.Deployment {
 			},
 		},
 	}
+}
+
+type mockPostRenderer struct {
+	k8sCli kube.Interface
+	key    string
+	value  string
+}
+
+var _ postrender.PostRenderer = &mockPostRenderer{}
+
+func newMockPostRenderer(key, value string) PostRendererProvider {
+	return func(rm meta.RESTMapper, kubeClient kube.Interface, obj client.Object) postrender.PostRenderer {
+		return &mockPostRenderer{
+			k8sCli: kubeClient,
+			key:    key,
+			value:  value,
+		}
+	}
+}
+
+func (m *mockPostRenderer) Run(renderedManifests *bytes.Buffer) (modifiedManifests *bytes.Buffer, err error) {
+	b, err := io.ReadAll(renderedManifests)
+	if err != nil {
+		return nil, err
+	}
+	rl, err := m.k8sCli.Build(bytes.NewBuffer(b), false)
+	if err != nil {
+		return nil, err
+	}
+	out := bytes.Buffer{}
+	err = rl.Visit(func(r *resource.Info, err error) error {
+		objMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(r.Object)
+		if err != nil {
+			return err
+		}
+		u := &unstructured.Unstructured{Object: objMap}
+
+		annotations := u.GetAnnotations()
+		if annotations == nil {
+			annotations = map[string]string{}
+		}
+		annotations[m.key] = m.value
+		u.SetAnnotations(annotations)
+
+		outData, err := yaml.Marshal(u.Object)
+		if err != nil {
+			return err
+		}
+		if _, err := out.WriteString("---\n" + string(outData)); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
 }
