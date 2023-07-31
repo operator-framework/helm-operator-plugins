@@ -929,7 +929,11 @@ func (r *Reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) err
 
 	if err := c.Watch(
 		source.Kind(mgr.GetCache(), secret),
-		handler.RequeueFilter(ctrlhandler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), obj, ctrlhandler.OnlyControllerOwner())),
+		// Do not schedule a new reconcile if the upgrade has failed and the controller has entered an exponential backoff
+		// to avoid endless reconcile loop.
+		handler.RequeueFilter(
+			ctrlhandler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), obj, ctrlhandler.OnlyControllerOwner()),
+		),
 	); err != nil {
 		return err
 	}
