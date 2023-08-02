@@ -122,16 +122,6 @@ func (u *Updater) Apply(ctx context.Context, obj *unstructured.Unstructured) err
 	return nil
 }
 
-func EnsureFinalizer(finalizer string) UpdateFunc {
-	return func(obj *unstructured.Unstructured) bool {
-		if controllerutil.ContainsFinalizer(obj, finalizer) {
-			return false
-		}
-		controllerutil.AddFinalizer(obj, finalizer)
-		return true
-	}
-}
-
 func RemoveFinalizer(finalizer string) UpdateFunc {
 	return func(obj *unstructured.Unstructured) bool {
 		if !controllerutil.ContainsFinalizer(obj, finalizer) {
