@@ -99,9 +99,17 @@ func AppendInstallFailureUninstallOptions(opts ...UninstallOption) ActionClientG
 		return nil
 	}
 }
+
 func AppendUpgradeFailureRollbackOptions(opts ...RollbackOption) ActionClientGetterOption {
 	return func(getter *actionClientGetter) error {
 		getter.upgradeFailureRollbackOpts = append(getter.upgradeFailureRollbackOpts, opts...)
+		return nil
+	}
+}
+
+func AppendPostRenderers(postRendererFns ...PostRendererProvider) ActionClientGetterOption {
+	return func(getter *actionClientGetter) error {
+		getter.postRendererProviders = append(getter.postRendererProviders, postRendererFns...)
 		return nil
 	}
 }
@@ -126,6 +134,8 @@ type actionClientGetter struct {
 
 	installFailureUninstallOpts []UninstallOption
 	upgradeFailureRollbackOpts  []RollbackOption
+
+	postRendererProviders []PostRendererProvider
 }
 
 var _ ActionClientGetter = &actionClientGetter{}
@@ -139,7 +149,12 @@ func (hcg *actionClientGetter) ActionClientFor(obj client.Object) (ActionInterfa
 	if err != nil {
 		return nil, err
 	}
-	postRenderer := DefaultPostRendererFunc(rm, actionConfig.KubeClient, obj)
+	var cpr = chainedPostRenderer{}
+	for _, provider := range hcg.postRendererProviders {
+		cpr = append(cpr, provider(rm, actionConfig.KubeClient, obj))
+	}
+	cpr = append(cpr, DefaultPostRendererFunc(rm, actionConfig.KubeClient, obj))
+
 	return &actionClient{
 		conf: actionConfig,
 
@@ -147,8 +162,8 @@ func (hcg *actionClientGetter) ActionClientFor(obj client.Object) (ActionInterfa
 		// on purpose because we want user-provided defaults to be able to override the
 		// post-renderer that we automatically configure for the client.
 		defaultGetOpts:       hcg.defaultGetOpts,
-		defaultInstallOpts:   append([]InstallOption{WithInstallPostRenderer(postRenderer)}, hcg.defaultInstallOpts...),
-		defaultUpgradeOpts:   append([]UpgradeOption{WithUpgradePostRenderer(postRenderer)}, hcg.defaultUpgradeOpts...),
+		defaultInstallOpts:   append([]InstallOption{WithInstallPostRenderer(cpr)}, hcg.defaultInstallOpts...),
+		defaultUpgradeOpts:   append([]UpgradeOption{WithUpgradePostRenderer(cpr)}, hcg.defaultUpgradeOpts...),
 		defaultUninstallOpts: hcg.defaultUninstallOpts,
 
 		installFailureUninstallOpts: hcg.installFailureUninstallOpts,
