@@ -878,13 +878,13 @@ func (m *mockPostRenderer) Run(renderedManifests *bytes.Buffer) (modifiedManifes
 		return nil, err
 	}
 	out := bytes.Buffer{}
-	if err := rl.Visit(m.visit(out)); err != nil {
+	if err := rl.Visit(m.visit(&out)); err != nil {
 		return nil, err
 	}
 	return &out, nil
 }
 
-func (m *mockPostRenderer) visit(out bytes.Buffer) func(r *resource.Info, err error) error {
+func (m *mockPostRenderer) visit(out *bytes.Buffer) func(r *resource.Info, err error) error {
 	return func(r *resource.Info, rErr error) error {
 		if rErr != nil {
 			return rErr
