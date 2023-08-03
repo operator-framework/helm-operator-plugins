@@ -885,7 +885,10 @@ func (m *mockPostRenderer) Run(renderedManifests *bytes.Buffer) (modifiedManifes
 }
 
 func (m *mockPostRenderer) visit(out bytes.Buffer) func(r *resource.Info, err error) error {
-	return func(r *resource.Info, err error) error {
+	return func(r *resource.Info, rErr error) error {
+		if rErr != nil {
+			return rErr
+		}
 		objMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(r.Object)
 		if err != nil {
 			return err
