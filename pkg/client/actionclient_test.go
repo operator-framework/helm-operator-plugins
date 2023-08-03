@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"strconv"
 	"time"
@@ -278,8 +277,6 @@ var _ = Describe("ActionClient", func() {
 					return nil
 				})
 				Expect(err).To(BeNil())
-
-				fmt.Println(rel.Manifest)
 
 				// Uninstall the chart to cleanup for other tests.
 				_, err = ac.Uninstall(obj.GetName())
