@@ -41,6 +41,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/source"
@@ -569,6 +570,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl.Re
 	}
 	if err != nil {
 		return ctrl.Result{}, err
+	}
+
+	if r.selectorPredicate != nil && !r.selectorPredicate.Generic(event.GenericEvent{Object: obj}) {
+		log.V(1).Info("Label selector does not match, skipping reconcile")
+		return ctrl.Result{}, nil
 	}
 
 	// The finalizer must be present on the CR before we can do anything. Otherwise, if the reconciliation fails,

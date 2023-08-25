@@ -486,6 +486,7 @@ var _ = Describe("Reconciler", func() {
 			Expect(mgr.GetCache().WaitForCacheSync(ctx)).To(BeTrue())
 
 			obj = testutil.BuildTestCR(gvk)
+			obj.SetLabels(map[string]string{"foo": "bar"})
 			objKey = types.NamespacedName{Namespace: obj.GetNamespace(), Name: obj.GetName()}
 			req = reconcile.Request{NamespacedName: objKey}
 		})
@@ -518,6 +519,8 @@ var _ = Describe("Reconciler", func() {
 			cancel()
 		})
 
+		selector := metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}
+
 		// After migration to Ginkgo v2 this can be rewritten using e.g. DescribeTable.
 		parameterizedReconcilerTests := func(opts reconcilerTestSuiteOpts) {
 			BeforeEach(func() {
@@ -535,6 +538,7 @@ var _ = Describe("Reconciler", func() {
 						WithInstallAnnotations(annotation.InstallDescription{}),
 						WithUpgradeAnnotations(annotation.UpgradeDescription{}),
 						WithUninstallAnnotations(annotation.UninstallDescription{}),
+						WithSelector(selector),
 						WithOverrideValues(map[string]string{
 							"image.repository": "custom-nginx",
 						}),
@@ -549,6 +553,7 @@ var _ = Describe("Reconciler", func() {
 						WithInstallAnnotations(annotation.InstallDescription{}),
 						WithUpgradeAnnotations(annotation.UpgradeDescription{}),
 						WithUninstallAnnotations(annotation.UninstallDescription{}),
+						WithSelector(selector),
 						WithOverrideValues(map[string]string{
 							"image.repository": "custom-nginx",
 						}),
@@ -1422,6 +1427,40 @@ var _ = Describe("Reconciler", func() {
 								By("ensuring the finalizer is removed and the CR is deleted", func() {
 									err := mgr.GetAPIReader().Get(ctx, objKey, obj)
 									Expect(apierrors.IsNotFound(err)).To(BeTrue())
+								})
+							})
+						})
+						When("label selector succeeds", func() {
+							It("reconciles only matching label", func() {
+								By("setting an invalid action client getter to assert different reconcile results", func() {
+									r.actionClientGetter = helmclient.ActionClientGetterFunc(func(context.Context, client.Object) (helmclient.ActionInterface, error) {
+										fakeClient := helmfake.NewActionClient()
+										return &fakeClient, nil
+									})
+								})
+
+								By("setting not matching label to the CR", func() {
+									Expect(mgr.GetClient().Get(ctx, objKey, obj)).To(Succeed())
+									obj.SetLabels(map[string]string{"foo": "baz"})
+									Expect(mgr.GetClient().Update(ctx, obj)).To(Succeed())
+								})
+
+								By("reconciling is skipped, action client was not called and no error returned", func() {
+									res, err := r.Reconcile(ctx, req)
+									Expect(res).To(Equal(reconcile.Result{}))
+									Expect(err).ToNot(HaveOccurred())
+								})
+
+								By("setting matching label to the CR", func() {
+									Expect(mgr.GetClient().Get(ctx, objKey, obj)).To(Succeed())
+									obj.SetLabels(map[string]string{"foo": "bar"})
+									Expect(mgr.GetClient().Update(ctx, obj)).To(Succeed())
+								})
+
+								By("reconciling is not skipped and error returned because of  broken action client", func() {
+									res, err := r.Reconcile(ctx, req)
+									Expect(res).To(Equal(reconcile.Result{}))
+									Expect(err).To(MatchError("get not implemented"))
 								})
 							})
 						})
