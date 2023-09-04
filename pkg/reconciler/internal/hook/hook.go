@@ -43,6 +43,8 @@ func NewDependentResourceWatcher(c controller.Controller, rm meta.RESTMapper, ca
 	return &dependentResourceWatcher{
 		controller: c,
 		restMapper: rm,
+		cache:      cache,
+		scheme:     *scheme,
 		m:          sync.Mutex{},
 		watches:    make(map[schema.GroupVersionKind]struct{}),
 	}
