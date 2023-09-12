@@ -43,6 +43,8 @@ func NewDependentResourceWatcher(c controller.Controller, rm meta.RESTMapper, ca
 	return &dependentResourceWatcher{
 		controller: c,
 		restMapper: rm,
+		cache:      cache,
+		scheme:     scheme,
 		m:          sync.Mutex{},
 		watches:    make(map[schema.GroupVersionKind]struct{}),
 	}
@@ -52,7 +54,7 @@ type dependentResourceWatcher struct {
 	controller controller.Controller
 	restMapper meta.RESTMapper
 	cache      cache.Cache
-	scheme     runtime.Scheme
+	scheme     *runtime.Scheme
 
 	m       sync.Mutex
 	watches map[schema.GroupVersionKind]struct{}
@@ -96,7 +98,7 @@ func (d *dependentResourceWatcher) Exec(owner *unstructured.Unstructured, rel re
 			}
 
 			if useOwnerRef && !manifestutil.HasResourcePolicyKeep(unstructuredObj.GetAnnotations()) { // Setup watch using owner references.
-				if err := d.controller.Watch(source.Kind(d.cache, unstructuredObj), handler.EnqueueRequestForOwner(&d.scheme, d.restMapper, owner, handler.OnlyControllerOwner()), dependentPredicate); err != nil {
+				if err := d.controller.Watch(source.Kind(d.cache, unstructuredObj), handler.EnqueueRequestForOwner(d.scheme, d.restMapper, owner, handler.OnlyControllerOwner()), dependentPredicate); err != nil {
 					return err
 				}
 			} else { // Setup watch using annotations.
