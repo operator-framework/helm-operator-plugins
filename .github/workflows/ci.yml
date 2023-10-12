@@ -14,14 +14,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-    - name: Set up Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: ~1.21
-      id: go
-
     - name: Check out code into the Go module directory
       uses: actions/checkout@v2
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version-file: "go.mod"
+      id: go
 
     - name: Cache go module cache
       id: cache-go-mod
@@ -53,14 +53,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-    - name: Set up Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: ~1.21
-      id: go
-
     - name: Check out code into the Go module directory
       uses: actions/checkout@v2
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version-file: "go.mod"
+      id: go
 
     - name: Lint
       uses: golangci/golangci-lint-action@v3
@@ -73,16 +73,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-    - name: Set up Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: ~1.21
-      id: go
-
     - name: Check out code into the Go module directory
       uses: actions/checkout@v2
       with:
         fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version-file: "go.mod"
+      id: go
 
     - name: Run go-apidiff
       uses: joelanford/go-apidiff@main
