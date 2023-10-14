@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/operator-framework/helm-operator-plugins/pkg/internal/handler"
 	sdkhandler "github.com/operator-framework/operator-lib/handler"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
@@ -42,8 +43,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	ctrlhandler "sigs.k8s.io/controller-runtime/pkg/handler"
 	ctrlpredicate "sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
@@ -74,7 +74,7 @@ type Reconciler struct {
 	log                              logr.Logger
 	gvk                              *schema.GroupVersionKind
 	chrt                             *chart.Chart
-	selectorPredicate                predicate.Predicate
+	selectorPredicate                ctrlpredicate.Predicate
 	overrideValues                   map[string]string
 	skipDependentWatches             bool
 	maxConcurrentReconciles          int
@@ -970,7 +970,11 @@ func (r *Reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) err
 
 	if err := c.Watch(
 		source.Kind(mgr.GetCache(), secret),
-		handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), obj, handler.OnlyControllerOwner()),
+		// Do not schedule a new reconcile if the upgrade has failed and the controller has entered an exponential backoff
+		// to avoid endless reconcile loop.
+		handler.RequeueFilter(
+			ctrlhandler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), obj, ctrlhandler.OnlyControllerOwner()),
+		),
 	); err != nil {
 		return err
 	}
