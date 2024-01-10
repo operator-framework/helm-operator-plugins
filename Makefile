@@ -76,9 +76,9 @@ fix: $(GOLANGCI_LINT) ## Fixup files in the repo.
 	$(GOLANGCI_LINT) run --fix
 
 .PHONY: release
-release: GORELEASER_ARGS ?= --snapshot --rm-dist --skip-sign
-release:
-	fetch goreleaser 0.177.0 && goreleaser $(GORELEASER_ARGS)
+release: GORELEASER_ARGS ?= --snapshot --clean --skip-sign
+release: $(GORELEASER)
+	$(GORELEASER) $(GORELEASER_ARGS)
 
 .PHONY: clean
 clean:
