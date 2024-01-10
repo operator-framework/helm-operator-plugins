@@ -22,10 +22,7 @@ export GO111MODULE = on
 
 # Setup project-local paths and build settings
 SHELL=/bin/bash
-TOOLS_DIR=$(PWD)/tools
-TOOLS_BIN_DIR=$(TOOLS_DIR)/bin
-SCRIPTS_DIR=$(TOOLS_DIR)/scripts
-export PATH := $(BUILD_DIR):$(TOOLS_BIN_DIR):$(SCRIPTS_DIR):$(PATH)
+export PATH := $(BUILD_DIR):$(PATH)
 
 # bingo manages consistent tooling versions for things like kind, kustomize, etc.
 include .bingo/Variables.mk
@@ -82,4 +79,4 @@ release: $(GORELEASER)
 
 .PHONY: clean
 clean:
-	rm -rf $(TOOLS_BIN_DIR) $(BUILD_DIR)
+	rm -rf $(BUILD_DIR)
