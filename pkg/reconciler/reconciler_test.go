@@ -47,9 +47,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	"sigs.k8s.io/yaml"
+
+	sdkhandler "github.com/operator-framework/operator-lib/handler"
 
 	"github.com/operator-framework/helm-operator-plugins/internal/sdk/controllerutil"
 	"github.com/operator-framework/helm-operator-plugins/pkg/annotation"
@@ -60,7 +63,6 @@ import (
 	"github.com/operator-framework/helm-operator-plugins/pkg/reconciler/internal/conditions"
 	helmfake "github.com/operator-framework/helm-operator-plugins/pkg/reconciler/internal/fake"
 	"github.com/operator-framework/helm-operator-plugins/pkg/values"
-	sdkhandler "github.com/operator-framework/operator-lib/handler"
 )
 
 // custom is used within the reconciler test suite as underlying type for the GVK scheme.
@@ -1376,8 +1378,10 @@ func getManagerOrFail() manager.Manager {
 	sch := runtime.NewScheme()
 	Expect(clientgoscheme.AddToScheme(sch)).NotTo(HaveOccurred())
 	mgr, err := manager.New(cfg, manager.Options{
-		MetricsBindAddress: "0",
-		Scheme:             sch,
+		Metrics: metricsserver.Options{
+			BindAddress: "0",
+		},
+		Scheme: sch,
 	})
 	Expect(err).To(BeNil())
 	return mgr

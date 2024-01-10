@@ -23,10 +23,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -136,7 +133,7 @@ func run(cmd *cobra.Command, f *flags.Flags) {
 	// Log manager option flags
 	// Log manager option flags
 	optionsLog := map[string]interface{}{
-		"MetricsBindAddress": options.MetricsBindAddress,
+		"MetricsBindAddress": options.Metrics.BindAddress,
 		"HealthProbeAddress": options.HealthProbeBindAddress,
 		"LeaderElection":     options.LeaderElection,
 	}
@@ -148,38 +145,9 @@ func run(cmd *cobra.Command, f *flags.Flags) {
 	}
 	log.Info("Setting manager options", "Options", optionsLog)
 
-	namespace, found := os.LookupEnv(helmmgr.WatchNamespaceEnvVar)
-	log = log.WithValues("Namespace", namespace)
+	helmmgr.ConfigureWatchNamespaces(&options, log)
 
-	var watchNamespaces []string
-	if found {
-		log.V(1).Info(fmt.Sprintf("Setting namespace with value in %s", helmmgr.WatchNamespaceEnvVar))
-		if namespace == metav1.NamespaceAll {
-			log.Info("Watching all namespaces.")
-			watchNamespaces = []string{metav1.NamespaceAll}
-		} else {
-			if strings.Contains(namespace, ",") {
-				log.Info("Watching multiple namespaces.")
-				watchNamespaces = strings.Split(namespace, "")
-			} else {
-				log.Info("Watching single namespace.")
-				watchNamespaces = []string{namespace}
-			}
-		}
-		// TODO: remove this when loading from config file option is removed
-	} else if options.Namespace == "" { //nolint:staticcheck
-		log.Info(fmt.Sprintf("Watch namespaces not configured by environment variable %s or file. "+
-			"Watching all namespaces.", helmmgr.WatchNamespaceEnvVar))
-		watchNamespaces = []string{metav1.NamespaceAll}
-	}
-
-	mgr, err := manager.New(cfg, manager.Options{
-		NewCache: func(config *rest.Config, opts cache.Options) (cache.Cache, error) {
-			return cache.New(config, cache.Options{
-				Namespaces: watchNamespaces,
-			})
-		},
-	})
+	mgr, err := manager.New(cfg, options)
 	if err != nil {
 		log.Error(err, "Failed to create a new manager")
 		os.Exit(1)

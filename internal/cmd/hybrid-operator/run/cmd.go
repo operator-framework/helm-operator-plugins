@@ -22,13 +22,6 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/operator-framework/helm-operator-plugins/internal/flags"
-	"github.com/operator-framework/helm-operator-plugins/internal/metrics"
-	"github.com/operator-framework/helm-operator-plugins/internal/version"
-	"github.com/operator-framework/helm-operator-plugins/pkg/annotation"
-	helmmgr "github.com/operator-framework/helm-operator-plugins/pkg/manager"
-	"github.com/operator-framework/helm-operator-plugins/pkg/reconciler"
-	"github.com/operator-framework/helm-operator-plugins/pkg/watches"
 	"github.com/spf13/cobra"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -38,6 +31,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	crmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+
+	"github.com/operator-framework/helm-operator-plugins/internal/flags"
+	"github.com/operator-framework/helm-operator-plugins/internal/metrics"
+	"github.com/operator-framework/helm-operator-plugins/internal/version"
+	"github.com/operator-framework/helm-operator-plugins/pkg/annotation"
+	helmmgr "github.com/operator-framework/helm-operator-plugins/pkg/manager"
+	"github.com/operator-framework/helm-operator-plugins/pkg/reconciler"
+	"github.com/operator-framework/helm-operator-plugins/pkg/watches"
 )
 
 var log = logf.Log.WithName("cmd")
@@ -133,7 +134,7 @@ func run(cmd *cobra.Command, f *flags.Flags) {
 
 	// Log manager option flags
 	optionsLog := map[string]interface{}{
-		"MetricsBindAddress": options.MetricsBindAddress,
+		"MetricsBindAddress": options.Metrics.BindAddress,
 		"HealthProbeAddress": options.HealthProbeBindAddress,
 		"LeaderElection":     options.LeaderElection,
 	}

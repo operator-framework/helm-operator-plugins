@@ -29,7 +29,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
@@ -60,21 +59,21 @@ var _ = Describe("ConfigureWatchNamespaces", func() {
 			By("configuring WATCH_NAMESPACE with the namespaces of the watched pods")
 			ConfigureWatchNamespaces(&opts, log)
 
-			By("verifying of opts.NewCache func is not nil")
-			Expect(opts.NewCache).NotTo(BeNil())
-
-			By("using the options NewCache function to create a cache")
-			c, err := opts.NewCache(cfg, cache.Options{})
+			By("creating the manager")
+			mgr, err := manager.New(cfg, opts)
 			Expect(err).To(BeNil())
 
-			By("starting the cache and waiting for it to sync")
+			By("starting the manager")
 			ctx, cancel := context.WithCancel(context.Background())
 			var wg sync.WaitGroup
 			wg.Add(1)
 			go func() {
-				Expect(c.Start(ctx)).To(Succeed())
+				Expect(mgr.Start(ctx)).To(Succeed())
 				wg.Done()
 			}()
+
+			By("waiting for the cache to sync")
+			c := mgr.GetCache()
 			Expect(c.WaitForCacheSync(ctx)).To(BeTrue())
 
 			By("successfully getting the watched pods")
@@ -90,24 +89,21 @@ var _ = Describe("ConfigureWatchNamespaces", func() {
 			By("configuring WATCH_NAMESPACE with empty string")
 			Expect(os.Setenv(WatchNamespaceEnvVar, ""))
 
-			By("configuring WATCH_NAMESPACE with the namespaces of the watched pods")
-			ConfigureWatchNamespaces(&opts, log)
-
-			By("verifying of opts.NewCache func is not nil")
-			Expect(opts.NewCache).NotTo(BeNil())
-
-			By("using the options NewCache function to create a cache")
-			c, err := opts.NewCache(cfg, cache.Options{})
+			By("creating the manager")
+			mgr, err := manager.New(cfg, opts)
 			Expect(err).To(BeNil())
 
-			By("starting the cache and waiting for it to sync")
+			By("starting the manager")
 			ctx, cancel := context.WithCancel(context.Background())
 			var wg sync.WaitGroup
 			wg.Add(1)
 			go func() {
-				Expect(c.Start(ctx)).To(Succeed())
+				Expect(mgr.Start(ctx)).To(Succeed())
 				wg.Done()
 			}()
+
+			By("waiting for the cache to sync")
+			c := mgr.GetCache()
 			Expect(c.WaitForCacheSync(ctx)).To(BeTrue())
 
 			By("successfully getting the watched pods")
@@ -134,21 +130,21 @@ var _ = Describe("ConfigureWatchNamespaces", func() {
 			Expect(os.Setenv(WatchNamespaceEnvVar, strings.Join(getNamespaces(watchedPods), ",")))
 			ConfigureWatchNamespaces(&opts, log)
 
-			By("verifying of opts.NewCache func is not nil")
-			Expect(opts.NewCache).NotTo(BeNil())
-
-			By("using the options NewCache function to create a cache")
-			c, err := opts.NewCache(cfg, cache.Options{})
+			By("creating the manager")
+			mgr, err := manager.New(cfg, opts)
 			Expect(err).To(BeNil())
 
-			By("starting the cache and waiting for it to sync")
+			By("starting the manager")
 			ctx, cancel := context.WithCancel(context.Background())
 			var wg sync.WaitGroup
 			wg.Add(1)
 			go func() {
-				Expect(c.Start(ctx)).To(Succeed())
+				Expect(mgr.Start(ctx)).To(Succeed())
 				wg.Done()
 			}()
+
+			By("waiting for the cache to sync")
+			c := mgr.GetCache()
 			Expect(c.WaitForCacheSync(ctx)).To(BeTrue())
 
 			By("successfully getting the watched pods")

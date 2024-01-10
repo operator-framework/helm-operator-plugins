@@ -133,8 +133,8 @@ func (f *Flags) ToManagerOptions(options manager.Options) manager.Options {
 	}
 
 	// TODO(2.0.0): remove metrics-addr
-	if changed("metrics-bind-address") || changed("metrics-addr") || options.MetricsBindAddress == "" {
-		options.MetricsBindAddress = f.MetricsBindAddress
+	if changed("metrics-bind-address") || changed("metrics-addr") || options.Metrics.BindAddress == "" {
+		options.Metrics.BindAddress = f.MetricsBindAddress
 	}
 	if changed("health-probe-bind-address") || options.HealthProbeBindAddress == "" {
 		options.HealthProbeBindAddress = f.ProbeAddr
@@ -150,7 +150,7 @@ func (f *Flags) ToManagerOptions(options manager.Options) manager.Options {
 		options.LeaderElectionNamespace = f.LeaderElectionNamespace
 	}
 	if options.LeaderElectionResourceLock == "" {
-		options.LeaderElectionResourceLock = resourcelock.ConfigMapsLeasesResourceLock
+		options.LeaderElectionResourceLock = resourcelock.LeasesResourceLock
 	}
 	return options
 }
