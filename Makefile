@@ -1,3 +1,5 @@
+.DEFAULT_GOAL := all
+
 # GO_BUILD_ARGS should be set when running 'go build' or 'go install'.
 VERSION_PKG = "$(shell go list -m)/internal/version"
 export SCAFFOLD_VERSION = $(shell git describe --tags --abbrev=0)
@@ -25,6 +27,9 @@ TOOLS_BIN_DIR=$(TOOLS_DIR)/bin
 SCRIPTS_DIR=$(TOOLS_DIR)/scripts
 export PATH := $(BUILD_DIR):$(TOOLS_BIN_DIR):$(SCRIPTS_DIR):$(PATH)
 
+# bingo manages consistent tooling versions for things like kind, kustomize, etc.
+include .bingo/Variables.mk
+
 ##@ Development
 
 .PHONY: generate
@@ -43,11 +48,10 @@ all: test lint build
 # https://github.com/kubernetes-sigs/kubebuilder/pull/2287 targeting the kubebuilder
 # "tools-releases" branch. Make sure to look up the appropriate etcd version in the
 # kubernetes release notes for the minor version you're building tools for.
-ENVTEST_VERSION = $(shell go list -m k8s.io/client-go | cut -d" " -f2 | sed 's/^v0\.\([[:digit:]]\{1,\}\)\.[[:digit:]]\{1,\}$$/1.\1.x/')
+CLIENT_GO_VERSION = $(shell go list -m k8s.io/client-go | cut -d" " -f2 | sed 's/^v0\.\([[:digit:]]\{1,\}\)\.[[:digit:]]\{1,\}$$/1.\1.x/')
 TESTPKG ?= ./...
-test: build
-	go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
-	eval $$(setup-envtest use -p env $(ENVTEST_VERSION)) && go test -race -covermode atomic -coverprofile cover.out $(TESTPKG)
+test: build $(SETUP_ENVTEST)
+	eval $$($(SETUP_ENVTEST) use -p env $(CLIENT_GO_VERSION)) && go test -race -covermode atomic -coverprofile cover.out $(TESTPKG)
 
 .PHONY: test-sanity
 test-sanity: generate fix lint ## Test repo formatting, linting, etc.
