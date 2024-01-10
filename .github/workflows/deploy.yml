@@ -3,7 +3,7 @@ name: Deploy
 on:
   push:
     branches:
-      - '**'
+      - 'main'
     tags:
       - 'v*'
   pull_request:
@@ -24,7 +24,7 @@ jobs:
       run: .ci/gpg/create-keyring.sh
       env:
         GPG_PASSWORD: ${{ secrets.GPG_PASSWORD }}
-        
+
     - name: Install Go
       uses: actions/setup-go@v4
       with:
