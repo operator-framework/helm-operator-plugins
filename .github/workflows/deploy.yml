@@ -35,7 +35,7 @@ jobs:
     - name: Create release
       run: |
         if [[ $GITHUB_REF == refs/tags/* ]]; then
-          export GORELEASER_ARGS="--rm-dist"
+          export GORELEASER_ARGS="--clean"
         fi
         make release
       env:
