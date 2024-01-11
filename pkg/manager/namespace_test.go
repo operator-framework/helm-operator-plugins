@@ -91,6 +91,9 @@ var _ = Describe("ConfigureWatchNamespaces", func() {
 			By("configuring WATCH_NAMESPACE with empty string")
 			Expect(os.Setenv(WatchNamespaceEnvVar, "")).To(Succeed())
 
+			By("configuring WATCH_NAMESPACE with the namespaces of the watched pods")
+			ConfigureWatchNamespaces(&opts, log)
+
 			By("creating the manager")
 			mgr, err := manager.New(cfg, opts)
 			Expect(err).ToNot(HaveOccurred())
