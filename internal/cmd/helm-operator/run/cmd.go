@@ -200,7 +200,6 @@ func run(cmd *cobra.Command, f *flags.Flags) {
 		log.Error(err, "Manager exited non-zero.")
 		os.Exit(1)
 	}
-
 }
 
 // exitIfUnsupported prints an error containing unsupported field names and exits

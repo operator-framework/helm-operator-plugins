@@ -44,8 +44,8 @@ var (
 func WaitForDeletion(ctx context.Context, cl client.Reader, o client.Object) error {
 	key := client.ObjectKeyFromObject(o)
 
-	return wait.PollUntilContextCancel(ctx, time.Millisecond*10, true, func(ctx context.Context) (done bool, err error) {
-		err = cl.Get(ctx, key, o)
+	return wait.PollUntilContextCancel(ctx, time.Millisecond*10, true, func(ctx context.Context) (bool, error) {
+		err := cl.Get(ctx, key, o)
 		if apierrors.IsNotFound(err) {
 			return true, nil
 		}

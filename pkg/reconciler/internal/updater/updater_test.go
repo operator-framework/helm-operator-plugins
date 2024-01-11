@@ -64,7 +64,7 @@ var _ = Describe("Updater", func() {
 				return true
 			})
 			err := u.Apply(context.TODO(), obj)
-			Expect(err).NotTo(BeNil())
+			Expect(err).To(HaveOccurred())
 			Expect(apierrors.IsNotFound(err)).To(BeTrue())
 		})
 	})

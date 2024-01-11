@@ -79,7 +79,7 @@ type ActionConfigGetterOption func(getter *actionConfigGetter)
 
 type ObjectToStringMapper func(client.Object) (string, error)
 
-func ClientNamespaceMapper(m ObjectToStringMapper) ActionConfigGetterOption {
+func ClientNamespaceMapper(m ObjectToStringMapper) ActionConfigGetterOption { // nolint:revive
 	return func(getter *actionConfigGetter) {
 		getter.objectToClientNamespace = m
 	}

@@ -40,7 +40,7 @@ var _ = Describe("chainedPostRenderer", func() {
 	When("nothing is in chain", func() {
 		It("leaves input unmodified", func() {
 			out, err := cpr.Run(bytes.NewBufferString("original"))
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(out.String()).To(Equal("original"))
 		})
 	})
@@ -51,7 +51,7 @@ var _ = Describe("chainedPostRenderer", func() {
 		})
 		It("runs the postrenderer", func() {
 			out, err := cpr.Run(bytes.NewBufferString("original\n"))
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(out.String()).To(Equal("original\npr1\n"))
 		})
 	})
@@ -62,7 +62,7 @@ var _ = Describe("chainedPostRenderer", func() {
 		})
 		It("runs the postrenderer", func() {
 			out, err := cpr.Run(bytes.NewBufferString("original\n"))
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(out.String()).To(Equal("original\npr1\npr2\npr3\n"))
 		})
 	})
@@ -90,7 +90,7 @@ var _ = Describe("PostRender install options", func() {
 		It("overrides the default postrenderer", func() {
 			Expect(WithInstallPostRenderer(add)(install)).To(Succeed())
 			out, err := install.PostRenderer.Run(&bytes.Buffer{})
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(out.String()).To(Equal("add\n"))
 		})
 	})
@@ -98,14 +98,14 @@ var _ = Describe("PostRender install options", func() {
 		It("runs the extra post renderer after the default", func() {
 			Expect(AppendInstallPostRenderer(add)(install)).To(Succeed())
 			out, err := install.PostRenderer.Run(&bytes.Buffer{})
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(out.String()).To(Equal("base\nadd\n"))
 		})
 		It("appends extra post renders if the existing post-render is a chainedPostRender", func() {
 			Expect(AppendInstallPostRenderer(add)(install)).To(Succeed())
 			Expect(AppendInstallPostRenderer(add)(install)).To(Succeed())
 			out, err := install.PostRenderer.Run(&bytes.Buffer{})
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(out.String()).To(Equal("base\nadd\nadd\n"))
 			Expect(install.PostRenderer).To(BeAssignableToTypeOf(chainedPostRenderer{}))
 			Expect(install.PostRenderer).To(HaveLen(3))
@@ -135,7 +135,7 @@ var _ = Describe("PostRender upgrade options", func() {
 		It("overrides the default postrenderer", func() {
 			Expect(WithUpgradePostRenderer(add)(upgrade)).To(Succeed())
 			out, err := upgrade.PostRenderer.Run(&bytes.Buffer{})
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(out.String()).To(Equal("add\n"))
 		})
 	})
@@ -143,14 +143,14 @@ var _ = Describe("PostRender upgrade options", func() {
 		It("runs the extra post renderer after the default", func() {
 			Expect(AppendUpgradePostRenderer(add)(upgrade)).To(Succeed())
 			out, err := upgrade.PostRenderer.Run(&bytes.Buffer{})
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(out.String()).To(Equal("base\nadd\n"))
 		})
 		It("appends extra post renders if the existing post-render is a chainedPostRender", func() {
 			Expect(AppendUpgradePostRenderer(add)(upgrade)).To(Succeed())
 			Expect(AppendUpgradePostRenderer(add)(upgrade)).To(Succeed())
 			out, err := upgrade.PostRenderer.Run(&bytes.Buffer{})
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(out.String()).To(Equal("base\nadd\nadd\n"))
 			Expect(upgrade.PostRenderer).To(BeAssignableToTypeOf(chainedPostRenderer{}))
 			Expect(upgrade.PostRenderer).To(HaveLen(3))
@@ -169,7 +169,7 @@ var _ = Describe("ownerPostRenderer", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		rm, err := apiutil.NewDynamicRESTMapper(cfg, httpClient)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 
 		owner = newTestDeployment([]corev1.Container{{
 			Name: "test",
@@ -183,7 +183,7 @@ var _ = Describe("ownerPostRenderer", func() {
 
 	It("injects an owner reference", func() {
 		buf, err := pr.Run(bytes.NewBufferString(getTestManifest()))
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 		objs := manifestToObjects(buf.String())
 		for _, obj := range objs {
 			Expect(obj.GetOwnerReferences()).To(HaveLen(1))
@@ -192,7 +192,7 @@ var _ = Describe("ownerPostRenderer", func() {
 
 	It("fails on invalid input", func() {
 		_, err := pr.Run(bytes.NewBufferString("test"))
-		Expect(err).NotTo(BeNil())
+		Expect(err).To(HaveOccurred())
 	})
 })
 
@@ -204,6 +204,6 @@ func getTestManifest() string {
 	i.ReleaseName = "release-name"
 	i.ClientOnly = true
 	rel, err := i.Run(&testChart, nil)
-	Expect(err).To(BeNil())
+	Expect(err).ToNot(HaveOccurred())
 	return rel.Manifest
 }

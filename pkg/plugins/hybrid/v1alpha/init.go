@@ -25,7 +25,6 @@ import (
 	"sigs.k8s.io/kubebuilder/v3/pkg/machinery"
 	"sigs.k8s.io/kubebuilder/v3/pkg/plugin"
 	"sigs.k8s.io/kubebuilder/v3/pkg/plugin/util"
-	kbutils "sigs.k8s.io/kubebuilder/v3/pkg/plugin/util"
 	"sigs.k8s.io/kubebuilder/v3/pkg/plugins/golang"
 
 	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/hybrid/v1alpha/scaffolds"
@@ -78,7 +77,6 @@ func (p *initSubcommand) BindFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&p.license, "license", "apache2",
 		"license to use to boilerplate, may be one of 'apache2', 'none'")
 	fs.StringVar(&p.owner, "owner", "", "owner to add to the copyright")
-
 }
 
 func (p *initSubcommand) InjectConfig(c config.Config) error {
@@ -105,7 +103,6 @@ func (p *initSubcommand) InjectConfig(c config.Config) error {
 // 2. Verify if additional customizations are needed in config files as done in
 // helm operator.
 func (p *initSubcommand) Scaffold(fs machinery.Filesystem) error {
-
 	if err := addInitCustomizations(p.config.GetProjectName()); err != nil {
 		return fmt.Errorf("error updating init manifests: %q", err)
 	}
@@ -144,13 +141,13 @@ func addInitCustomizations(projectName string) error {
 	// by https://github.com/kubernetes-sigs/kubebuilder/pull/2119
 
 	// Add leader election arg in config/manager/manager.yaml and in config/default/manager_auth_proxy_patch.yaml
-	err := kbutils.InsertCode(managerFile,
+	err := util.InsertCode(managerFile,
 		"--leader-elect",
 		fmt.Sprintf("\n        - --leader-election-id=%s", projectName))
 	if err != nil {
 		return err
 	}
-	err = kbutils.InsertCode(filepath.Join("config", "default", "manager_auth_proxy_patch.yaml"),
+	err = util.InsertCode(filepath.Join("config", "default", "manager_auth_proxy_patch.yaml"),
 		"- \"--leader-elect\"",
 		fmt.Sprintf("\n        - \"--leader-election-id=%s\"", projectName))
 	if err != nil {

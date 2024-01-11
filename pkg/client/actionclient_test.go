@@ -35,7 +35,7 @@ import (
 	"helm.sh/helm/v3/pkg/releaseutil"
 	"helm.sh/helm/v3/pkg/storage/driver"
 	appsv1 "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -67,14 +67,14 @@ var _ = Describe("ActionClient", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		rm, err = apiutil.NewDynamicRESTMapper(cfg, httpClient)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 	})
 	var _ = Describe("NewActionClientGetter", func() {
 		It("should return a valid ActionConfigGetter", func() {
 			actionConfigGetter, err := NewActionConfigGetter(cfg, rm, logr.Discard())
 			Expect(err).ShouldNot(HaveOccurred())
 			acg, err := NewActionClientGetter(actionConfigGetter)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(acg).NotTo(BeNil())
 		})
 
@@ -107,11 +107,11 @@ var _ = Describe("ActionClient", func() {
 						return expectErr
 					},
 				))
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				Expect(acg).NotTo(BeNil())
 
 				ac, err := acg.ActionClientFor(obj)
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				Expect(ac).NotTo(BeNil())
 
 				_, err = ac.Get(obj.GetName())
@@ -128,11 +128,11 @@ var _ = Describe("ActionClient", func() {
 						return expectErr
 					},
 				))
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				Expect(acg).NotTo(BeNil())
 
 				ac, err := acg.ActionClientFor(obj)
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				Expect(ac).NotTo(BeNil())
 
 				_, err = ac.Install(obj.GetName(), obj.GetNamespace(), &chrt, chartutil.Values{})
@@ -149,11 +149,11 @@ var _ = Describe("ActionClient", func() {
 						return expectErr
 					},
 				))
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				Expect(acg).NotTo(BeNil())
 
 				ac, err := acg.ActionClientFor(obj)
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				Expect(ac).NotTo(BeNil())
 
 				_, err = ac.Upgrade(obj.GetName(), obj.GetNamespace(), &chrt, chartutil.Values{})
@@ -170,11 +170,11 @@ var _ = Describe("ActionClient", func() {
 						return expectErr
 					},
 				))
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				Expect(acg).NotTo(BeNil())
 
 				ac, err := acg.ActionClientFor(obj)
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				Expect(ac).NotTo(BeNil())
 
 				_, err = ac.Uninstall(obj.GetName())
@@ -191,11 +191,11 @@ var _ = Describe("ActionClient", func() {
 						return expectErr
 					},
 				))
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				Expect(acg).NotTo(BeNil())
 
 				ac, err := acg.ActionClientFor(obj)
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				Expect(ac).NotTo(BeNil())
 
 				_, err = ac.Install(obj.GetName(), obj.GetNamespace(), &chrt, chartutil.Values{}, func(install *action.Install) error {
@@ -209,7 +209,7 @@ var _ = Describe("ActionClient", func() {
 
 				// Uninstall the chart to cleanup for other tests.
 				_, err = ac.Uninstall(obj.GetName())
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 			})
 			It("should get clients with custom upgrade failure rollback options", func() {
 				expectMaxHistory := rand.Int()
@@ -223,16 +223,16 @@ var _ = Describe("ActionClient", func() {
 						return expectErr
 					},
 				))
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				Expect(acg).NotTo(BeNil())
 
 				ac, err := acg.ActionClientFor(obj)
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				Expect(ac).NotTo(BeNil())
 
 				// Install the chart so that we can try an upgrade.
 				rel, err := ac.Install(obj.GetName(), obj.GetNamespace(), &chrt, chartutil.Values{})
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				Expect(rel).NotTo(BeNil())
 
 				_, err = ac.Upgrade(obj.GetName(), obj.GetNamespace(), &chrt, chartutil.Values{}, func(upgrade *action.Upgrade) error {
@@ -246,41 +246,41 @@ var _ = Describe("ActionClient", func() {
 
 				// Uninstall the chart to cleanup for other tests.
 				_, err = ac.Uninstall(obj.GetName())
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 			})
 			It("should get clients with postrenderers", func() {
 
 				acg, err := NewActionClientGetter(actionConfigGetter, AppendPostRenderers(newMockPostRenderer("foo", "bar")))
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				Expect(acg).NotTo(BeNil())
 
 				ac, err := acg.ActionClientFor(obj)
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 
 				_, err = ac.Install(obj.GetName(), obj.GetNamespace(), &chrt, chartutil.Values{})
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 
 				rel, err := ac.Get(obj.GetName())
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 
 				rl, err := cli.Build(bytes.NewBufferString(rel.Manifest), false)
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 
 				Expect(rl).NotTo(BeEmpty())
 				err = rl.Visit(func(info *resource.Info, err error) error {
-					Expect(err).To(BeNil())
+					Expect(err).ToNot(HaveOccurred())
 					Expect(info.Object).NotTo(BeNil())
 					objMeta, err := meta.Accessor(info.Object)
-					Expect(err).To(BeNil())
+					Expect(err).ToNot(HaveOccurred())
 					Expect(objMeta.GetAnnotations()).To(HaveKey("foo"))
 					Expect(objMeta.GetAnnotations()["foo"]).To(Equal("bar"))
 					return nil
 				})
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 
 				// Uninstall the chart to cleanup for other tests.
 				_, err = ac.Uninstall(obj.GetName())
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 			})
 		})
 	})
@@ -309,9 +309,9 @@ var _ = Describe("ActionClient", func() {
 			actionConfGetter, err := NewActionConfigGetter(cfg, rm, logr.Discard())
 			Expect(err).ShouldNot(HaveOccurred())
 			acg, err := NewActionClientGetter(actionConfGetter)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			ac, err := acg.ActionClientFor(obj)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(ac).NotTo(BeNil())
 		})
 	})
@@ -329,12 +329,12 @@ var _ = Describe("ActionClient", func() {
 			actionConfigGetter, err := NewActionConfigGetter(cfg, rm, logr.Discard())
 			Expect(err).ShouldNot(HaveOccurred())
 			acg, err := NewActionClientGetter(actionConfigGetter)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			ac, err = acg.ActionClientFor(obj)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			cl, err = client.New(cfg, client.Options{})
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			Expect(cl.Create(context.TODO(), obj)).To(Succeed())
 		})
@@ -345,7 +345,7 @@ var _ = Describe("ActionClient", func() {
 
 		When("release is not installed", func() {
 			AfterEach(func() {
-				if _, err := ac.Get(obj.GetName()); err == driver.ErrReleaseNotFound {
+				if _, err := ac.Get(obj.GetName()); errors.Is(err, driver.ErrReleaseNotFound) {
 					return
 				}
 				_, err := ac.Uninstall(obj.GetName())
@@ -362,7 +362,7 @@ var _ = Describe("ActionClient", func() {
 					By("installing the release", func() {
 						opt := func(i *action.Install) error { i.Description = mockTestDesc; return nil }
 						rel, err = ac.Install(obj.GetName(), obj.GetNamespace(), &chrt, vals, opt)
-						Expect(err).To(BeNil())
+						Expect(err).ToNot(HaveOccurred())
 						Expect(rel).NotTo(BeNil())
 					})
 					verifyRelease(cl, obj, rel)
@@ -372,7 +372,7 @@ var _ = Describe("ActionClient", func() {
 						chrt := testutil.MustLoadChart("../../pkg/internal/testdata/test-chart-1.2.0.tgz")
 						chrt.Templates[2].Data = append(chrt.Templates[2].Data, []byte("\ngibberish")...)
 						r, err := ac.Install(obj.GetName(), obj.GetNamespace(), &chrt, vals)
-						Expect(err).NotTo(BeNil())
+						Expect(err).To(HaveOccurred())
 						Expect(r).To(BeNil())
 					})
 					verifyNoRelease(cl, obj.GetNamespace(), obj.GetName(), nil)
@@ -389,14 +389,14 @@ var _ = Describe("ActionClient", func() {
 			var _ = Describe("Upgrade", func() {
 				It("should fail", func() {
 					r, err := ac.Upgrade(obj.GetName(), obj.GetNamespace(), &chrt, vals)
-					Expect(err).NotTo(BeNil())
+					Expect(err).To(HaveOccurred())
 					Expect(r).To(BeNil())
 				})
 			})
 			var _ = Describe("Uninstall", func() {
 				It("should fail", func() {
 					resp, err := ac.Uninstall(obj.GetName())
-					Expect(err).NotTo(BeNil())
+					Expect(err).To(HaveOccurred())
 					Expect(resp).To(BeNil())
 				})
 			})
@@ -410,11 +410,11 @@ var _ = Describe("ActionClient", func() {
 				var err error
 				opt := func(i *action.Install) error { i.Description = mockTestDesc; return nil }
 				installedRelease, err = ac.Install(obj.GetName(), obj.GetNamespace(), &chrt, vals, opt)
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				Expect(installedRelease).NotTo(BeNil())
 			})
 			AfterEach(func() {
-				if _, err := ac.Get(obj.GetName()); err == driver.ErrReleaseNotFound {
+				if _, err := ac.Get(obj.GetName()); errors.Is(err, driver.ErrReleaseNotFound) {
 					return
 				}
 				_, err := ac.Uninstall(obj.GetName())
@@ -430,7 +430,7 @@ var _ = Describe("ActionClient", func() {
 				It("should succeed", func() {
 					By("getting the release", func() {
 						rel, err = ac.Get(obj.GetName())
-						Expect(err).To(BeNil())
+						Expect(err).ToNot(HaveOccurred())
 						Expect(rel).NotTo(BeNil())
 					})
 					verifyRelease(cl, obj, rel)
@@ -447,13 +447,13 @@ var _ = Describe("ActionClient", func() {
 					It("should succeed with an existing version", func() {
 						opt := func(g *action.Get) error { g.Version = 1; return nil }
 						rel, err = ac.Get(obj.GetName(), opt)
-						Expect(err).To(BeNil())
+						Expect(err).ToNot(HaveOccurred())
 						Expect(rel).NotTo(BeNil())
 					})
 					It("should fail with a non-existent version", func() {
 						opt := func(g *action.Get) error { g.Version = 10; return nil }
 						rel, err = ac.Get(obj.GetName(), opt)
-						Expect(err).NotTo(BeNil())
+						Expect(err).To(HaveOccurred())
 						Expect(rel).To(BeNil())
 					})
 				})
@@ -461,7 +461,7 @@ var _ = Describe("ActionClient", func() {
 			var _ = Describe("Install", func() {
 				It("should fail", func() {
 					r, err := ac.Install(obj.GetName(), obj.GetNamespace(), &chrt, vals)
-					Expect(err).NotTo(BeNil())
+					Expect(err).To(HaveOccurred())
 					Expect(r).To(BeNil())
 				})
 			})
@@ -474,7 +474,7 @@ var _ = Describe("ActionClient", func() {
 					By("upgrading the release", func() {
 						opt := func(u *action.Upgrade) error { u.Description = mockTestDesc; return nil }
 						rel, err = ac.Upgrade(obj.GetName(), obj.GetNamespace(), &chrt, vals, opt)
-						Expect(err).To(BeNil())
+						Expect(err).ToNot(HaveOccurred())
 						Expect(rel).NotTo(BeNil())
 					})
 					verifyRelease(cl, obj, rel)
@@ -483,7 +483,7 @@ var _ = Describe("ActionClient", func() {
 					By("failing to install the release", func() {
 						vals := chartutil.Values{"service": map[string]interface{}{"type": "FooBar"}}
 						r, err := ac.Upgrade(obj.GetName(), obj.GetNamespace(), &chrt, vals)
-						Expect(err).NotTo(BeNil())
+						Expect(err).To(HaveOccurred())
 						Expect(r).To(BeNil())
 					})
 					tmp := *installedRelease
@@ -509,7 +509,7 @@ var _ = Describe("ActionClient", func() {
 					By("uninstalling the release", func() {
 						opt := func(i *action.Uninstall) error { i.Description = mockTestDesc; return nil }
 						resp, err = ac.Uninstall(obj.GetName(), opt)
-						Expect(err).To(BeNil())
+						Expect(err).ToNot(HaveOccurred())
 						Expect(resp).NotTo(BeNil())
 					})
 					verifyNoRelease(cl, obj.GetNamespace(), obj.GetName(), resp.Release)
@@ -527,7 +527,7 @@ var _ = Describe("ActionClient", func() {
 				It("should succeed", func() {
 					By("reconciling the release", func() {
 						err := ac.Reconcile(installedRelease)
-						Expect(err).To(BeNil())
+						Expect(err).ToNot(HaveOccurred())
 					})
 					verifyRelease(cl, obj, installedRelease)
 				})
@@ -536,12 +536,12 @@ var _ = Describe("ActionClient", func() {
 						objs := manifestToObjects(installedRelease.Manifest)
 						for _, obj := range objs {
 							err := cl.Delete(context.TODO(), obj)
-							Expect(err).To(BeNil())
+							Expect(err).ToNot(HaveOccurred())
 						}
 					})
 					By("reconciling the release", func() {
 						err := ac.Reconcile(installedRelease)
-						Expect(err).To(BeNil())
+						Expect(err).ToNot(HaveOccurred())
 					})
 					verifyRelease(cl, obj, installedRelease)
 				})
@@ -554,19 +554,19 @@ var _ = Describe("ActionClient", func() {
 							u := &unstructured.Unstructured{}
 							u.SetGroupVersionKind(obj.GetObjectKind().GroupVersionKind())
 							err := cl.Get(context.TODO(), key, u)
-							Expect(err).To(BeNil())
+							Expect(err).ToNot(HaveOccurred())
 
 							labels := u.GetLabels()
 							labels["app.kubernetes.io/managed-by"] = "Unmanaged"
 							u.SetLabels(labels)
 
 							err = cl.Update(context.TODO(), u)
-							Expect(err).To(BeNil())
+							Expect(err).ToNot(HaveOccurred())
 						}
 					})
 					By("reconciling the release", func() {
 						err := ac.Reconcile(installedRelease)
-						Expect(err).To(BeNil())
+						Expect(err).ToNot(HaveOccurred())
 					})
 					verifyRelease(cl, obj, installedRelease)
 				})
@@ -592,7 +592,7 @@ var _ = Describe("ActionClient", func() {
 				}),
 			}
 			patch, patchType, err := createPatch(o1, o2)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(string(patch)).To(Equal(``))
 			Expect(patchType).To(Equal(apitypes.JSONPatchType))
 		})
@@ -613,7 +613,7 @@ var _ = Describe("ActionClient", func() {
 				}),
 			}
 			patch, patchType, err := createPatch(o1, o2)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(string(patch)).To(Equal(`[{"op":"add","path":"/spec/template/spec/containers/1","value":{"name":"test2"}}]`))
 			Expect(patchType).To(Equal(apitypes.JSONPatchType))
 		})
@@ -632,7 +632,7 @@ var _ = Describe("ActionClient", func() {
 				}),
 			}
 			patch, patchType, err := createPatch(o1, o2)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(string(patch)).To(Equal(``))
 			Expect(patchType).To(Equal(apitypes.JSONPatchType))
 		})
@@ -650,65 +650,65 @@ var _ = Describe("ActionClient", func() {
 				}),
 			}
 			patch, patchType, err := createPatch(o1, o2)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(string(patch)).To(Equal(`[{"op":"replace","path":"/spec/template/spec/containers/0/name","value":"test2"}]`))
 			Expect(patchType).To(Equal(apitypes.JSONPatchType))
 		})
 		It("ignores extra fields in core types", func() {
-			o1 := newTestDeployment([]v1.Container{
+			o1 := newTestDeployment([]corev1.Container{
 				{Name: "test1"},
 				{Name: "test2"},
 			})
 			o2 := &resource.Info{
-				Object: newTestDeployment([]v1.Container{
+				Object: newTestDeployment([]corev1.Container{
 					{Name: "test1"},
 				}),
 			}
 			patch, patchType, err := createPatch(o1, o2)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(string(patch)).To(Equal(`{"spec":{"template":{"spec":{"$setElementOrder/containers":[{"name":"test1"}]}}}}`))
 			Expect(patchType).To(Equal(apitypes.StrategicMergePatchType))
 		})
 		It("patches missing fields in core types", func() {
-			o1 := newTestDeployment([]v1.Container{
+			o1 := newTestDeployment([]corev1.Container{
 				{Name: "test1"},
 			})
 			o2 := &resource.Info{
-				Object: newTestDeployment([]v1.Container{
+				Object: newTestDeployment([]corev1.Container{
 					{Name: "test1"},
 					{Name: "test2"},
 				}),
 			}
 			patch, patchType, err := createPatch(o1, o2)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(string(patch)).To(Equal(`{"spec":{"template":{"spec":{"$setElementOrder/containers":[{"name":"test1"},{"name":"test2"}],"containers":[{"name":"test2","resources":{}}]}}}}`))
 			Expect(patchType).To(Equal(apitypes.StrategicMergePatchType))
 		})
 		It("ignores nil fields in core types", func() {
-			o1 := newTestDeployment([]v1.Container{
+			o1 := newTestDeployment([]corev1.Container{
 				{Name: "test1"},
 			})
 			o2 := &resource.Info{
-				Object: newTestDeployment([]v1.Container{
+				Object: newTestDeployment([]corev1.Container{
 					{Name: "test1", LivenessProbe: nil},
 				}),
 			}
 			patch, patchType, err := createPatch(o1, o2)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(patch).To(BeNil())
 			Expect(patchType).To(Equal(apitypes.StrategicMergePatchType))
 		})
 		It("replaces incorrect fields in core types", func() {
-			o1 := newTestDeployment([]v1.Container{
+			o1 := newTestDeployment([]corev1.Container{
 				{Name: "test1"},
 			})
 			o2 := &resource.Info{
-				Object: newTestDeployment([]v1.Container{
+				Object: newTestDeployment([]corev1.Container{
 					{Name: "test2"},
 				}),
 			}
 			patch, patchType, err := createPatch(o1, o2)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(string(patch)).To(Equal(`{"spec":{"template":{"spec":{"$setElementOrder/containers":[{"name":"test2"}],"containers":[{"name":"test2","resources":{}}]}}}}`))
 			Expect(patchType).To(Equal(apitypes.StrategicMergePatchType))
 		})
@@ -735,7 +735,7 @@ var _ = Describe("ActionClient", func() {
 				},
 			}
 			patch, patchType, err := createPatch(o1, o2)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(patch).To(BeNil())
 			Expect(patchType).To(Equal(apitypes.StrategicMergePatchType))
 		})
@@ -747,7 +747,7 @@ func manifestToObjects(manifest string) []client.Object {
 	for _, m := range releaseutil.SplitManifests(manifest) {
 		u := &unstructured.Unstructured{}
 		err := yaml.Unmarshal([]byte(m), u)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 		objs = append(objs, u)
 	}
 	return objs
@@ -755,11 +755,11 @@ func manifestToObjects(manifest string) []client.Object {
 
 func verifyRelease(cl client.Client, owner client.Object, rel *release.Release) {
 	By("verifying release secret exists at release version", func() {
-		releaseSecrets := &v1.SecretList{}
+		releaseSecrets := &corev1.SecretList{}
 		err := cl.List(context.TODO(), releaseSecrets, client.InNamespace(owner.GetNamespace()), client.MatchingLabels{"owner": "helm", "name": rel.Name})
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 		Expect(releaseSecrets.Items).To(HaveLen(rel.Version))
-		Expect(releaseSecrets.Items[rel.Version-1].Type).To(Equal(v1.SecretType("helm.sh/release.v1")))
+		Expect(releaseSecrets.Items[rel.Version-1].Type).To(Equal(corev1.SecretType("helm.sh/release.v1")))
 		Expect(releaseSecrets.Items[rel.Version-1].Labels["version"]).To(Equal(strconv.Itoa(rel.Version)))
 		Expect(releaseSecrets.Items[rel.Version-1].Data["release"]).NotTo(BeNil())
 	})
@@ -773,7 +773,7 @@ func verifyRelease(cl client.Client, owner client.Object, rel *release.Release) 
 		for _, obj := range objs {
 			key := client.ObjectKeyFromObject(obj)
 			err := cl.Get(context.TODO(), key, obj)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(obj.GetOwnerReferences()).To(HaveLen(1))
 			Expect(obj.GetOwnerReferences()[0]).To(Equal(
 				metav1.OwnerReference{
@@ -791,10 +791,10 @@ func verifyRelease(cl client.Client, owner client.Object, rel *release.Release) 
 
 func verifyNoRelease(cl client.Client, ns string, name string, rel *release.Release) {
 	By("verifying all release secrets are removed", func() {
-		releaseSecrets := &v1.SecretList{}
+		releaseSecrets := &corev1.SecretList{}
 		err := cl.List(context.TODO(), releaseSecrets, client.InNamespace(ns), client.MatchingLabels{"owner": "helm", "name": name})
-		Expect(err).To(BeNil())
-		Expect(releaseSecrets.Items).To(HaveLen(0))
+		Expect(err).ToNot(HaveOccurred())
+		Expect(releaseSecrets.Items).To(BeEmpty())
 	})
 	By("verifying the uninstall description option was honored", func() {
 		if rel != nil {
@@ -806,7 +806,7 @@ func verifyNoRelease(cl client.Client, ns string, name string, rel *release.Rele
 			for _, r := range releaseutil.SplitManifests(rel.Manifest) {
 				u := &unstructured.Unstructured{}
 				err := yaml.Unmarshal([]byte(r), u)
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 
 				key := client.ObjectKeyFromObject(u)
 				err = cl.Get(context.TODO(), key, u)
@@ -836,13 +836,13 @@ func newTestUnstructured(containers []interface{}) *unstructured.Unstructured {
 	}
 }
 
-func newTestDeployment(containers []v1.Container) *appsv1.Deployment {
+func newTestDeployment(containers []corev1.Container) *appsv1.Deployment {
 	return &appsv1.Deployment{
 		TypeMeta:   metav1.TypeMeta{Kind: "Deployment", APIVersion: "apps/v1"},
 		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "ns"},
 		Spec: appsv1.DeploymentSpec{
-			Template: v1.PodTemplateSpec{
-				Spec: v1.PodSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
 					Containers: containers,
 				},
 			},
@@ -868,7 +868,7 @@ func newMockPostRenderer(key, value string) PostRendererProvider {
 	}
 }
 
-func (m *mockPostRenderer) Run(renderedManifests *bytes.Buffer) (modifiedManifests *bytes.Buffer, err error) {
+func (m *mockPostRenderer) Run(renderedManifests *bytes.Buffer) (*bytes.Buffer, error) {
 	b, err := io.ReadAll(renderedManifests)
 	if err != nil {
 		return nil, err

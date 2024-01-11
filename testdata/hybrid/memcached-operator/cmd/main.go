@@ -23,11 +23,10 @@ import (
 	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
-
 	"github.com/operator-framework/helm-operator-plugins/pkg/annotation"
 	"github.com/operator-framework/helm-operator-plugins/pkg/reconciler"
 	"github.com/operator-framework/helm-operator-plugins/pkg/watches"
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	ctrlruntime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"

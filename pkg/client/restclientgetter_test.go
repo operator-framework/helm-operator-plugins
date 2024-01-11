@@ -42,7 +42,7 @@ var _ = Describe("restClientGetter", func() {
 
 		It("returns an error getting the discovery client", func() {
 			cdc, err := rcg.ToDiscoveryClient()
-			Expect(err).NotTo(BeNil())
+			Expect(err).To(HaveOccurred())
 			Expect(cdc).To(BeNil())
 		})
 	})
@@ -55,7 +55,7 @@ var _ = Describe("restClientGetter", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			rm, err = apiutil.NewDynamicRESTMapper(cfg, httpClient)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			rcg = newRESTClientGetter(cfg, rm, "test-ns")
 			Expect(rcg).NotTo(BeNil())
@@ -63,23 +63,23 @@ var _ = Describe("restClientGetter", func() {
 
 		It("returns the configured rest config", func() {
 			restConfig, err := rcg.ToRESTConfig()
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(restConfig).To(Equal(cfg))
 		})
 
 		It("returns a valid discovery client", func() {
 			cdc, err := rcg.ToDiscoveryClient()
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(cdc).NotTo(BeNil())
 
 			vers, err := cdc.ServerVersion()
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(vers.GitTreeState).To(Equal("clean"))
 		})
 
 		It("returns the configured rest mapper", func() {
 			restMapper, err := rcg.ToRESTMapper()
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(restMapper).To(Equal(rm))
 		})
 
@@ -89,19 +89,19 @@ var _ = Describe("restClientGetter", func() {
 
 			By("verifying the namespace", func() {
 				ns, _, err := rkcl.Namespace()
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				Expect(ns).To(Equal("test-ns"))
 			})
 
 			By("verifying raw config is empty", func() {
 				rc, err := rkcl.RawConfig()
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				Expect(rc).To(Equal(clientcmdapi.Config{}))
 			})
 
 			By("verifying client config is empty", func() {
 				cc, err := rkcl.ClientConfig()
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				Expect(cc).To(BeNil())
 			})
 

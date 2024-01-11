@@ -45,7 +45,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	ctrlpredicate "sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/operator-framework/helm-operator-plugins/internal/sdk/controllerutil"
@@ -483,7 +482,7 @@ func WithValueMapper(m values.Mapper) Option {
 // predicate that is used to filter resources based on the specified selector
 func WithSelector(s metav1.LabelSelector) Option {
 	return func(r *Reconciler) error {
-		p, err := ctrlpredicate.LabelSelectorPredicate(s)
+		p, err := predicate.LabelSelectorPredicate(s)
 		if err != nil {
 			return err
 		}
@@ -540,13 +539,13 @@ type ControllerSetupFunc func(c ControllerSetup) error
 //   - Deployed - a release for this CR is deployed (but not necessarily ready).
 //   - ReleaseFailed - an installation or upgrade failed.
 //   - Irreconcilable - an error occurred during reconciliation
-func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
+func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.log.WithValues(strings.ToLower(r.gvk.Kind), req.NamespacedName)
 	log.V(1).Info("Reconciliation triggered")
 
 	obj := &unstructured.Unstructured{}
 	obj.SetGroupVersionKind(*r.gvk)
-	err = r.client.Get(ctx, req.NamespacedName, obj)
+	err := r.client.Get(ctx, req.NamespacedName, obj)
 	if apierrors.IsNotFound(err) {
 		log.V(1).Info("Resource %s/%s not found, nothing to do", req.NamespacedName.Namespace, req.NamespacedName.Name)
 		return ctrl.Result{}, nil
@@ -949,7 +948,7 @@ func (r *Reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) err
 	obj := &unstructured.Unstructured{}
 	obj.SetGroupVersionKind(*r.gvk)
 
-	var preds []ctrlpredicate.Predicate
+	var preds []predicate.Predicate
 	if r.selectorPredicate != nil {
 		preds = append(preds, r.selectorPredicate)
 	}

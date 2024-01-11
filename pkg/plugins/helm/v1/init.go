@@ -26,7 +26,6 @@ import (
 
 	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/helm/v1/scaffolds"
 	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/util"
-	projutil "github.com/operator-framework/helm-operator-plugins/pkg/plugins/util"
 )
 
 const (
@@ -161,7 +160,7 @@ func addInitCustomizations(projectName string) error {
 	}
 
 	// Remove the webhook option for the componentConfig since webhooks are not supported by helm
-	err = projutil.ReplaceInFile(filepath.Join("config", "manager", "controller_manager_config.yaml"),
+	err = util.ReplaceInFile(filepath.Join("config", "manager", "controller_manager_config.yaml"),
 		"webhook:\n  port: 9443", "")
 	if err != nil {
 		return err
@@ -172,7 +171,7 @@ func addInitCustomizations(projectName string) error {
 	const command = `command:
         - /manager
         `
-	err = projutil.ReplaceInFile(managerFile, command, "")
+	err = util.ReplaceInFile(managerFile, command, "")
 	if err != nil {
 		return err
 	}

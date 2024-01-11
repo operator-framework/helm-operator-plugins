@@ -85,7 +85,7 @@ var _ = Describe("Hook", func() {
 			It("should fail with an invalid release manifest", func() {
 				rel.Manifest = "---\nfoobar"
 				err := drw.Exec(owner, *rel, log)
-				Expect(err).NotTo(BeNil())
+				Expect(err).To(HaveOccurred())
 			})
 			It("should fail with unknown owner kind", func() {
 				Expect(drw.Exec(owner, *rel, log)).To(MatchError(&meta.NoKindMatchError{

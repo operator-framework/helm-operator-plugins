@@ -22,40 +22,40 @@ import (
 
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
-	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-func BuildTestCRD(gvk schema.GroupVersionKind) apiextv1.CustomResourceDefinition {
+func BuildTestCRD(gvk schema.GroupVersionKind) apiextensionsv1.CustomResourceDefinition {
 	trueVal := true
 	singular := strings.ToLower(gvk.Kind)
 	plural := fmt.Sprintf("%ss", singular)
-	return apiextv1.CustomResourceDefinition{
+	return apiextensionsv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("%s.%s", plural, gvk.Group),
 		},
-		Spec: apiextv1.CustomResourceDefinitionSpec{
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
 			Group: gvk.Group,
-			Names: apiextv1.CustomResourceDefinitionNames{
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
 				Kind:     gvk.Kind,
 				ListKind: fmt.Sprintf("%sList", gvk.Kind),
 				Singular: singular,
 				Plural:   plural,
 			},
-			Scope: apiextv1.NamespaceScoped,
-			Versions: []apiextv1.CustomResourceDefinitionVersion{
+			Scope: apiextensionsv1.NamespaceScoped,
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
 				{
 					Name: "v1",
-					Schema: &apiextv1.CustomResourceValidation{
-						OpenAPIV3Schema: &apiextv1.JSONSchemaProps{
+					Schema: &apiextensionsv1.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
 							Type:                   "object",
 							XPreserveUnknownFields: &trueVal,
 						},
 					},
-					Subresources: &apiextv1.CustomResourceSubresources{
-						Status: &apiextv1.CustomResourceSubresourceStatus{},
+					Subresources: &apiextensionsv1.CustomResourceSubresources{
+						Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
 					},
 					Served:  true,
 					Storage: true,

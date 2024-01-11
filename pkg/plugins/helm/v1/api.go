@@ -135,7 +135,7 @@ func (p *createAPISubcommand) InjectResource(res *resource.Resource) error {
 	// The following checks and the chart creation would be a better fit for PreScaffold method
 	// but, as having a chart sets some default values for the resource's GVK, we need to do it here.
 	var err error
-	if len(strings.TrimSpace(p.options.chartOptions.Chart)) == 0 {
+	if len(strings.TrimSpace(p.options.chartOptions.Chart)) == 0 { // nolint:nestif
 		// Chart repo and version can only be provided if chart was provided.
 		if len(strings.TrimSpace(p.options.chartOptions.Repo)) != 0 {
 			return fmt.Errorf("value of --%s can only be used with --%s", helmChartRepoFlag, helmChartFlag)

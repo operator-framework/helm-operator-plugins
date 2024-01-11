@@ -52,7 +52,7 @@ func (f *CustomResource) SetTemplateDefaults() error {
 
 	f.IfExistsAction = machinery.OverwriteFile
 
-	if len(f.Spec) == 0 {
+	if len(f.Spec) == 0 { // nolint:nestif
 		f.Spec = defaultSpecTemplate
 		if f.Chart != nil {
 			spec, err := yaml.Marshal(f.Chart.Values)

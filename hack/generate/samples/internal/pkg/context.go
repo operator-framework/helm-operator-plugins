@@ -22,7 +22,9 @@ type SampleContext struct {
 }
 
 // NewSampleContext returns a SampleContext containing a new kubebuilder TestContext.
-func NewSampleContext(binary string, path string, env ...string) (s SampleContext, err error) {
+func NewSampleContext(binary string, path string, env ...string) (SampleContext, error) {
+	var s SampleContext
+	var err error
 	s.TestContext, err = testutils.NewPartialTestContext(binary, path, env...)
 	return s, err
 }

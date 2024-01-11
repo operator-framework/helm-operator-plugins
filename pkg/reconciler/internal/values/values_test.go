@@ -33,22 +33,22 @@ var _ = Describe("ApplyOverrides", func() {
 	When("Unstructured object is invalid", func() {
 		It("should error with nil unstructured", func() {
 			u = nil
-			Expect(ApplyOverrides(nil, u)).NotTo(BeNil())
+			Expect(ApplyOverrides(nil, u)).NotTo(Succeed())
 		})
 
 		It("should error with nil object", func() {
 			u = &unstructured.Unstructured{}
-			Expect(ApplyOverrides(nil, u)).NotTo(BeNil())
+			Expect(ApplyOverrides(nil, u)).NotTo(Succeed())
 		})
 
 		It("should error with missing spec", func() {
 			u = &unstructured.Unstructured{Object: map[string]interface{}{}}
-			Expect(ApplyOverrides(nil, u)).NotTo(BeNil())
+			Expect(ApplyOverrides(nil, u)).NotTo(Succeed())
 		})
 
 		It("should error with non-map spec", func() {
 			u = &unstructured.Unstructured{Object: map[string]interface{}{"spec": 0}}
-			Expect(ApplyOverrides(nil, u)).NotTo(BeNil())
+			Expect(ApplyOverrides(nil, u)).NotTo(Succeed())
 		})
 	})
 
@@ -70,7 +70,7 @@ var _ = Describe("ApplyOverrides", func() {
 		})
 
 		It("should fail with invalid overrides", func() {
-			Expect(ApplyOverrides(map[string]string{"foo[": "test"}, u)).ToNot(BeNil())
+			Expect(ApplyOverrides(map[string]string{"foo[": "test"}, u)).ToNot(Succeed())
 		})
 	})
 })

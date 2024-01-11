@@ -33,7 +33,7 @@ import (
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/releaseutil"
 	"helm.sh/helm/v3/pkg/storage/driver"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -107,17 +107,17 @@ var _ = Describe("Reconciler", func() {
 		It("should fail without a GVK", func() {
 			r, err := New(WithChart(chart.Chart{}))
 			Expect(r).To(BeNil())
-			Expect(err).NotTo(BeNil())
+			Expect(err).To(HaveOccurred())
 		})
 		It("should fail without a chart", func() {
 			r, err := New(WithGroupVersionKind(schema.GroupVersionKind{}))
 			Expect(r).To(BeNil())
-			Expect(err).NotTo(BeNil())
+			Expect(err).To(HaveOccurred())
 		})
 		It("should succeed with just a GVK and chart", func() {
 			r, err := New(WithChart(chart.Chart{}), WithGroupVersionKind(schema.GroupVersionKind{}))
 			Expect(r).NotTo(BeNil())
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 		})
 		It("should return an error if an option func fails", func() {
 			r, err := New(func(r *Reconciler) error { return errors.New("expect this error") })
@@ -188,11 +188,11 @@ var _ = Describe("Reconciler", func() {
 		var _ = Describe("SkipDependentWatches", func() {
 			It("should set to false", func() {
 				Expect(SkipDependentWatches(false)(r)).To(Succeed())
-				Expect(r.skipDependentWatches).To(Equal(false))
+				Expect(r.skipDependentWatches).To(BeFalse())
 			})
 			It("should set to true", func() {
 				Expect(SkipDependentWatches(true)(r)).To(Succeed())
-				Expect(r.skipDependentWatches).To(Equal(true))
+				Expect(r.skipDependentWatches).To(BeTrue())
 			})
 		})
 		var _ = Describe("WithMaxConcurrentReconciles", func() {
@@ -465,7 +465,7 @@ var _ = Describe("Reconciler", func() {
 		BeforeEach(func() {
 			mgr = getManagerOrFail()
 			ctx, cancel = context.WithCancel(context.Background())
-			go func() { Expect(mgr.GetCache().Start(ctx)) }()
+			go func() { Expect(mgr.GetCache().Start(ctx)).To(Succeed()) }()
 			Expect(mgr.GetCache().WaitForCacheSync(ctx)).To(BeTrue())
 
 			obj = testutil.BuildTestCR(gvk)
@@ -476,7 +476,7 @@ var _ = Describe("Reconciler", func() {
 
 		AfterEach(func() {
 			By("ensuring the release is uninstalled", func() {
-				if _, err := ac.Get(obj.GetName()); err == driver.ErrReleaseNotFound {
+				if _, err := ac.Get(obj.GetName()); errors.Is(err, driver.ErrReleaseNotFound) {
 					return
 				}
 				_, err := ac.Uninstall(obj.GetName())
@@ -490,14 +490,14 @@ var _ = Describe("Reconciler", func() {
 				if apierrors.IsNotFound(err) {
 					return
 				}
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				obj.SetFinalizers([]string{})
 				Expect(mgr.GetClient().Update(ctx, obj)).To(Succeed())
 				err = mgr.GetClient().Delete(ctx, obj)
 				if apierrors.IsNotFound(err) {
 					return
 				}
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 			})
 			cancel()
 		})
@@ -538,11 +538,11 @@ var _ = Describe("Reconciler", func() {
 						}),
 					)
 				}
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				Expect(r.SetupWithManager(mgr)).To(Succeed())
 
 				ac, err = r.actionClientGetter.ActionClientFor(obj)
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 			})
 
 			It("GVK type is registered in scheme", func() {
@@ -557,7 +557,7 @@ var _ = Describe("Reconciler", func() {
 				It("returns successfully with no action", func() {
 					res, err := r.Reconcile(ctx, req)
 					Expect(res).To(Equal(reconcile.Result{}))
-					Expect(err).To(BeNil())
+					Expect(err).ToNot(HaveOccurred())
 
 					rel, err := ac.Get(obj.GetName())
 					Expect(err).To(Equal(driver.ErrReleaseNotFound))
@@ -659,7 +659,7 @@ var _ = Describe("Reconciler", func() {
 							By("reconciling unsuccessfully", func() {
 								res, err := r.Reconcile(ctx, req)
 								Expect(res).To(Equal(reconcile.Result{}))
-								Expect(err).ToNot(BeNil())
+								Expect(err).To(HaveOccurred())
 								Expect(err.Error()).To(ContainSubstring("error parsing index"))
 							})
 
@@ -698,7 +698,7 @@ var _ = Describe("Reconciler", func() {
 							By("successfully reconciling a request", func() {
 								res, err := r.Reconcile(ctx, req)
 								Expect(res).To(Equal(reconcile.Result{}))
-								Expect(err).To(BeNil())
+								Expect(err).ToNot(HaveOccurred())
 							})
 
 							By("ensuring the finalizer is removed and the CR is deleted", func() {
@@ -762,13 +762,13 @@ var _ = Describe("Reconciler", func() {
 								)
 								By("successfully reconciling a request", func() {
 									res, err := r.Reconcile(ctx, req)
-									Expect(err).To(BeNil())
+									Expect(err).ToNot(HaveOccurred())
 									Expect(res).To(Equal(reconcile.Result{}))
 								})
 
 								By("getting the release and CR", func() {
 									rel, err = ac.Get(obj.GetName())
-									Expect(err).To(BeNil())
+									Expect(err).ToNot(HaveOccurred())
 									Expect(rel).NotTo(BeNil())
 									Expect(mgr.GetAPIReader().Get(ctx, objKey, obj)).To(Succeed())
 								})
@@ -815,10 +815,10 @@ var _ = Describe("Reconciler", func() {
 						var err error
 						res, err := r.Reconcile(ctx, req)
 						Expect(res).To(Equal(reconcile.Result{}))
-						Expect(err).To(BeNil())
+						Expect(err).ToNot(HaveOccurred())
 
 						currentRelease, err = ac.Get(obj.GetName())
-						Expect(err).To(BeNil())
+						Expect(err).ToNot(HaveOccurred())
 					})
 					When("action client getter is not working", func() {
 						It("returns an error getting the action client", func() {
@@ -905,7 +905,7 @@ var _ = Describe("Reconciler", func() {
 							By("reconciling unsuccessfully", func() {
 								res, err := r.Reconcile(ctx, req)
 								Expect(res).To(Equal(reconcile.Result{}))
-								Expect(err).ToNot(BeNil())
+								Expect(err).To(HaveOccurred())
 								Expect(err.Error()).To(ContainSubstring("error parsing index"))
 							})
 
@@ -981,7 +981,7 @@ var _ = Describe("Reconciler", func() {
 								acg, err := helmclient.NewActionConfigGetter(mgr.GetConfig(), mgr.GetRESTMapper(), logr.Discard())
 								Expect(err).ShouldNot(HaveOccurred())
 								actionConf, err = acg.ActionConfigFor(obj)
-								Expect(err).To(BeNil())
+								Expect(err).ToNot(HaveOccurred())
 							})
 						})
 						When("state is Failed", func() {
@@ -993,11 +993,11 @@ var _ = Describe("Reconciler", func() {
 								By("successfully reconciling a request", func() {
 									res, err := r.Reconcile(ctx, req)
 									Expect(res).To(Equal(reconcile.Result{}))
-									Expect(err).To(BeNil())
+									Expect(err).ToNot(HaveOccurred())
 								})
 								By("verifying the release", func() {
 									rel, err := ac.Get(obj.GetName())
-									Expect(err).To(BeNil())
+									Expect(err).ToNot(HaveOccurred())
 									Expect(rel).NotTo(BeNil())
 									Expect(rel.Version).To(Equal(2))
 									verifyRelease(ctx, mgr.GetAPIReader(), obj.GetNamespace(), rel)
@@ -1013,11 +1013,11 @@ var _ = Describe("Reconciler", func() {
 								By("successfully reconciling a request", func() {
 									res, err := r.Reconcile(ctx, req)
 									Expect(res).To(Equal(reconcile.Result{}))
-									Expect(err).To(BeNil())
+									Expect(err).ToNot(HaveOccurred())
 								})
 								By("verifying the release", func() {
 									rel, err := ac.Get(obj.GetName())
-									Expect(err).To(BeNil())
+									Expect(err).ToNot(HaveOccurred())
 									Expect(rel).NotTo(BeNil())
 									Expect(rel.Version).To(Equal(2))
 									verifyRelease(ctx, mgr.GetAPIReader(), obj.GetNamespace(), rel)
@@ -1094,12 +1094,12 @@ var _ = Describe("Reconciler", func() {
 								By("successfully reconciling a request", func() {
 									res, err := r.Reconcile(ctx, req)
 									Expect(res).To(Equal(reconcile.Result{}))
-									Expect(err).To(BeNil())
+									Expect(err).ToNot(HaveOccurred())
 								})
 
 								By("getting the release and CR", func() {
 									rel, err = ac.Get(obj.GetName())
-									Expect(err).To(BeNil())
+									Expect(err).ToNot(HaveOccurred())
 									Expect(rel).NotTo(BeNil())
 									Expect(mgr.GetAPIReader().Get(ctx, objKey, obj)).To(Succeed())
 								})
@@ -1191,26 +1191,26 @@ var _ = Describe("Reconciler", func() {
 										u := &unstructured.Unstructured{}
 										u.SetGroupVersionKind(resource.GetObjectKind().GroupVersionKind())
 										err = mgr.GetAPIReader().Get(ctx, key, u)
-										Expect(err).To(BeNil())
+										Expect(err).ToNot(HaveOccurred())
 
 										labels := u.GetLabels()
 										labels["app.kubernetes.io/managed-by"] = "Unmanaged"
 										u.SetLabels(labels)
 
 										err = mgr.GetClient().Update(ctx, u)
-										Expect(err).To(BeNil())
+										Expect(err).ToNot(HaveOccurred())
 									}
 								})
 
 								By("successfully reconciling a request", func() {
 									res, err := r.Reconcile(ctx, req)
 									Expect(res).To(Equal(reconcile.Result{}))
-									Expect(err).To(BeNil())
+									Expect(err).ToNot(HaveOccurred())
 								})
 
 								By("getting the release and CR", func() {
 									rel, err = ac.Get(obj.GetName())
-									Expect(err).To(BeNil())
+									Expect(err).ToNot(HaveOccurred())
 									Expect(rel).NotTo(BeNil())
 									Expect(mgr.GetAPIReader().Get(ctx, objKey, obj)).To(Succeed())
 								})
@@ -1304,7 +1304,7 @@ var _ = Describe("Reconciler", func() {
 								By("successfully reconciling a request", func() {
 									res, err := r.Reconcile(ctx, req)
 									Expect(res).To(Equal(reconcile.Result{}))
-									Expect(err).To(BeNil())
+									Expect(err).ToNot(HaveOccurred())
 								})
 
 								By("verifying the release is uninstalled", func() {
@@ -1361,7 +1361,7 @@ var _ = Describe("Reconciler", func() {
 				}),
 				WithControllerSetupFunc(setupController),
 			)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("Setting up reconciler with manager causes custom builder setup to be executed", func() {
@@ -1383,7 +1383,7 @@ func getManagerOrFail() manager.Manager {
 		},
 		Scheme: sch,
 	})
-	Expect(err).To(BeNil())
+	Expect(err).ToNot(HaveOccurred())
 	return mgr
 }
 
@@ -1402,7 +1402,7 @@ func manifestToObjects(manifest string) []client.Object {
 	for _, m := range releaseutil.SplitManifests(manifest) {
 		u := &unstructured.Unstructured{}
 		err := yaml.Unmarshal([]byte(m), u)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 		objs = append(objs, u)
 	}
 	return objs
@@ -1410,11 +1410,11 @@ func manifestToObjects(manifest string) []client.Object {
 
 func verifyRelease(ctx context.Context, cl client.Reader, ns string, rel *release.Release) {
 	By("verifying release secret exists at release version", func() {
-		releaseSecrets := &v1.SecretList{}
+		releaseSecrets := &corev1.SecretList{}
 		err := cl.List(ctx, releaseSecrets, client.InNamespace(ns), client.MatchingLabels{"owner": "helm", "name": rel.Name})
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 		Expect(releaseSecrets.Items).To(HaveLen(rel.Version))
-		Expect(releaseSecrets.Items[rel.Version-1].Type).To(Equal(v1.SecretType("helm.sh/release.v1")))
+		Expect(releaseSecrets.Items[rel.Version-1].Type).To(Equal(corev1.SecretType("helm.sh/release.v1")))
 		Expect(releaseSecrets.Items[rel.Version-1].Labels["version"]).To(Equal(strconv.Itoa(rel.Version)))
 		Expect(releaseSecrets.Items[rel.Version-1].Data["release"]).NotTo(BeNil())
 	})
@@ -1434,7 +1434,7 @@ func verifyRelease(ctx context.Context, cl client.Reader, ns string, rel *releas
 		for _, obj := range objs {
 			key := client.ObjectKeyFromObject(obj)
 			err := cl.Get(ctx, key, obj)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 		}
 	})
 
@@ -1453,27 +1453,27 @@ func expectDeploymentImagePrefix(obj client.Object, prefix string) {
 	u := obj.(*unstructured.Unstructured)
 	containers, ok, err := unstructured.NestedSlice(u.Object, "spec", "template", "spec", "containers")
 	Expect(ok).To(BeTrue())
-	Expect(err).To(BeNil())
+	Expect(err).ToNot(HaveOccurred())
 	container := containers[0].(map[string]interface{})
 	val, ok, err := unstructured.NestedString(container, "image")
 	Expect(ok).To(BeTrue())
-	Expect(err).To(BeNil())
+	Expect(err).ToNot(HaveOccurred())
 	Expect(val).To(HavePrefix(prefix))
 }
 
 func verifyNoRelease(ctx context.Context, cl client.Client, ns string, name string, rel *release.Release) {
 	By("verifying all release secrets are removed", func() {
-		releaseSecrets := &v1.SecretList{}
+		releaseSecrets := &corev1.SecretList{}
 		err := cl.List(ctx, releaseSecrets, client.InNamespace(ns), client.MatchingLabels{"owner": "helm", "name": name})
-		Expect(err).To(BeNil())
-		Expect(releaseSecrets.Items).To(HaveLen(0))
+		Expect(err).ToNot(HaveOccurred())
+		Expect(releaseSecrets.Items).To(BeEmpty())
 	})
 	By("verifying all release resources are removed", func() {
 		if rel != nil {
 			for _, r := range releaseutil.SplitManifests(rel.Manifest) {
 				u := &unstructured.Unstructured{}
 				err := yaml.Unmarshal([]byte(r), u)
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 
 				key := client.ObjectKeyFromObject(u)
 				err = cl.Get(ctx, key, u)
@@ -1498,7 +1498,7 @@ func verifyHooksCalled(ctx context.Context, r *Reconciler, req reconcile.Request
 	})
 	By("successfully reconciling a request", func() {
 		res, err := r.Reconcile(ctx, req)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 		Expect(res).To(Equal(reconcile.Result{}))
 	})
 	By("verifying pre and post hooks were called and errors logged", func() {
@@ -1510,7 +1510,7 @@ func verifyHooksCalled(ctx context.Context, r *Reconciler, req reconcile.Request
 }
 
 func verifyEvent(ctx context.Context, cl client.Reader, obj metav1.Object, eventType, reason, message string) {
-	events := &v1.EventList{}
+	events := &corev1.EventList{}
 	Expect(cl.List(ctx, events, client.InNamespace(obj.GetNamespace()))).To(Succeed())
 	for _, e := range events.Items {
 		if e.Type == eventType && e.Reason == reason && e.Message == message {

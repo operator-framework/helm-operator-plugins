@@ -117,7 +117,6 @@ func (f *Flags) AddTo(flagSet *pflag.FlagSet) {
 			" holding the leader lock (required if running locally with leader"+
 			" election enabled).",
 	)
-
 }
 
 // ToManagerOptions uses the flag set in f to configure options.
