@@ -21,8 +21,6 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
@@ -32,36 +30,29 @@ const (
 )
 
 func ConfigureWatchNamespaces(options *manager.Options, log logr.Logger) {
-	namespaces := lookupEnv()
-	var watchNamespaces []string
+	namespaces := splitNamespaces(os.Getenv(WatchNamespaceEnvVar))
+
+	var namespaceConfigs map[string]cache.Config
 	if len(namespaces) != 0 {
 		log.Info("watching namespaces", "namespaces", namespaces)
-		watchNamespaces = namespaces
+		namespaceConfigs = make(map[string]cache.Config)
+		for _, namespace := range namespaces {
+			namespaceConfigs[namespace] = cache.Config{}
+		}
 	} else {
 		log.Info("watching all namespaces")
-		watchNamespaces = []string{v1.NamespaceAll}
 	}
 
-	options.NewCache = func(config *rest.Config, opts cache.Options) (cache.Cache, error) {
-		return cache.New(config, cache.Options{
-			Namespaces: watchNamespaces,
-		})
-	}
-}
-
-func lookupEnv() []string {
-	if watchNamespace, found := os.LookupEnv(WatchNamespaceEnvVar); found {
-		return splitNamespaces(watchNamespace)
-	}
-	return nil
+	options.Cache.DefaultNamespaces = namespaceConfigs
 }
 
 func splitNamespaces(namespaces string) []string {
 	list := strings.Split(namespaces, ",")
-	out := []string{}
+	var out []string
 	for _, ns := range list {
-		if ns != "" {
-			out = append(out, strings.TrimSpace(ns))
+		trimmed := strings.TrimSpace(ns)
+		if trimmed != "" {
+			out = append(out, trimmed)
 		}
 	}
 	return out
