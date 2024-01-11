@@ -32,10 +32,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache/informertest"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 
+	sdkhandler "github.com/operator-framework/operator-lib/handler"
+
 	"github.com/operator-framework/helm-operator-plugins/pkg/hook"
 	"github.com/operator-framework/helm-operator-plugins/pkg/internal/fake"
 	internalhook "github.com/operator-framework/helm-operator-plugins/pkg/reconciler/internal/hook"
-	sdkhandler "github.com/operator-framework/operator-lib/handler"
 )
 
 var _ = Describe("Hook", func() {

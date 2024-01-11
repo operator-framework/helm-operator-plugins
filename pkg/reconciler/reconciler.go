@@ -20,10 +20,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	errs "github.com/pkg/errors"
 	"strings"
 	"sync"
 	"time"
+
+	errs "github.com/pkg/errors"
 
 	"github.com/go-logr/logr"
 	sdkhandler "github.com/operator-framework/operator-lib/handler"

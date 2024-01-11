@@ -20,8 +20,6 @@ import (
 
 	golangv4 "sigs.k8s.io/kubebuilder/v3/pkg/plugins/golang/v4/scaffolds"
 
-	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/hybrid/v1alpha/scaffolds"
-	projutil "github.com/operator-framework/helm-operator-plugins/pkg/plugins/util"
 	"github.com/spf13/pflag"
 	"sigs.k8s.io/kubebuilder/v3/pkg/config"
 	"sigs.k8s.io/kubebuilder/v3/pkg/machinery"
@@ -29,6 +27,9 @@ import (
 	"sigs.k8s.io/kubebuilder/v3/pkg/plugin/util"
 	kbutils "sigs.k8s.io/kubebuilder/v3/pkg/plugin/util"
 	"sigs.k8s.io/kubebuilder/v3/pkg/plugins/golang"
+
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/hybrid/v1alpha/scaffolds"
+	projutil "github.com/operator-framework/helm-operator-plugins/pkg/plugins/util"
 )
 
 type initSubcommand struct {

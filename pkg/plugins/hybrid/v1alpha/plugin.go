@@ -15,11 +15,12 @@
 package v1alpha
 
 import (
-	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/util"
 	"sigs.k8s.io/kubebuilder/v3/pkg/config"
 	cfgv3 "sigs.k8s.io/kubebuilder/v3/pkg/config/v3"
 	"sigs.k8s.io/kubebuilder/v3/pkg/model/stage"
 	"sigs.k8s.io/kubebuilder/v3/pkg/plugin"
+
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/util"
 )
 
 const pluginName = "hybrid.helm" + util.DefaultNameQualifier

@@ -20,9 +20,6 @@ import (
 	"strings"
 
 	"github.com/iancoleman/strcase"
-	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/helm/v1/chartutil"
-	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/helm/v1/scaffolds"
-	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/util"
 	"github.com/spf13/pflag"
 	"helm.sh/helm/v3/pkg/chart"
 	"sigs.k8s.io/kubebuilder/v3/pkg/config"
@@ -30,6 +27,10 @@ import (
 	"sigs.k8s.io/kubebuilder/v3/pkg/model/resource"
 	"sigs.k8s.io/kubebuilder/v3/pkg/plugin"
 	pluginutil "sigs.k8s.io/kubebuilder/v3/pkg/plugin/util"
+
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/helm/v1/chartutil"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/helm/v1/scaffolds"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/util"
 )
 
 const (

@@ -18,14 +18,15 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/helm/v1/scaffolds"
-	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/util"
-	projutil "github.com/operator-framework/helm-operator-plugins/pkg/plugins/util"
 	"github.com/spf13/pflag"
 	"sigs.k8s.io/kubebuilder/v3/pkg/config"
 	"sigs.k8s.io/kubebuilder/v3/pkg/machinery"
 	"sigs.k8s.io/kubebuilder/v3/pkg/plugin"
 	kbutils "sigs.k8s.io/kubebuilder/v3/pkg/plugin/util"
+
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/helm/v1/scaffolds"
+	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/util"
+	projutil "github.com/operator-framework/helm-operator-plugins/pkg/plugins/util"
 )
 
 const (
