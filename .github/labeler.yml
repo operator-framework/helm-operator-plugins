@@ -1,22 +1,35 @@
 area/main-binary:
-  - 'main.go'
-  - 'internal/**/*'
+- changed-files:
+  - any-glob-to-any-file:
+    - 'main.go'
+    - 'internal/**/*'
 area/sdk:
-  - any:
+- changed-files:
+  - any-glob-to-any-file:
     - 'pkg/**/*'
     - '!pkg/plugin/**/*'
 area/plugin:
-  - 'pkg/plugin/**/*'
+- changed-files:
+  - any-glob-to-any-file:
+    - 'pkg/plugin/**/*'
 area/infra:
-  - '.github/**/*'
-  - 'Makefile'
-  - '.goreleaser.yml'
-  - '.golangci.yml'
+- changed-files:
+  - any-glob-to-any-file:
+    - '.github/**/*'
+    - 'Makefile'
+    - '.goreleaser.yml'
+    - '.golangci.yml'
 area/deps:
-  - 'go.mod'
-  - 'go.sum'
+- changed-files:
+  - any-glob-to-any-file:
+    - 'go.mod'
+    - 'go.sum'
 area/docs:
-  - 'README.md'
+- changed-files:
+  - any-glob-to-any-file:
+    - 'README.md'
 area/testing:
-  - '**/*_test.go'
-  - '**/testdata/**/*'
+- changed-files:
+  - any-glob-to-any-file:
+    - '**/*_test.go'
+    - '**/testdata/**/*'
