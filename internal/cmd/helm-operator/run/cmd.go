@@ -136,7 +136,7 @@ func run(cmd *cobra.Command, f *flags.Flags) {
 	// Log manager option flags
 	// Log manager option flags
 	optionsLog := map[string]interface{}{
-		"MetricsBindAddress": options.MetricsBindAddress,
+		"MetricsBindAddress": options.Metrics.BindAddress,
 		"HealthProbeAddress": options.HealthProbeBindAddress,
 		"LeaderElection":     options.LeaderElection,
 	}
@@ -151,32 +151,36 @@ func run(cmd *cobra.Command, f *flags.Flags) {
 	namespace, found := os.LookupEnv(helmmgr.WatchNamespaceEnvVar)
 	log = log.WithValues("Namespace", namespace)
 
-	var watchNamespaces []string
+	watchNamespaces := make(map[string]cache.Config, 0)
 	if found {
 		log.V(1).Info(fmt.Sprintf("Setting namespace with value in %s", helmmgr.WatchNamespaceEnvVar))
 		if namespace == metav1.NamespaceAll {
 			log.Info("Watching all namespaces.")
-			watchNamespaces = []string{metav1.NamespaceAll}
+			watchNamespaces[cache.AllNamespaces] = cache.Config{}
 		} else {
 			if strings.Contains(namespace, ",") {
 				log.Info("Watching multiple namespaces.")
-				watchNamespaces = strings.Split(namespace, "")
+
+				namespaces := strings.Split(namespace, "")
+				for _, ns := range namespaces {
+					watchNamespaces[ns] = cache.Config{}
+				}
 			} else {
 				log.Info("Watching single namespace.")
-				watchNamespaces = []string{namespace}
+				watchNamespaces[namespace] = cache.Config{}
 			}
 		}
 		// TODO: remove this when loading from config file option is removed
-	} else if options.Namespace == "" { //nolint:staticcheck
+	} else if len(options.Cache.DefaultNamespaces) == 0 { //nolint:staticcheck
 		log.Info(fmt.Sprintf("Watch namespaces not configured by environment variable %s or file. "+
 			"Watching all namespaces.", helmmgr.WatchNamespaceEnvVar))
-		watchNamespaces = []string{metav1.NamespaceAll}
+		watchNamespaces[cache.AllNamespaces] = cache.Config{}
 	}
 
 	mgr, err := manager.New(cfg, manager.Options{
 		NewCache: func(config *rest.Config, opts cache.Options) (cache.Cache, error) {
 			return cache.New(config, cache.Options{
-				Namespaces: watchNamespaces,
+				DefaultNamespaces: watchNamespaces,
 			})
 		},
 	})

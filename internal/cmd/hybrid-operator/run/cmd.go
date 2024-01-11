@@ -133,7 +133,7 @@ func run(cmd *cobra.Command, f *flags.Flags) {
 
 	// Log manager option flags
 	optionsLog := map[string]interface{}{
-		"MetricsBindAddress": options.MetricsBindAddress,
+		"MetricsBindAddress": options.Metrics.BindAddress,
 		"HealthProbeAddress": options.HealthProbeBindAddress,
 		"LeaderElection":     options.LeaderElection,
 	}

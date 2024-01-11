@@ -21,6 +21,7 @@ import (
 	"github.com/spf13/pflag"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
 
 // Flags - Options to be used by a helm operator
@@ -133,8 +134,10 @@ func (f *Flags) ToManagerOptions(options manager.Options) manager.Options {
 	}
 
 	// TODO(2.0.0): remove metrics-addr
-	if changed("metrics-bind-address") || changed("metrics-addr") || options.MetricsBindAddress == "" {
-		options.MetricsBindAddress = f.MetricsBindAddress
+	if changed("metrics-bind-address") || changed("metrics-addr") || options.Metrics.BindAddress == "" {
+		options.Metrics = metricsserver.Options{
+			BindAddress: f.MetricsBindAddress,
+		}
 	}
 	if changed("health-probe-bind-address") || options.HealthProbeBindAddress == "" {
 		options.HealthProbeBindAddress = f.ProbeAddr
@@ -150,7 +153,7 @@ func (f *Flags) ToManagerOptions(options manager.Options) manager.Options {
 		options.LeaderElectionNamespace = f.LeaderElectionNamespace
 	}
 	if options.LeaderElectionResourceLock == "" {
-		options.LeaderElectionResourceLock = resourcelock.ConfigMapsLeasesResourceLock
+		options.LeaderElectionResourceLock = resourcelock.LeasesResourceLock
 	}
 	return options
 }
