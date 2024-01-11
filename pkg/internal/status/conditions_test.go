@@ -162,7 +162,7 @@ func TestConditionsGetNotExists(t *testing.T) {
 }
 
 func TestConditionsRemoveFromNilConditions(t *testing.T) {
-	var conditions *Conditions = nil
+	var conditions *Conditions
 	assert.False(t, conditions.RemoveCondition(ConditionType("C")))
 }
 

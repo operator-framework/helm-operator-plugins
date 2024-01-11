@@ -112,7 +112,7 @@ func getMostRecentTag(m debug.Module) string {
 	// This is necessary to handle projects that
 	// import this project at untagged commits.
 	if len(split) > 1 && sv.Patch > 0 {
-		sv.Patch -= 1
+		sv.Patch--
 	}
 	return fmt.Sprintf("v%s", sv.FinalizeVersion())
 }

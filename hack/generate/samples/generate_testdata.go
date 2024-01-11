@@ -52,5 +52,4 @@ func main() {
 
 	log.Infof("creating Hybrid Memcached Sample")
 	hybrid.GenerateMemcachedSamples(binaryPath, samplesPath)
-
 }

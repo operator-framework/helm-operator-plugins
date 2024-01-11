@@ -32,10 +32,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache/informertest"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 
+	sdkhandler "github.com/operator-framework/operator-lib/handler"
+
 	"github.com/operator-framework/helm-operator-plugins/pkg/hook"
 	"github.com/operator-framework/helm-operator-plugins/pkg/internal/fake"
 	internalhook "github.com/operator-framework/helm-operator-plugins/pkg/reconciler/internal/hook"
-	sdkhandler "github.com/operator-framework/operator-lib/handler"
 )
 
 var _ = Describe("Hook", func() {
@@ -84,7 +85,7 @@ var _ = Describe("Hook", func() {
 			It("should fail with an invalid release manifest", func() {
 				rel.Manifest = "---\nfoobar"
 				err := drw.Exec(owner, *rel, log)
-				Expect(err).NotTo(BeNil())
+				Expect(err).To(HaveOccurred())
 			})
 			It("should fail with unknown owner kind", func() {
 				Expect(drw.Exec(owner, *rel, log)).To(MatchError(&meta.NoKindMatchError{

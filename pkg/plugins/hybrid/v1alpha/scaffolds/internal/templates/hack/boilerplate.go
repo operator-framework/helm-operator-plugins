@@ -51,15 +51,18 @@ type Boilerplate struct {
 func (f Boilerplate) Validate() error {
 	if f.License == "" {
 		// A default license will be set later
-	} else if _, found := knownLicenses[f.License]; found {
+		return nil
+	}
+	if _, found := knownLicenses[f.License]; found {
 		// One of the know licenses
-	} else if _, found := f.Licenses[f.License]; found {
+		return nil
+	}
+	if _, found := f.Licenses[f.License]; found {
 		// A map containing the requested license was also provided
-	} else {
-		return fmt.Errorf("unknown specified license %s", f.License)
+		return nil
 	}
 
-	return nil
+	return fmt.Errorf("unknown specified license %s", f.License)
 }
 
 // SetTemplateDefaults implements file.Template

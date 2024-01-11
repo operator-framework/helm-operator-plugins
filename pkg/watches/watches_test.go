@@ -20,7 +20,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -49,11 +49,11 @@ var _ = Describe("LoadReader", func() {
 				ChartPath:               "../../pkg/internal/testdata/test-chart",
 				WatchDependentResources: &falseVal,
 				OverrideValues:          map[string]string{"key": "value"},
-				Selector: &v1.LabelSelector{
+				Selector: &metav1.LabelSelector{
 					MatchLabels: nil,
-					MatchExpressions: []v1.LabelSelectorRequirement{{
+					MatchExpressions: []metav1.LabelSelectorRequirement{{
 						Key:      "testLabel",
-						Operator: v1.LabelSelectorOpExists,
+						Operator: metav1.LabelSelectorOpExists,
 						Values:   []string{},
 					}},
 				},
@@ -114,7 +114,7 @@ var _ = Describe("LoadReader", func() {
 				WatchDependentResources: &falseVal,
 				OverrideValues:          map[string]string{"key": "value"},
 				MaxConcurrentReconciles: &concurrentReconciles,
-				ReconcilePeriod:         &v1.Duration{Duration: 1000000000},
+				ReconcilePeriod:         &metav1.Duration{Duration: 1000000000},
 			},
 		}
 
@@ -340,7 +340,7 @@ func verifyEqualWatches(expectedWatch, obtainedWatch []Watch) {
 		Expect(expectedWatch[i].MaxConcurrentReconciles).To(BeEquivalentTo(obtainedWatch[i].MaxConcurrentReconciles))
 		Expect(expectedWatch[i].ReconcilePeriod).To(BeEquivalentTo(obtainedWatch[i].ReconcilePeriod))
 		if expectedWatch[i].Selector == nil {
-			Expect(&v1.LabelSelector{}).To(BeEquivalentTo(obtainedWatch[i].Selector))
+			Expect(&metav1.LabelSelector{}).To(BeEquivalentTo(obtainedWatch[i].Selector))
 		} else {
 			Expect(expectedWatch[i].Selector).To(BeEquivalentTo(obtainedWatch[i].Selector))
 		}

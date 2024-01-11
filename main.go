@@ -29,10 +29,11 @@ import (
 	"sigs.k8s.io/kubebuilder/v3/pkg/model/stage"
 	"sigs.k8s.io/kubebuilder/v3/pkg/plugin"
 
+	golangv4 "sigs.k8s.io/kubebuilder/v3/pkg/plugins/golang/v4"
+
 	"github.com/operator-framework/helm-operator-plugins/internal/cmd/hybrid-operator/run"
 	"github.com/operator-framework/helm-operator-plugins/internal/version"
 	pluginv1alpha "github.com/operator-framework/helm-operator-plugins/pkg/plugins/hybrid/v1alpha"
-	golangv4 "sigs.k8s.io/kubebuilder/v3/pkg/plugins/golang/v4"
 )
 
 func main() {

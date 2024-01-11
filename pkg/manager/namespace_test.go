@@ -26,9 +26,10 @@ import (
 	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
@@ -47,13 +48,13 @@ var _ = Describe("ConfigureWatchNamespaces", func() {
 
 	When("should watch all namespaces", func() {
 		var (
-			watchedPods []v1.Pod
+			watchedPods []corev1.Pod
 			err         error
 		)
 		BeforeEach(func() {
 			By("creating pods in watched namespaces")
 			watchedPods, err = createPods(context.TODO(), 2)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 		})
 		It("should watch all namespaces when no env set", func() {
 			By("configuring WATCH_NAMESPACE with the namespaces of the watched pods")
@@ -61,7 +62,7 @@ var _ = Describe("ConfigureWatchNamespaces", func() {
 
 			By("creating the manager")
 			mgr, err := manager.New(cfg, opts)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			By("starting the manager")
 			ctx, cancel := context.WithCancel(context.Background())
@@ -77,7 +78,8 @@ var _ = Describe("ConfigureWatchNamespaces", func() {
 			Expect(c.WaitForCacheSync(ctx)).To(BeTrue())
 
 			By("successfully getting the watched pods")
-			for _, p := range watchedPods {
+			for i := range watchedPods {
+				p := watchedPods[i]
 				key := client.ObjectKeyFromObject(&p)
 				Expect(c.Get(context.TODO(), key, &p)).To(Succeed())
 			}
@@ -87,11 +89,11 @@ var _ = Describe("ConfigureWatchNamespaces", func() {
 
 		It("should watch all namespaces when WATCH_NAMESPACE is empty", func() {
 			By("configuring WATCH_NAMESPACE with empty string")
-			Expect(os.Setenv(WatchNamespaceEnvVar, ""))
+			Expect(os.Setenv(WatchNamespaceEnvVar, "")).To(Succeed())
 
 			By("creating the manager")
 			mgr, err := manager.New(cfg, opts)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			By("starting the manager")
 			ctx, cancel := context.WithCancel(context.Background())
@@ -107,7 +109,8 @@ var _ = Describe("ConfigureWatchNamespaces", func() {
 			Expect(c.WaitForCacheSync(ctx)).To(BeTrue())
 
 			By("successfully getting the watched pods")
-			for _, p := range watchedPods {
+			for i := range watchedPods {
+				p := watchedPods[i]
 				key := client.ObjectKeyFromObject(&p)
 				Expect(c.Get(context.TODO(), key, &p)).To(Succeed())
 			}
@@ -120,19 +123,19 @@ var _ = Describe("ConfigureWatchNamespaces", func() {
 		It("should watch multiple namespaces when WATCH_NAMESPACE has multiple namespaces", func() {
 			By("creating pods in watched namespaces")
 			watchedPods, err := createPods(context.TODO(), 2)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			By("creating pods in watched namespaces")
 			unwatchedPods, err := createPods(context.TODO(), 2)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			By("configuring WATCH_NAMESPACE with the namespaces of the watched pods")
-			Expect(os.Setenv(WatchNamespaceEnvVar, strings.Join(getNamespaces(watchedPods), ",")))
+			Expect(os.Setenv(WatchNamespaceEnvVar, strings.Join(getNamespaces(watchedPods), ","))).To(Succeed())
 			ConfigureWatchNamespaces(&opts, log)
 
 			By("creating the manager")
 			mgr, err := manager.New(cfg, opts)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			By("starting the manager")
 			ctx, cancel := context.WithCancel(context.Background())
@@ -148,13 +151,15 @@ var _ = Describe("ConfigureWatchNamespaces", func() {
 			Expect(c.WaitForCacheSync(ctx)).To(BeTrue())
 
 			By("successfully getting the watched pods")
-			for _, p := range watchedPods {
+			for i := range watchedPods {
+				p := watchedPods[i]
 				key := client.ObjectKeyFromObject(&p)
 				Expect(c.Get(context.TODO(), key, &p)).To(Succeed())
 			}
 
 			By("failing to get the unwatched pods")
-			for _, p := range unwatchedPods {
+			for i := range unwatchedPods {
+				p := unwatchedPods[i]
 				key := client.ObjectKeyFromObject(&p)
 				Expect(c.Get(context.TODO(), key, &p)).NotTo(Succeed())
 			}
@@ -164,26 +169,26 @@ var _ = Describe("ConfigureWatchNamespaces", func() {
 	})
 })
 
-func createPods(ctx context.Context, count int) ([]v1.Pod, error) {
+func createPods(ctx context.Context, count int) ([]corev1.Pod, error) {
 	cl, err := client.New(cfg, client.Options{})
 	if err != nil {
 		return nil, err
 	}
 
-	pods := make([]v1.Pod, count)
+	pods := make([]corev1.Pod, count)
 	for i := 0; i < count; i++ {
 		nsName := fmt.Sprintf("watch-%s", rand.String(5))
-		ns := v1.Namespace{
+		ns := corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: nsName,
 			},
 		}
-		pod := v1.Pod{
+		pod := corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test",
 				Namespace: nsName,
 			},
-			Spec: v1.PodSpec{Containers: []v1.Container{
+			Spec: corev1.PodSpec{Containers: []corev1.Container{
 				{Name: "test", Image: "test"},
 			}},
 		}
@@ -198,9 +203,10 @@ func createPods(ctx context.Context, count int) ([]v1.Pod, error) {
 	return pods, nil
 }
 
-func getNamespaces(objs []v1.Pod) (namespaces []string) {
+func getNamespaces(objs []corev1.Pod) []string {
+	namespaces := sets.New[string]()
 	for _, obj := range objs {
-		namespaces = append(namespaces, obj.GetNamespace())
+		namespaces.Insert(obj.GetNamespace())
 	}
-	return namespaces
+	return namespaces.UnsortedList()
 }

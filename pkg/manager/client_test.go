@@ -22,7 +22,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -34,8 +34,8 @@ import (
 
 var _ = Describe("NewCachingClientBuilder", func() {
 	var ns *unstructured.Unstructured
-	var pod *v1.Pod
-	var cfgMap *v1.ConfigMap
+	var pod *corev1.Pod
+	var cfgMap *corev1.ConfigMap
 
 	BeforeEach(func() {
 		ns = &unstructured.Unstructured{}
@@ -44,16 +44,16 @@ var _ = Describe("NewCachingClientBuilder", func() {
 			Kind:    "Namespace",
 		})
 		ns.SetName("ns-" + rand.String(4))
-		pod = &v1.Pod{
+		pod = &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod-" + rand.String(4),
 				Namespace: ns.GetName(),
 			},
-			Spec: v1.PodSpec{Containers: []v1.Container{
+			Spec: corev1.PodSpec{Containers: []corev1.Container{
 				{Name: "test", Image: "test"},
 			}},
 		}
-		cfgMap = &v1.ConfigMap{
+		cfgMap = &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "config-" + rand.String(4),
 				Namespace: ns.GetName(),
@@ -71,7 +71,7 @@ var _ = Describe("NewCachingClientBuilder", func() {
 		BeforeEach(func() {
 			var err error
 			c, err = cache.New(cfg, cache.Options{})
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			cl, err = client.New(cfg, client.Options{
 				Cache: &client.CacheOptions{
@@ -80,7 +80,7 @@ var _ = Describe("NewCachingClientBuilder", func() {
 					Unstructured: true,
 				},
 			})
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			Expect(cl.Create(context.TODO(), ns)).To(Succeed())
 			Expect(cl.Create(context.TODO(), pod)).To(Succeed())
@@ -139,6 +139,6 @@ var _ = Describe("NewCachingClientBuilder", func() {
 		}
 
 		_, err := client.New(&badConfig, client.Options{})
-		Expect(err).NotTo(BeNil())
+		Expect(err).To(HaveOccurred())
 	})
 })

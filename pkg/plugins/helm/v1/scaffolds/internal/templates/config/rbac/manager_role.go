@@ -320,7 +320,7 @@ func generateRoleRules(dc roleDiscoveryInterface, chart *chart.Chart) ([]rbacv1.
 			continue
 		}
 
-		if resourceName, namespaced, ok := getResource(serverResources, groupVersion, kind); ok {
+		if resourceName, namespaced, ok := getResource(serverResources, groupVersion, kind); ok { // nolint:nestif
 			if !namespaced {
 				if clusterGroups[group] == nil {
 					clusterGroups[group] = map[string]struct{}{}

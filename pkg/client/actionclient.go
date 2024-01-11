@@ -28,7 +28,7 @@ import (
 	helmkube "helm.sh/helm/v3/pkg/kube"
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/storage/driver"
-	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -350,7 +350,7 @@ func createPatch(existing runtime.Object, expected *resource.Info) ([]byte, apit
 
 	// On newer K8s versions, CRDs aren't unstructured but has this dedicated type
 	_, isCRDv1beta1 := versionedObject.(*apiextv1beta1.CustomResourceDefinition)
-	_, isCRDv1 := versionedObject.(*apiextv1.CustomResourceDefinition)
+	_, isCRDv1 := versionedObject.(*apiextensionsv1.CustomResourceDefinition)
 
 	if isUnstructured || isCRDv1beta1 || isCRDv1 {
 		// fall back to generic JSON merge patch

@@ -51,7 +51,7 @@ var _ = Describe("ActionConfig", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			rm, err = apiutil.NewDiscoveryRESTMapper(cfg, httpClient)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("should return a valid ActionConfigGetter", func() {
@@ -71,7 +71,7 @@ var _ = Describe("ActionConfig", func() {
 
 				var err error
 				cl, err = client.New(cfg, client.Options{Scheme: clientgoscheme.Scheme})
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 			})
 
 			It("should use a custom client namespace", func() {
@@ -80,9 +80,9 @@ var _ = Describe("ActionConfig", func() {
 				acg, err := NewActionConfigGetter(cfg, rm, logr.Discard(),
 					ClientNamespaceMapper(clientNsMapper),
 				)
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				ac, err := acg.ActionConfigFor(obj)
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				Expect(ac.KubeClient.(*kube.Client).Namespace).To(Equal(clientNs.Name))
 				Expect(ac.RESTClientGetter.(*namespacedRCG).namespaceConfig.Namespace()).To(Equal(clientNs.Name))
 				resources, err := ac.KubeClient.Build(bytes.NewBufferString(`---
@@ -90,9 +90,9 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: sa`), false)
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				Expect(resources.Visit(func(info *resource.Info, err error) error {
-					Expect(err).To(BeNil())
+					Expect(err).ToNot(HaveOccurred())
 					Expect(info.Namespace).To(Equal(clientNs.Name))
 					return nil
 				})).To(Succeed())
@@ -104,10 +104,10 @@ metadata:
 				acg, err := NewActionConfigGetter(cfg, rm, logr.Discard(),
 					StorageNamespaceMapper(storageNsMapper),
 				)
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 
 				ac, err := acg.ActionConfigFor(obj)
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 
 				By("Creating the storage namespace")
 				Expect(cl.Create(context.Background(), storageNs)).To(Succeed())
@@ -117,7 +117,7 @@ metadata:
 				i.ReleaseName = fmt.Sprintf("release-name-%s", rand.String(8))
 				i.Namespace = obj.GetNamespace()
 				rel, err := i.Run(&chrt, nil)
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				Expect(rel.Namespace).To(Equal(obj.GetNamespace()))
 
 				By("Verifying the release secret is created in the storage namespace")
@@ -131,7 +131,7 @@ metadata:
 
 				By("Uninstalling the release")
 				_, err = action.NewUninstall(ac).Run(i.ReleaseName)
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 
 				By("Deleting the storage namespace")
 				Expect(cl.Delete(context.Background(), storageNs)).To(Succeed())
@@ -141,17 +141,17 @@ metadata:
 				acg, err := NewActionConfigGetter(cfg, rm, logr.Discard(),
 					DisableStorageOwnerRefInjection(true),
 				)
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 
 				ac, err := acg.ActionConfigFor(obj)
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 
 				By("Installing a release")
 				i := action.NewInstall(ac)
 				i.ReleaseName = fmt.Sprintf("release-name-%s", rand.String(8))
 				i.Namespace = obj.GetNamespace()
 				rel, err := i.Run(&chrt, nil)
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 				Expect(rel.Namespace).To(Equal(obj.GetNamespace()))
 
 				By("Verifying the release secret has no owner references")
@@ -161,11 +161,11 @@ metadata:
 				}
 				secret := &corev1.Secret{}
 				Expect(cl.Get(context.Background(), secretKey, secret)).To(Succeed())
-				Expect(secret.OwnerReferences).To(HaveLen(0))
+				Expect(secret.OwnerReferences).To(BeEmpty())
 
 				By("Uninstalling the release")
 				_, err = action.NewUninstall(ac).Run(i.ReleaseName)
-				Expect(err).To(BeNil())
+				Expect(err).ToNot(HaveOccurred())
 			})
 		})
 	})
@@ -180,12 +180,12 @@ metadata:
 			Expect(err).NotTo(HaveOccurred())
 
 			rm, err := apiutil.NewDiscoveryRESTMapper(cfg, httpClient)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 
 			acg, err := NewActionConfigGetter(cfg, rm, logr.Discard())
 			Expect(err).ShouldNot(HaveOccurred())
 			ac, err := acg.ActionConfigFor(obj)
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(HaveOccurred())
 			Expect(ac).NotTo(BeNil())
 		})
 	})

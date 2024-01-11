@@ -44,7 +44,11 @@ type TestContext struct {
 
 // NewTestContext returns a TestContext containing a new kubebuilder TestContext.
 // Construct if your environment is connected to a live cluster, ex. for e2e tests.
-func NewTestContext(binaryName string, env ...string) (tc TestContext, err error) {
+func NewTestContext(binaryName string, env ...string) (TestContext, error) {
+	var (
+		tc  TestContext
+		err error
+	)
 	if tc.TestContext, err = kbtestutils.NewTestContext(binaryName, env...); err != nil {
 		return tc, err
 	}
@@ -59,7 +63,12 @@ func NewTestContext(binaryName string, env ...string) (tc TestContext, err error
 // NewPartialTestContext returns a TestContext containing a partial kubebuilder TestContext.
 // This object needs to be populated with GVK information. The underlying TestContext is
 // created directly rather than through a constructor so cluster-based setup is skipped.
-func NewPartialTestContext(binaryName, dir string, env ...string) (tc TestContext, err error) {
+func NewPartialTestContext(binaryName, dir string, env ...string) (TestContext, error) {
+	var (
+		tc  TestContext
+		err error
+	)
+
 	cc := &kbtestutils.CmdContext{
 		Env: env,
 	}
