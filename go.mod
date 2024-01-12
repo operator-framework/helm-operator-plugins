@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/blang/semver/v4 v4.0.0
 	github.com/go-logr/logr v1.2.4
-	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572
+	github.com/go-task/slim-sprig v2.20.0+incompatible
 	github.com/iancoleman/strcase v0.2.0
 	github.com/kr/text v0.2.0
 	github.com/onsi/ginkgo/v2 v2.13.0
@@ -38,6 +38,7 @@ require (
 	github.com/BurntSushi/toml v1.3.2 // indirect
 	github.com/MakeNowJust/heredoc v1.0.0 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
+	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/Masterminds/semver/v3 v3.2.1 // indirect
 	github.com/Masterminds/sprig/v3 v3.2.3 // indirect
 	github.com/Masterminds/squirrel v1.5.4 // indirect
