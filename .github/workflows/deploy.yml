@@ -21,7 +21,7 @@ jobs:
         fetch-depth: 0
 
     - name: gpg init
-      if: github.event_name != 'pull_request'
+      if: github.ref_type == 'tag'
       run: .ci/gpg/create-keyring.sh
       env:
         GPG_PASSWORD: ${{ secrets.GPG_PASSWORD }}
