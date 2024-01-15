@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/blang/semver/v4 v4.0.0
-	github.com/go-logr/logr v1.2.4
+	github.com/go-logr/logr v1.4.1
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572
 	github.com/iancoleman/strcase v0.2.0
 	github.com/kr/text v0.2.0
