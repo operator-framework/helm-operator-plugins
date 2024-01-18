@@ -112,11 +112,11 @@ help: ## Display this help.
 ##@ Build
 .PHONY: build
 build: manifests generate fmt vet ## Build manager binary.
-	go build -o bin/manager main.go
+	go build -o bin/manager cmd/main.go
 
 .PHONY: run
 run: manifests generate fmt vet ## Run against the configured Kubernetes cluster in ~/.kube/config
-	go run ./main.go
+	go run cmd/main.go
 
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.

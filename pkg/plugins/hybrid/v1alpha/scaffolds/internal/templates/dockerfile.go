@@ -52,12 +52,12 @@ COPY go.sum go.sum
 RUN go mod download
 
 # Copy the go source
-COPY main.go main.go
+COPY cmd/ cmd/
 COPY api/ api/
 COPY controllers/ controllers/
 
 # Build
-RUN GOOS=linux GOARCH=amd64 go build -a -o manager main.go
+RUN GOOS=linux GOARCH=amd64 go build -a -o manager cmd/main.go
 
 FROM registry.access.redhat.com/ubi8/ubi-micro:8.7
 
