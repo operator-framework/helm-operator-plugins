@@ -109,7 +109,6 @@ func main() {
 			TLSOpts:       tlsOpts,
 		},
 		WebhookServer:          webhookServer,
-		Port:                   9443,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       leaderElectionID,
