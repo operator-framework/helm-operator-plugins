@@ -15,12 +15,14 @@
 package flags
 
 import (
+	"crypto/tls"
 	"runtime"
 	"time"
 
 	"github.com/spf13/pflag"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 // Flags - Options to be used by a helm operator
@@ -33,6 +35,8 @@ type Flags struct {
 	LeaderElectionNamespace string
 	MaxConcurrentReconciles int
 	ProbeAddr               string
+	EnableHTTP2             bool
+	SecureMetrics           bool
 
 	// Path to a controller-runtime componentconfig file.
 	// If this is empty, use default values.
@@ -117,6 +121,16 @@ func (f *Flags) AddTo(flagSet *pflag.FlagSet) {
 			" holding the leader lock (required if running locally with leader"+
 			" election enabled).",
 	)
+	flagSet.BoolVar(&f.EnableHTTP2,
+		"enable-http2",
+		false,
+		"enables HTTP/2 on the webhook and metrics servers",
+	)
+	flagSet.BoolVar(&f.SecureMetrics,
+		"metrics-secure",
+		false,
+		"enables secure serving of the metrics endpoint",
+	)
 }
 
 // ToManagerOptions uses the flag set in f to configure options.
@@ -151,5 +165,16 @@ func (f *Flags) ToManagerOptions(options manager.Options) manager.Options {
 	if options.LeaderElectionResourceLock == "" {
 		options.LeaderElectionResourceLock = resourcelock.LeasesResourceLock
 	}
+
+	disableHTTP2 := func(c *tls.Config) {
+		c.NextProtos = []string{"http/1.1"}
+	}
+	if !f.EnableHTTP2 {
+		options.WebhookServer = webhook.NewServer(webhook.Options{
+			TLSOpts: []func(*tls.Config){disableHTTP2},
+		})
+		options.Metrics.TLSOpts = append(options.Metrics.TLSOpts, disableHTTP2)
+	}
+	options.Metrics.SecureServing = f.SecureMetrics
 	return options
 }

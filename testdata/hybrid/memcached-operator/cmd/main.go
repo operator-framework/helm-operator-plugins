@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"crypto/tls"
 	"flag"
 	"os"
 	"runtime"
@@ -34,6 +35,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	cachev1alpha1 "github.com/example/memcached-operator/api/v1alpha1"
 	"github.com/example/memcached-operator/internal/controller"
@@ -61,6 +63,8 @@ func main() {
 		watchesPath          string
 		probeAddr            string
 		enableLeaderElection bool
+		enableHTTP2          bool
+		secureMetrics        bool
 	)
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
@@ -70,6 +74,10 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+	flag.BoolVar(&secureMetrics, "metrics-secure", false,
+		"Whether or not the metrics endpoint should be served securely")
+	flag.BoolVar(&enableHTTP2, "enable-http2", false,
+		"Whether or not HTTP/2 should be enabled for the metrics and webhook servers")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -78,9 +86,28 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
+	disableHTTP2 := func(c *tls.Config) {
+		setupLog.Info("disabling http/2")
+		c.NextProtos = []string{"http/1.1"}
+	}
+
+	tlsOpts := []func(*tls.Config){}
+	if !enableHTTP2 {
+		tlsOpts = append(tlsOpts, disableHTTP2)
+	}
+
+	webhookServer := webhook.NewServer(webhook.Options{
+		TLSOpts: tlsOpts,
+	})
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                 scheme,
-		MetricsBindAddress:     metricsAddr,
+		Scheme: scheme,
+		Metrics: metricsserver.Options{
+			BindAddress:   metricsAddr,
+			SecureServing: secureMetrics,
+			TLSOpts:       tlsOpts,
+		},
+		WebhookServer:          webhookServer,
 		Port:                   9443,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,

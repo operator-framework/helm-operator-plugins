@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/onsi/ginkgo/v2 v2.13.0
 	github.com/onsi/gomega v1.30.0
-	github.com/operator-framework/helm-operator-plugins v0.1.1
+	github.com/operator-framework/helm-operator-plugins v0.1.2
 	k8s.io/apimachinery v0.28.5
 	k8s.io/client-go v0.28.5
 	sigs.k8s.io/controller-runtime v0.16.3
@@ -60,7 +60,7 @@ require (
 	github.com/google/gnostic-models v0.6.8 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
-	github.com/google/pprof v0.0.0-20230510103437-eeec1cb781c3 // indirect
+	github.com/google/pprof v0.0.0-20230907193218-d3ddc7976beb // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/google/uuid v1.3.1 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
@@ -83,7 +83,7 @@ require (
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.17 // indirect
 	github.com/mattn/go-runewidth v0.0.14 // indirect
-	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
+	github.com/matttproud/golang_protobuf_extensions/v2 v2.0.0 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
@@ -100,10 +100,10 @@ require (
 	github.com/operator-framework/operator-lib v0.12.0 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/prometheus/client_golang v1.16.0 // indirect
-	github.com/prometheus/client_model v0.4.0 // indirect
-	github.com/prometheus/common v0.44.0 // indirect
-	github.com/prometheus/procfs v0.10.1 // indirect
+	github.com/prometheus/client_golang v1.18.0 // indirect
+	github.com/prometheus/client_model v0.5.0 // indirect
+	github.com/prometheus/common v0.45.0 // indirect
+	github.com/prometheus/procfs v0.12.0 // indirect
 	github.com/rivo/uniseg v0.4.2 // indirect
 	github.com/rubenv/sql-migrate v1.5.2 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
@@ -127,13 +127,13 @@ require (
 	golang.org/x/crypto v0.17.0 // indirect
 	golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e // indirect
 	golang.org/x/net v0.17.0 // indirect
-	golang.org/x/oauth2 v0.11.0 // indirect
-	golang.org/x/sync v0.3.0 // indirect
+	golang.org/x/oauth2 v0.12.0 // indirect
+	golang.org/x/sync v0.4.0 // indirect
 	golang.org/x/sys v0.15.0 // indirect
 	golang.org/x/term v0.15.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
-	golang.org/x/tools v0.12.0 // indirect
+	golang.org/x/tools v0.14.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230711160842-782d3b101e98 // indirect
@@ -157,5 +157,5 @@ require (
 	sigs.k8s.io/kustomize/api v0.13.5-0.20230601165947-6ce0bf390ce3 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.14.3-0.20230601165947-6ce0bf390ce3 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
-	sigs.k8s.io/yaml v1.3.0 // indirect
+	sigs.k8s.io/yaml v1.4.0 // indirect
 )
