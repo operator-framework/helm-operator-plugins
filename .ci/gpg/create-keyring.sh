@@ -14,20 +14,24 @@ declare -r SECRING_AUTO="${GPG_HOME}/secring.auto"
 declare -r PUBRING_AUTO="${GPG_HOME}/pubring.auto"
 
 mkdir -p "$GPG_HOME"
+chmod 700 "$GPG_HOME"
 cp "${DIR}"/*.auto* "${GPG_HOME}"
+
+echo -e "\nImporting public keys..."
+{ gpg --home "${GPG_HOME}" --import "${PUBRING_AUTO}" ; } || { err_exit "Could not import public key into gpg." ; }
+echo "Success!"
 
 echo -e "\nDecrypting secret key..."
 {
   # $GPG_PASSWORD is taken from the script's env (injected by CI).
-  echo $GPG_PASSWORD | gpg --decrypt \
-    --pinentry-mode loopback --batch \
+  echo $GPG_PASSWORD | gpg --home "${GPG_HOME}" --decrypt \
+    --pinentry-mode loopback --yes \
     --passphrase-fd 0 \
     --output "${SECRING_AUTO}" \
     "${SECRING_AUTO}".gpg ; \
 } || { err_exit "Failed to decrypt secret key." ; }
 echo "Success!"
 
-echo -e "\nImporting keys..."
-{ gpg --home "${GPG_HOME}" --import "${PUBRING_AUTO}" ; } || { err_exit "Could not import public key into gpg." ; }
+echo -e "\nImporting private keys..."
 { gpg --home "${GPG_HOME}" --import "${SECRING_AUTO}" ; } || { err_exit "Could not import secret key into gpg." ; }
 echo "Success!"
