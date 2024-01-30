@@ -28,7 +28,7 @@ import (
 	"github.com/operator-framework/helm-operator-plugins/pkg/values"
 )
 
-var DefaultMaxHistory = 10
+var DefaultMaxReleaseHistory = 10
 
 var DefaultMapper = values.MapperFunc(func(v chartutil.Values) chartutil.Values { return v })
 

@@ -79,7 +79,7 @@ type Reconciler struct {
 	skipDependentWatches             bool
 	maxConcurrentReconciles          int
 	reconcilePeriod                  time.Duration
-	maxHistory                       *int
+	maxReleaseHistory                *int
 	skipPrimaryGVKSchemeRegistration bool
 	controllerSetupFuncs             []ControllerSetupFunc
 
@@ -356,7 +356,7 @@ func WithMaxReleaseHistory(maxHistory int) Option {
 		if maxHistory < 0 {
 			return errors.New("maximum Helm release history size must not be negative")
 		}
-		r.maxHistory = &maxHistory
+		r.maxReleaseHistory = &maxHistory
 		return nil
 	}
 }
@@ -748,9 +748,9 @@ func (r *Reconciler) getReleaseState(client helmclient.ActionInterface, obj meta
 	}
 
 	var opts []helmclient.UpgradeOption
-	if *r.maxHistory > 0 {
+	if *r.maxReleaseHistory > 0 {
 		opts = append(opts, func(u *action.Upgrade) error {
-			u.MaxHistory = *r.maxHistory
+			u.MaxHistory = *r.maxReleaseHistory
 			return nil
 		})
 	}
@@ -804,9 +804,9 @@ func (r *Reconciler) doInstall(actionClient helmclient.ActionInterface, u *updat
 
 func (r *Reconciler) doUpgrade(actionClient helmclient.ActionInterface, u *updater.Updater, obj *unstructured.Unstructured, vals map[string]interface{}, log logr.Logger) (*release.Release, error) {
 	var opts []helmclient.UpgradeOption
-	if *r.maxHistory > 0 {
+	if *r.maxReleaseHistory > 0 {
 		opts = append(opts, func(u *action.Upgrade) error {
-			u.MaxHistory = *r.maxHistory
+			u.MaxHistory = *r.maxReleaseHistory
 			return nil
 		})
 	}
@@ -939,8 +939,8 @@ func (r *Reconciler) addDefaults(mgr ctrl.Manager, controllerName string) error 
 		r.valueMapper = internalvalues.DefaultMapper
 	}
 
-	if r.maxHistory == nil {
-		r.maxHistory = &internalvalues.DefaultMaxHistory 
+	if r.maxReleaseHistory == nil {
+		r.maxReleaseHistory = &internalvalues.DefaultMaxReleaseHistory
 	}
 
 	return nil
