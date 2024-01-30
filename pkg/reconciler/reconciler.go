@@ -348,7 +348,9 @@ func WithReconcilePeriod(rp time.Duration) Option {
 }
 
 // WithMaxReleaseHistory specifies the maximum size of the Helm release history maintained
-// on upgrades/rollbacks. Zero (default) means unlimited.
+// on upgrades/rollbacks. Zero means unlimited.
+//
+// Defaults is 10
 func WithMaxReleaseHistory(maxHistory int) Option {
 	return func(r *Reconciler) error {
 		if maxHistory < 0 {
@@ -936,6 +938,9 @@ func (r *Reconciler) addDefaults(mgr ctrl.Manager, controllerName string) error 
 	if r.valueMapper == nil {
 		r.valueMapper = internalvalues.DefaultMapper
 	}
+
+	r.maxHistory = 10
+
 	return nil
 }
 
