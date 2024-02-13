@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/blang/semver/v4 v4.0.0
 	github.com/go-logr/logr v1.4.1
-	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572
+	github.com/go-task/slim-sprig/v3 v3.0.0
 	github.com/iancoleman/strcase v0.3.0
 	github.com/kr/text v0.2.0
 	github.com/onsi/ginkgo/v2 v2.15.0
@@ -78,6 +78,7 @@ require (
 	github.com/go-openapi/jsonpointer v0.19.6 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
 	github.com/go-openapi/swag v0.22.4 // indirect
+	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/gobuffalo/flect v1.0.2 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/gofrs/uuid v4.0.0+incompatible // indirect
