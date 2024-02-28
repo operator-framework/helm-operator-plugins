@@ -50,7 +50,7 @@ var _ = Describe("ActionConfig", func() {
 			httpClient, err := rest.HTTPClientFor(cfg)
 			Expect(err).NotTo(HaveOccurred())
 
-			rm, err = apiutil.NewDiscoveryRESTMapper(cfg, httpClient)
+			rm, err = apiutil.NewDynamicRESTMapper(cfg, httpClient)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -179,7 +179,7 @@ metadata:
 			httpClient, err := rest.HTTPClientFor(cfg)
 			Expect(err).NotTo(HaveOccurred())
 
-			rm, err := apiutil.NewDiscoveryRESTMapper(cfg, httpClient)
+			rm, err := apiutil.NewDynamicRESTMapper(cfg, httpClient)
 			Expect(err).ToNot(HaveOccurred())
 
 			acg, err := NewActionConfigGetter(cfg, rm, logr.Discard())

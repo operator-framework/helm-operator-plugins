@@ -46,7 +46,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/yaml"
@@ -781,8 +781,8 @@ func verifyRelease(cl client.Client, owner client.Object, rel *release.Release) 
 					Kind:               owner.GetObjectKind().GroupVersionKind().Kind,
 					Name:               owner.GetName(),
 					UID:                owner.GetUID(),
-					Controller:         pointer.Bool(true),
-					BlockOwnerDeletion: pointer.Bool(true),
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
 				}),
 			)
 		}
