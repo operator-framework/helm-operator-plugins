@@ -50,7 +50,7 @@ jobs:
     - name: Lint
       uses: golangci/golangci-lint-action@v4
       with:
-        version: v1.51.2
+        version: v1.54.1
 
   go-apidiff:
     name: go-apidiff
