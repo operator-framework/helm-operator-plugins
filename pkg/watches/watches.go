@@ -22,7 +22,7 @@ import (
 	"os"
 	"text/template"
 
-	sprig "github.com/go-task/slim-sprig"
+	sprig "github.com/go-task/slim-sprig/v3"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
