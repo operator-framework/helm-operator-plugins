@@ -28,6 +28,8 @@ import (
 	"github.com/operator-framework/helm-operator-plugins/pkg/values"
 )
 
+var DefaultMaxReleaseHistory = 10
+
 var DefaultMapper = values.MapperFunc(func(v chartutil.Values) chartutil.Values { return v })
 
 var DefaultTranslator = values.TranslatorFunc(func(ctx context.Context, u *unstructured.Unstructured) (chartutil.Values, error) {
