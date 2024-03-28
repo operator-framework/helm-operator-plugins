@@ -11,7 +11,7 @@ require (
 	github.com/iancoleman/strcase v0.3.0
 	github.com/kr/text v0.2.0
 	github.com/onsi/ginkgo/v2 v2.17.1
-	github.com/onsi/gomega v1.31.1
+	github.com/onsi/gomega v1.32.0
 	github.com/operator-framework/operator-lib v0.12.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.19.0
