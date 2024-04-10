@@ -2,7 +2,7 @@ module github.com/operator-framework/helm-operator-plugins
 
 go 1.21
 
-toolchain go1.21.8
+toolchain go1.21.9
 
 require (
 	github.com/blang/semver/v4 v4.0.0

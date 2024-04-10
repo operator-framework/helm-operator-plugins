@@ -28,38 +28,28 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/discovery/cached/memory"
 	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type ActionConfigGetter interface {
-	ActionConfigFor(obj client.Object) (*action.Configuration, error)
+	ActionConfigFor(ctx context.Context, obj client.Object) (*action.Configuration, error)
 }
 
-func NewActionConfigGetter(cfg *rest.Config, rm meta.RESTMapper, log logr.Logger, opts ...ActionConfigGetterOption) (ActionConfigGetter, error) {
-	rcg := newRESTClientGetter(cfg, rm, "")
-	// Setup the debug log function that Helm will use
-	debugLog := func(format string, v ...interface{}) {
-		if log.GetSink() != nil {
-			log.V(1).Info(fmt.Sprintf(format, v...))
-		}
-	}
-
-	kc := kube.New(rcg)
-	kc.Log = debugLog
-
-	kcs, err := kc.Factory.KubernetesClientSet()
+func NewActionConfigGetter(baseRestConfig *rest.Config, rm meta.RESTMapper, opts ...ActionConfigGetterOption) (ActionConfigGetter, error) {
+	dc, err := discovery.NewDiscoveryClientForConfig(baseRestConfig)
 	if err != nil {
-		return nil, fmt.Errorf("creating kubernetes client set: %w", err)
+		return nil, fmt.Errorf("create discovery client: %v", err)
 	}
+	cdc := memory.NewMemCacheClient(dc)
 
 	acg := &actionConfigGetter{
-		kubeClient:       kc,
-		kubeClientSet:    kcs,
-		debugLog:         debugLog,
-		restClientGetter: rcg.restClientGetter,
+		baseRestConfig:  baseRestConfig,
+		restMapper:      rm,
+		discoveryClient: cdc,
 	}
 	for _, o := range opts {
 		o(acg)
@@ -69,6 +59,11 @@ func NewActionConfigGetter(cfg *rest.Config, rm meta.RESTMapper, log logr.Logger
 	}
 	if acg.objectToStorageNamespace == nil {
 		acg.objectToStorageNamespace = getObjectNamespace
+	}
+	if acg.objectToRestConfig == nil {
+		acg.objectToRestConfig = func(_ context.Context, _ client.Object, baseRestConfig *rest.Config) (*rest.Config, error) {
+			return rest.CopyConfig(baseRestConfig), nil
+		}
 	}
 	return acg, nil
 }
@@ -97,28 +92,56 @@ func DisableStorageOwnerRefInjection(v bool) ActionConfigGetterOption {
 	}
 }
 
+func RestConfigMapper(f func(context.Context, client.Object, *rest.Config) (*rest.Config, error)) ActionConfigGetterOption {
+	return func(getter *actionConfigGetter) {
+		getter.objectToRestConfig = f
+	}
+}
+
 func getObjectNamespace(obj client.Object) (string, error) {
 	return obj.GetNamespace(), nil
 }
 
 type actionConfigGetter struct {
-	kubeClient       *kube.Client
-	kubeClientSet    kubernetes.Interface
-	debugLog         func(string, ...interface{})
-	restClientGetter *restClientGetter
+	baseRestConfig  *rest.Config
+	restMapper      meta.RESTMapper
+	discoveryClient discovery.CachedDiscoveryInterface
 
 	objectToClientNamespace         ObjectToStringMapper
 	objectToStorageNamespace        ObjectToStringMapper
+	objectToRestConfig              func(context.Context, client.Object, *rest.Config) (*rest.Config, error)
 	disableStorageOwnerRefInjection bool
 }
 
-func (acg *actionConfigGetter) ActionConfigFor(obj client.Object) (*action.Configuration, error) {
+func (acg *actionConfigGetter) ActionConfigFor(ctx context.Context, obj client.Object) (*action.Configuration, error) {
 	storageNs, err := acg.objectToStorageNamespace(obj)
 	if err != nil {
-		return nil, fmt.Errorf("get storage namespace from object: %v", err)
+		return nil, fmt.Errorf("get storage namespace for object: %v", err)
 	}
 
-	secretClient := acg.kubeClientSet.CoreV1().Secrets(storageNs)
+	restConfig, err := acg.objectToRestConfig(ctx, obj, acg.baseRestConfig)
+	if err != nil {
+		return nil, fmt.Errorf("get rest config for object: %v", err)
+	}
+
+	clientNamespace, err := acg.objectToClientNamespace(obj)
+	if err != nil {
+		return nil, fmt.Errorf("get client namespace for object: %v", err)
+	}
+
+	rcg := newRESTClientGetter(restConfig, acg.restMapper, acg.discoveryClient, clientNamespace)
+	kc := kube.New(rcg)
+	kc.Namespace = clientNamespace
+
+	kcs, err := kc.Factory.KubernetesClientSet()
+	if err != nil {
+		return nil, fmt.Errorf("create kubernetes clientset: %v", err)
+	}
+
+	// Setup the debug log function that Helm will use
+	debugLog := getDebugLogger(ctx)
+
+	secretClient := kcs.CoreV1().Secrets(storageNs)
 	if !acg.disableStorageOwnerRefInjection {
 		ownerRef := metav1.NewControllerRef(obj, obj.GetObjectKind().GroupVersionKind())
 		secretClient = &ownerRefSecretClient{
@@ -127,25 +150,27 @@ func (acg *actionConfigGetter) ActionConfigFor(obj client.Object) (*action.Confi
 		}
 	}
 	d := driver.NewSecrets(secretClient)
-
-	// Also, use the debug log for the storage driver
-	d.Log = acg.debugLog
+	d.Log = debugLog
 
 	// Initialize the storage backend
 	s := storage.Init(d)
 
-	kubeClient := *acg.kubeClient
-	kubeClient.Namespace, err = acg.objectToClientNamespace(obj)
-	if err != nil {
-		return nil, fmt.Errorf("get client namespace from object: %v", err)
-	}
-
 	return &action.Configuration{
-		RESTClientGetter: acg.restClientGetter.ForNamespace(kubeClient.Namespace),
+		RESTClientGetter: rcg,
 		Releases:         s,
-		KubeClient:       &kubeClient,
-		Log:              acg.debugLog,
+		KubeClient:       kc,
+		Log:              debugLog,
 	}, nil
+}
+
+func getDebugLogger(ctx context.Context) func(format string, v ...interface{}) {
+	logger, err := logr.FromContext(ctx)
+	if err != nil {
+		return func(format string, v ...interface{}) {}
+	}
+	return func(format string, v ...interface{}) {
+		logger.V(1).Info(fmt.Sprintf(format, v...))
+	}
 }
 
 var _ v1.SecretInterface = &ownerRefSecretClient{}

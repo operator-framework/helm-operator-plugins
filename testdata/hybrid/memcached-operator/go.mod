@@ -2,7 +2,7 @@ module github.com/example/memcached-operator
 
 go 1.21
 
-toolchain go1.21.8
+toolchain go1.21.9
 
 require (
 	github.com/onsi/ginkgo/v2 v2.14.0
