@@ -49,11 +49,12 @@ func (hcg *fakeActionClientGetter) ActionClientFor(_ context.Context, _ crclient
 }
 
 type ActionClient struct {
-	Gets       []GetCall
-	Installs   []InstallCall
-	Upgrades   []UpgradeCall
-	Uninstalls []UninstallCall
-	Reconciles []ReconcileCall
+	Gets         []GetCall
+	Installs     []InstallCall
+	Upgrades     []UpgradeCall
+	Uninstalls   []UninstallCall
+	Reconciles   []ReconcileCall
+	CheckHealths []CheckHealthCall
 
 	HandleGet       func() (*release.Release, error)
 	HandleInstall   func() (*release.Release, error)
@@ -73,11 +74,12 @@ func NewActionClient() ActionClient {
 		return func() error { return err }
 	}
 	return ActionClient{
-		Gets:       make([]GetCall, 0),
-		Installs:   make([]InstallCall, 0),
-		Upgrades:   make([]UpgradeCall, 0),
-		Uninstalls: make([]UninstallCall, 0),
-		Reconciles: make([]ReconcileCall, 0),
+		Gets:         make([]GetCall, 0),
+		Installs:     make([]InstallCall, 0),
+		Upgrades:     make([]UpgradeCall, 0),
+		Uninstalls:   make([]UninstallCall, 0),
+		Reconciles:   make([]ReconcileCall, 0),
+		CheckHealths: make([]CheckHealthCall, 0),
 
 		HandleGet:       relFunc(errors.New("get not implemented")),
 		HandleInstall:   relFunc(errors.New("install not implemented")),
@@ -119,6 +121,10 @@ type ReconcileCall struct {
 	Release *release.Release
 }
 
+type CheckHealthCall struct {
+	Release *release.Release
+}
+
 func (c *ActionClient) Get(name string, opts ...client.GetOption) (*release.Release, error) {
 	c.Gets = append(c.Gets, GetCall{name, opts})
 	return c.HandleGet()
@@ -142,4 +148,9 @@ func (c *ActionClient) Uninstall(name string, opts ...client.UninstallOption) (*
 func (c *ActionClient) Reconcile(rel *release.Release) error {
 	c.Reconciles = append(c.Reconciles, ReconcileCall{rel})
 	return c.HandleReconcile()
+}
+
+func (c *ActionClient) CheckHealth(_ context.Context, rel *release.Release) error {
+	c.CheckHealths = append(c.CheckHealths, CheckHealthCall{rel})
+	return nil
 }

@@ -33,10 +33,13 @@ import (
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/cli-runtime/pkg/resource"
+	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	"sigs.k8s.io/cli-utils/pkg/kstatus/status"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -56,6 +59,7 @@ type ActionInterface interface {
 	Upgrade(name, namespace string, chrt *chart.Chart, vals map[string]interface{}, opts ...UpgradeOption) (*release.Release, error)
 	Uninstall(name string, opts ...UninstallOption) (*release.UninstallReleaseResponse, error)
 	Reconcile(rel *release.Release) error
+	CheckHealth(ctx context.Context, rel *release.Release) error
 }
 
 type GetOption func(*action.Get) error
@@ -328,6 +332,88 @@ func (c *actionClient) Reconcile(rel *release.Release) error {
 		}
 		return nil
 	})
+}
+
+func (c *actionClient) CheckHealth(ctx context.Context, rel *release.Release) error {
+	var gvkErrors []error
+	infos, err := c.conf.KubeClient.Build(bytes.NewBufferString(rel.Manifest), false)
+	if err != nil {
+		return err
+	}
+
+	return infos.Visit(func(info *resource.Info, err error) error {
+		if err != nil {
+			return fmt.Errorf("visit error: %w", err)
+		}
+
+		u := &unstructured.Unstructured{}
+		u.SetGroupVersionKind(info.Object.GetObjectKind().GroupVersionKind())
+		u.SetNamespace(info.Namespace)
+		u.SetName(info.Name)
+
+		helper := resource.NewHelper(info.Client, info.Mapping)
+		req := helper.RESTClient.Get().
+			NamespaceIfScoped(info.Namespace, helper.NamespaceScoped).
+			Resource(helper.Resource).
+			Name(info.Namespace).
+			SubResource(helper.Subresource)
+		if err := req.Do(ctx).Into(u); err != nil {
+			gvkErrors = appendResourceError(gvkErrors, u, err.Error())
+			return nil
+		}
+
+		if u.GetObjectKind().GroupVersionKind() == apiregistrationv1.SchemeGroupVersion.WithKind("APIService") {
+			obj := &apiregistrationv1.APIService{}
+			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, obj); err != nil {
+				gvkErrors = appendResourceError(gvkErrors, obj, err.Error())
+				return nil
+			}
+
+			// Check if the APIService is available.
+			var isAvailable *apiregistrationv1.APIServiceCondition
+			for i, condition := range obj.Status.Conditions {
+				if condition.Type == apiregistrationv1.Available {
+					isAvailable = &obj.Status.Conditions[i]
+					break
+				}
+			}
+			if isAvailable == nil {
+				gvkErrors = appendResourceError(gvkErrors, obj, "Available condition not found")
+			} else if isAvailable.Status == apiregistrationv1.ConditionFalse {
+				gvkErrors = appendResourceError(gvkErrors, obj, isAvailable.Message)
+			}
+			return nil
+		}
+
+		result, err := status.Compute(u)
+		if err != nil {
+			gvkErrors = appendResourceError(gvkErrors, u, err.Error())
+			return nil
+		}
+
+		if result.Status != status.CurrentStatus {
+			gvkErrors = appendResourceError(gvkErrors, u, fmt.Sprintf("object %s: %s", result.Status, result.Message))
+			return nil
+		}
+		return nil
+	})
+	return errors.Join(gvkErrors...)
+}
+
+// toErrKey returns a string that identifies a resource based on its GVK and namespace/name. This key is used
+// to identify the resource in the error message.
+func toErrKey(resource client.Object) string {
+	// If the resource is namespaced, include the namespace in the key.
+	if resource.GetNamespace() != "" {
+		return fmt.Sprintf("(%s)(%s/%s)", resource.GetObjectKind().GroupVersionKind().String(), resource.GetNamespace(), resource.GetName())
+	}
+
+	return fmt.Sprintf("(%s)(%s)", resource.GetObjectKind().GroupVersionKind().String(), resource.GetName())
+}
+
+// appendResourceError appends a new error to the given slice of errors and returns it.
+func appendResourceError(gvkErrors []error, resource client.Object, message string) []error {
+	return append(gvkErrors, errors.New(toErrKey(resource)+": "+message))
 }
 
 func createPatch(existing runtime.Object, expected *resource.Info) ([]byte, apitypes.PatchType, error) {
