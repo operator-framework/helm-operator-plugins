@@ -27,6 +27,7 @@ import (
 	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	sdkhandler "github.com/operator-framework/operator-lib/handler"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chartutil"
@@ -51,8 +52,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	"sigs.k8s.io/yaml"
-
-	sdkhandler "github.com/operator-framework/operator-lib/handler"
 
 	"github.com/operator-framework/helm-operator-plugins/internal/sdk/controllerutil"
 	"github.com/operator-framework/helm-operator-plugins/pkg/annotation"
@@ -541,7 +540,7 @@ var _ = Describe("Reconciler", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(r.SetupWithManager(mgr)).To(Succeed())
 
-				ac, err = r.actionClientGetter.ActionClientFor(obj)
+				ac, err = r.actionClientGetter.ActionClientFor(ctx, obj)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -579,7 +578,7 @@ var _ = Describe("Reconciler", func() {
 							acgErr := errors.New("broken action client getter: error getting action client")
 
 							By("creating a reconciler with a broken action client getter", func() {
-								r.actionClientGetter = helmclient.ActionClientGetterFunc(func(client.Object) (helmclient.ActionInterface, error) {
+								r.actionClientGetter = helmclient.ActionClientGetterFunc(func(context.Context, client.Object) (helmclient.ActionInterface, error) {
 									return nil, acgErr
 								})
 							})
@@ -615,7 +614,7 @@ var _ = Describe("Reconciler", func() {
 						})
 						It("returns an error getting the release", func() {
 							By("creating a reconciler with a broken action client getter", func() {
-								r.actionClientGetter = helmclient.ActionClientGetterFunc(func(client.Object) (helmclient.ActionInterface, error) {
+								r.actionClientGetter = helmclient.ActionClientGetterFunc(func(context.Context, client.Object) (helmclient.ActionInterface, error) {
 									cl := helmfake.NewActionClient()
 									return &cl, nil
 								})
@@ -825,7 +824,7 @@ var _ = Describe("Reconciler", func() {
 							acgErr := errors.New("broken action client getter: error getting action client")
 
 							By("creating a reconciler with a broken action client getter", func() {
-								r.actionClientGetter = helmclient.ActionClientGetterFunc(func(client.Object) (helmclient.ActionInterface, error) {
+								r.actionClientGetter = helmclient.ActionClientGetterFunc(func(context.Context, client.Object) (helmclient.ActionInterface, error) {
 									return nil, acgErr
 								})
 							})
@@ -861,7 +860,7 @@ var _ = Describe("Reconciler", func() {
 						})
 						It("returns an error getting the release", func() {
 							By("creating a reconciler with a broken action client getter", func() {
-								r.actionClientGetter = helmclient.ActionClientGetterFunc(func(client.Object) (helmclient.ActionInterface, error) {
+								r.actionClientGetter = helmclient.ActionClientGetterFunc(func(context.Context, client.Object) (helmclient.ActionInterface, error) {
 									cl := helmfake.NewActionClient()
 									return &cl, nil
 								})
@@ -978,9 +977,9 @@ var _ = Describe("Reconciler", func() {
 						var actionConf *action.Configuration
 						BeforeEach(func() {
 							By("getting the current release and config", func() {
-								acg, err := helmclient.NewActionConfigGetter(mgr.GetConfig(), mgr.GetRESTMapper(), logr.Discard())
+								acg, err := helmclient.NewActionConfigGetter(mgr.GetConfig(), mgr.GetRESTMapper())
 								Expect(err).ShouldNot(HaveOccurred())
-								actionConf, err = acg.ActionConfigFor(obj)
+								actionConf, err = acg.ActionConfigFor(ctx, obj)
 								Expect(err).ToNot(HaveOccurred())
 							})
 						})

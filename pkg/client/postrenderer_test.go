@@ -9,6 +9,8 @@ import (
 	"helm.sh/helm/v3/pkg/kube"
 	"helm.sh/helm/v3/pkg/postrender"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
@@ -171,13 +173,17 @@ var _ = Describe("ownerPostRenderer", func() {
 		rm, err := apiutil.NewDynamicRESTMapper(cfg, httpClient)
 		Expect(err).ToNot(HaveOccurred())
 
+		dc, err := discovery.NewDiscoveryClientForConfig(cfg)
+		Expect(err).ToNot(HaveOccurred())
+		cdc := memory.NewMemCacheClient(dc)
+
 		owner = newTestDeployment([]corev1.Container{{
 			Name: "test",
 		}})
 		pr = ownerPostRenderer{
 			owner:      owner,
 			rm:         rm,
-			kubeClient: kube.New(newRESTClientGetter(cfg, rm, owner.GetNamespace())),
+			kubeClient: kube.New(newRESTClientGetter(cfg, rm, cdc, owner.GetNamespace())),
 		}
 	})
 

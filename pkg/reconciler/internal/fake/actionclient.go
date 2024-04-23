@@ -17,6 +17,7 @@ limitations under the License.
 package fake
 
 import (
+	"context"
 	"errors"
 
 	"helm.sh/helm/v3/pkg/chart"
@@ -40,7 +41,7 @@ type fakeActionClientGetter struct {
 
 var _ client.ActionClientGetter = &fakeActionClientGetter{}
 
-func (hcg *fakeActionClientGetter) ActionClientFor(_ crclient.Object) (client.ActionInterface, error) {
+func (hcg *fakeActionClientGetter) ActionClientFor(_ context.Context, _ crclient.Object) (client.ActionInterface, error) {
 	if hcg.returnErr != nil {
 		return nil, hcg.returnErr
 	}

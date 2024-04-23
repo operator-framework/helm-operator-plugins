@@ -17,32 +17,28 @@ limitations under the License.
 package client
 
 import (
-	"sync"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/discovery"
-	cached "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
-func newRESTClientGetter(cfg *rest.Config, rm meta.RESTMapper, ns string) *namespacedRCG {
+func newRESTClientGetter(cfg *rest.Config, rm meta.RESTMapper, cachedDiscoveryClient discovery.CachedDiscoveryInterface, ns string) *namespacedRCG {
 	return &namespacedRCG{
 		restClientGetter: &restClientGetter{
-			restConfig: cfg,
-			restMapper: rm,
+			restConfig:            cfg,
+			restMapper:            rm,
+			cachedDiscoveryClient: cachedDiscoveryClient,
 		},
 		namespaceConfig: namespaceClientConfig{ns},
 	}
 }
 
 type restClientGetter struct {
-	restConfig *rest.Config
-	restMapper meta.RESTMapper
-
-	setupDiscoveryClient  sync.Once
+	restConfig            *rest.Config
+	restMapper            meta.RESTMapper
 	cachedDiscoveryClient discovery.CachedDiscoveryInterface
 }
 
@@ -51,20 +47,6 @@ func (c *restClientGetter) ToRESTConfig() (*rest.Config, error) {
 }
 
 func (c *restClientGetter) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
-	var (
-		dc  discovery.DiscoveryInterface
-		err error
-	)
-	c.setupDiscoveryClient.Do(func() {
-		dc, err = discovery.NewDiscoveryClientForConfig(c.restConfig)
-		if err != nil {
-			return
-		}
-		c.cachedDiscoveryClient = cached.NewMemCacheClient(dc)
-	})
-	if err != nil {
-		return nil, err
-	}
 	return c.cachedDiscoveryClient, nil
 }
 
