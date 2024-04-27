@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -42,8 +43,10 @@ import (
 
 var _ = Describe("ActionConfig", func() {
 	var _ = Describe("NewActionConfigGetter", func() {
-		var rm meta.RESTMapper
-
+		var (
+			rm  meta.RESTMapper
+			sch *runtime.Scheme
+		)
 		BeforeEach(func() {
 			var err error
 
@@ -52,10 +55,12 @@ var _ = Describe("ActionConfig", func() {
 
 			rm, err = apiutil.NewDynamicRESTMapper(cfg, httpClient)
 			Expect(err).ToNot(HaveOccurred())
+
+			sch = runtime.NewScheme()
 		})
 
 		It("should return a valid ActionConfigGetter", func() {
-			acg, err := NewActionConfigGetter(cfg, nil)
+			acg, err := NewActionConfigGetter(cfg, nil, nil)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(acg).NotTo(BeNil())
 		})
@@ -77,7 +82,7 @@ var _ = Describe("ActionConfig", func() {
 			It("should use a custom client namespace", func() {
 				clientNs := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("client-%s", rand.String(8))}}
 				clientNsMapper := func(_ client.Object) (string, error) { return clientNs.Name, nil }
-				acg, err := NewActionConfigGetter(cfg, rm, ClientNamespaceMapper(clientNsMapper))
+				acg, err := NewActionConfigGetter(cfg, rm, sch, ClientNamespaceMapper(clientNsMapper))
 				Expect(err).ToNot(HaveOccurred())
 				ac, err := acg.ActionConfigFor(context.Background(), obj)
 				Expect(err).ToNot(HaveOccurred())
@@ -99,7 +104,7 @@ metadata:
 			It("should use a custom storage namespace", func() {
 				storageNs := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("storage-%s", rand.String(8))}}
 				storageNsMapper := func(_ client.Object) (string, error) { return storageNs.Name, nil }
-				acg, err := NewActionConfigGetter(cfg, rm, StorageNamespaceMapper(storageNsMapper))
+				acg, err := NewActionConfigGetter(cfg, rm, sch, StorageNamespaceMapper(storageNsMapper))
 				Expect(err).ToNot(HaveOccurred())
 
 				ac, err := acg.ActionConfigFor(context.Background(), obj)
@@ -134,7 +139,7 @@ metadata:
 			})
 
 			It("should disable storage owner ref injection", func() {
-				acg, err := NewActionConfigGetter(cfg, rm, DisableStorageOwnerRefInjection(true))
+				acg, err := NewActionConfigGetter(cfg, rm, sch, DisableStorageOwnerRefInjection(true))
 				Expect(err).ToNot(HaveOccurred())
 
 				ac, err := acg.ActionConfigFor(context.Background(), obj)
@@ -168,7 +173,7 @@ metadata:
 						BearerToken: obj.GetName(),
 					}, nil
 				}
-				acg, err := NewActionConfigGetter(cfg, rm, RestConfigMapper(restConfigMapper))
+				acg, err := NewActionConfigGetter(cfg, rm, sch, RestConfigMapper(restConfigMapper))
 				Expect(err).ToNot(HaveOccurred())
 
 				testObject := func(name string) client.Object {
@@ -199,8 +204,9 @@ metadata:
 
 			rm, err := apiutil.NewDynamicRESTMapper(cfg, httpClient)
 			Expect(err).ToNot(HaveOccurred())
+			sch := runtime.NewScheme()
 
-			acg, err := NewActionConfigGetter(cfg, rm)
+			acg, err := NewActionConfigGetter(cfg, rm, sch)
 			Expect(err).ShouldNot(HaveOccurred())
 			ac, err := acg.ActionConfigFor(context.Background(), obj)
 			Expect(err).ToNot(HaveOccurred())

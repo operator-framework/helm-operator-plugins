@@ -917,7 +917,7 @@ func (r *Reconciler) addDefaults(mgr ctrl.Manager, controllerName string) error 
 		r.log = ctrl.Log.WithName("controllers").WithName("Helm")
 	}
 	if r.actionClientGetter == nil {
-		actionConfigGetter, err := helmclient.NewActionConfigGetter(mgr.GetConfig(), mgr.GetRESTMapper())
+		actionConfigGetter, err := helmclient.NewActionConfigGetter(mgr.GetConfig(), mgr.GetRESTMapper(), mgr.GetScheme())
 		if err != nil {
 			return fmt.Errorf("creating action config getter: %w", err)
 		}

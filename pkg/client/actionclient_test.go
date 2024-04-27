@@ -59,7 +59,8 @@ const mockTestDesc = "Test Description"
 
 var _ = Describe("ActionClient", func() {
 	var (
-		rm meta.RESTMapper
+		rm  meta.RESTMapper
+		sch *runtime.Scheme
 	)
 	BeforeEach(func() {
 		var err error
@@ -69,10 +70,12 @@ var _ = Describe("ActionClient", func() {
 
 		rm, err = apiutil.NewDynamicRESTMapper(cfg, httpClient)
 		Expect(err).ToNot(HaveOccurred())
+
+		sch = runtime.NewScheme()
 	})
 	var _ = Describe("NewActionClientGetter", func() {
 		It("should return a valid ActionConfigGetter", func() {
-			actionConfigGetter, err := NewActionConfigGetter(cfg, rm)
+			actionConfigGetter, err := NewActionConfigGetter(cfg, rm, sch)
 			Expect(err).ShouldNot(HaveOccurred())
 			acg, err := NewActionClientGetter(actionConfigGetter)
 			Expect(err).ToNot(HaveOccurred())
@@ -89,7 +92,7 @@ var _ = Describe("ActionClient", func() {
 			)
 			BeforeEach(func() {
 				var err error
-				actionConfigGetter, err = NewActionConfigGetter(cfg, rm)
+				actionConfigGetter, err = NewActionConfigGetter(cfg, rm, sch)
 				Expect(err).ShouldNot(HaveOccurred())
 				dc, err := discovery.NewDiscoveryClientForConfig(cfg)
 				Expect(err).ShouldNot(HaveOccurred())
@@ -310,7 +313,7 @@ var _ = Describe("ActionClient", func() {
 			obj = testutil.BuildTestCR(gvk)
 		})
 		It("should return a valid ActionClient", func() {
-			actionConfGetter, err := NewActionConfigGetter(cfg, rm)
+			actionConfGetter, err := NewActionConfigGetter(cfg, rm, sch)
 			Expect(err).ShouldNot(HaveOccurred())
 			acg, err := NewActionClientGetter(actionConfGetter)
 			Expect(err).ToNot(HaveOccurred())
@@ -330,7 +333,7 @@ var _ = Describe("ActionClient", func() {
 		BeforeEach(func() {
 			obj = testutil.BuildTestCR(gvk)
 
-			actionConfigGetter, err := NewActionConfigGetter(cfg, rm)
+			actionConfigGetter, err := NewActionConfigGetter(cfg, rm, sch)
 			Expect(err).ShouldNot(HaveOccurred())
 			acg, err := NewActionClientGetter(actionConfigGetter)
 			Expect(err).ToNot(HaveOccurred())

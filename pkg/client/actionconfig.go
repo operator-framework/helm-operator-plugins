@@ -28,18 +28,22 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/discovery/cached/memory"
 	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 )
+
+const StorageNamespaceKey = "helm-secret-namespace"
 
 type ActionConfigGetter interface {
 	ActionConfigFor(ctx context.Context, obj client.Object) (*action.Configuration, error)
 }
 
-func NewActionConfigGetter(baseRestConfig *rest.Config, rm meta.RESTMapper, opts ...ActionConfigGetterOption) (ActionConfigGetter, error) {
+func NewActionConfigGetter(baseRestConfig *rest.Config, rm meta.RESTMapper, scheme *runtime.Scheme, opts ...ActionConfigGetterOption) (ActionConfigGetter, error) {
 	dc, err := discovery.NewDiscoveryClientForConfig(baseRestConfig)
 	if err != nil {
 		return nil, fmt.Errorf("create discovery client: %v", err)
@@ -50,6 +54,7 @@ func NewActionConfigGetter(baseRestConfig *rest.Config, rm meta.RESTMapper, opts
 		baseRestConfig:  baseRestConfig,
 		restMapper:      rm,
 		discoveryClient: cdc,
+		scheme:          scheme,
 	}
 	for _, o := range opts {
 		o(acg)
@@ -99,12 +104,14 @@ func RestConfigMapper(f func(context.Context, client.Object, *rest.Config) (*res
 }
 
 func getObjectNamespace(obj client.Object) (string, error) {
+
 	return obj.GetNamespace(), nil
 }
 
 type actionConfigGetter struct {
 	baseRestConfig  *rest.Config
 	restMapper      meta.RESTMapper
+	scheme          *runtime.Scheme
 	discoveryClient discovery.CachedDiscoveryInterface
 
 	objectToClientNamespace         ObjectToStringMapper
@@ -117,6 +124,19 @@ func (acg *actionConfigGetter) ActionConfigFor(ctx context.Context, obj client.O
 	storageNs, err := acg.objectToStorageNamespace(obj)
 	if err != nil {
 		return nil, fmt.Errorf("get storage namespace for object: %v", err)
+	}
+
+	isNamespaced, err := apiutil.IsObjectNamespaced(obj, acg.scheme, acg.restMapper)
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine scope of the object: %v", err)
+	}
+
+	if storageNs == "" || !isNamespaced {
+		ns, ok := ctx.Value(StorageNamespaceKey).(string)
+		if !ok || ns == "" {
+			return nil, fmt.Errorf("empty namespace for creating helm secret")
+		}
+		storageNs = ns
 	}
 
 	restConfig, err := acg.objectToRestConfig(ctx, obj, acg.baseRestConfig)
