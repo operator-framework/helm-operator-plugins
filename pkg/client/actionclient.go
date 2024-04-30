@@ -148,25 +148,24 @@ const (
 type PreflightFunc func(string, *release.Release) error
 
 func NewPreflightFunc(name string, pf PreflightFunc) Preflight {
-    return &preflightFuncImpl{
-        preflightFunc: pf,
-        name: name,
-    }
+	return &preflightFuncImpl{
+		preflightFunc: pf,
+		name:          name,
+	}
 }
 
 type preflightFuncImpl struct {
-    preflightFunc PreflightFunc
-    name string
+	preflightFunc PreflightFunc
+	name          string
 }
 
 func (pfi *preflightFuncImpl) Run(operation string, rel *release.Release) error {
-    return pfi.preflightFunc(operation, rel)
+	return pfi.preflightFunc(operation, rel)
 }
 
 func (pfi *preflightFuncImpl) Name() string {
-    return pfi.name
+	return pfi.name
 }
-
 
 type actionClientGetter struct {
 	acg ActionConfigGetter
