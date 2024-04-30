@@ -58,11 +58,13 @@ type ActionInterface interface {
 	Reconcile(rel *release.Release) error
 }
 
-type GetOption func(*action.Get) error
-type InstallOption func(*action.Install) error
-type UpgradeOption func(*action.Upgrade) error
-type UninstallOption func(*action.Uninstall) error
-type RollbackOption func(*action.Rollback) error
+type (
+	GetOption       func(*action.Get) error
+	InstallOption   func(*action.Install) error
+	UpgradeOption   func(*action.Upgrade) error
+	UninstallOption func(*action.Uninstall) error
+	RollbackOption  func(*action.Rollback) error
+)
 
 type ActionClientGetterOption func(*actionClientGetter) error
 
@@ -115,6 +117,13 @@ func AppendPostRenderers(postRendererFns ...PostRendererProvider) ActionClientGe
 	}
 }
 
+func AppendPreflight(preflights ...Preflight) ActionClientGetterOption {
+	return func(getter *actionClientGetter) error {
+		getter.preflights = append(getter.preflights, preflights...)
+		return nil
+	}
+}
+
 func NewActionClientGetter(acg ActionConfigGetter, opts ...ActionClientGetterOption) (ActionClientGetter, error) {
 	actionClientGetter := &actionClientGetter{acg: acg}
 	for _, opt := range opts {
@@ -124,6 +133,40 @@ func NewActionClientGetter(acg ActionConfigGetter, opts ...ActionClientGetterOpt
 	}
 	return actionClientGetter, nil
 }
+
+type Preflight interface {
+	Run(string, *release.Release) error
+	Name() string
+}
+
+const (
+	PreflightOperationInstall   = "install"
+	PreflightOperationUpgrade   = "upgrade"
+	PreflightOperationUninstall = "uninstall"
+)
+
+type PreflightFunc func(string, *release.Release) error
+
+func NewPreflightFunc(name string, pf PreflightFunc) Preflight {
+    return &preflightFuncImpl{
+        preflightFunc: pf,
+        name: name,
+    }
+}
+
+type preflightFuncImpl struct {
+    preflightFunc PreflightFunc
+    name string
+}
+
+func (pfi *preflightFuncImpl) Run(operation string, rel *release.Release) error {
+    return pfi.preflightFunc(operation, rel)
+}
+
+func (pfi *preflightFuncImpl) Name() string {
+    return pfi.name
+}
+
 
 type actionClientGetter struct {
 	acg ActionConfigGetter
@@ -135,6 +178,8 @@ type actionClientGetter struct {
 
 	installFailureUninstallOpts []UninstallOption
 	upgradeFailureRollbackOpts  []RollbackOption
+
+	preflights []Preflight
 
 	postRendererProviders []PostRendererProvider
 }
@@ -150,7 +195,7 @@ func (hcg *actionClientGetter) ActionClientFor(ctx context.Context, obj client.O
 	if err != nil {
 		return nil, err
 	}
-	var cpr = chainedPostRenderer{}
+	cpr := chainedPostRenderer{}
 	for _, provider := range hcg.postRendererProviders {
 		cpr = append(cpr, provider(rm, actionConfig.KubeClient, obj))
 	}
@@ -167,6 +212,8 @@ func (hcg *actionClientGetter) ActionClientFor(ctx context.Context, obj client.O
 		defaultUpgradeOpts:   append([]UpgradeOption{WithUpgradePostRenderer(cpr)}, hcg.defaultUpgradeOpts...),
 		defaultUninstallOpts: hcg.defaultUninstallOpts,
 
+		preflights: hcg.preflights,
+
 		installFailureUninstallOpts: hcg.installFailureUninstallOpts,
 		upgradeFailureRollbackOpts:  hcg.upgradeFailureRollbackOpts,
 	}, nil
@@ -179,6 +226,8 @@ type actionClient struct {
 	defaultInstallOpts   []InstallOption
 	defaultUpgradeOpts   []UpgradeOption
 	defaultUninstallOpts []UninstallOption
+
+	preflights []Preflight
 
 	installFailureUninstallOpts []UninstallOption
 	upgradeFailureRollbackOpts  []RollbackOption
@@ -205,6 +254,25 @@ func (c *actionClient) Install(name, namespace string, chrt *chart.Chart, vals m
 	}
 	install.ReleaseName = name
 	install.Namespace = namespace
+
+	// TODO: Open Question -  should we always run preflight checks if they exist?
+	if len(c.preflights) > 0 && !install.DryRun {
+		install.DryRun = true
+		c.conf.Log("Running preflight checks")
+		c.conf.Log("Performing install dry run")
+		rel, err := install.Run(chrt, vals)
+		if err != nil {
+			c.conf.Log("Install dry run failed")
+			return nil, fmt.Errorf("preflight checks were specified, install dry run failed: %w", err)
+		}
+		for _, preflight := range c.preflights {
+			if err := preflight.Run(PreflightOperationInstall, rel); err != nil {
+				return nil, fmt.Errorf("preflight check %q failed: %w", preflight.Name(), err)
+			}
+		}
+		install.DryRun = false
+	}
+
 	c.conf.Log("Starting install")
 	rel, err := install.Run(chrt, vals)
 	if err != nil {
@@ -241,6 +309,25 @@ func (c *actionClient) Upgrade(name, namespace string, chrt *chart.Chart, vals m
 		}
 	}
 	upgrade.Namespace = namespace
+
+	// TODO: Open Question -  should we always run preflight checks if they exist?
+	if len(c.preflights) > 0 && !upgrade.DryRun {
+		upgrade.DryRun = true
+		c.conf.Log("Running preflight checks")
+		c.conf.Log("Performing upgrade dry run")
+		rel, err := upgrade.Run(name, chrt, vals)
+		if err != nil {
+			c.conf.Log("Upgrade dry run failed")
+			return nil, fmt.Errorf("preflight checks were specified, upgrade dry run failed: %w", err)
+		}
+		for _, preflight := range c.preflights {
+			if err := preflight.Run(PreflightOperationUpgrade, rel); err != nil {
+				return nil, fmt.Errorf("preflight check %q failed: %w", preflight.Name(), err)
+			}
+		}
+		upgrade.DryRun = false
+	}
+
 	rel, err := upgrade.Run(name, chrt, vals)
 	if err != nil {
 		if rel != nil {
@@ -286,6 +373,25 @@ func (c *actionClient) uninstall(name string, opts ...UninstallOption) (*release
 			return nil, err
 		}
 	}
+
+	// TODO: Open Question -  should we always run preflight checks if they exist?
+	if len(c.preflights) > 0 && !uninstall.DryRun {
+		uninstall.DryRun = true
+		c.conf.Log("Running preflight checks")
+		c.conf.Log("Performing uninstall dry run")
+		rel, err := uninstall.Run(name)
+		if err != nil {
+			c.conf.Log("Uninstall dry run failed")
+			return nil, fmt.Errorf("preflight checks were specified, uninstall dry run failed: %w", err)
+		}
+		for _, preflight := range c.preflights {
+			if err := preflight.Run(PreflightOperationUninstall, rel.Release); err != nil {
+				return nil, fmt.Errorf("preflight check %q failed: %w", preflight.Name(), err)
+			}
+		}
+		uninstall.DryRun = false
+	}
+
 	return uninstall.Run(name)
 }
 

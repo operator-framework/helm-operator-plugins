@@ -58,9 +58,7 @@ import (
 const mockTestDesc = "Test Description"
 
 var _ = Describe("ActionClient", func() {
-	var (
-		rm meta.RESTMapper
-	)
+	var rm meta.RESTMapper
 	BeforeEach(func() {
 		var err error
 
@@ -70,7 +68,7 @@ var _ = Describe("ActionClient", func() {
 		rm, err = apiutil.NewDynamicRESTMapper(cfg, httpClient)
 		Expect(err).ToNot(HaveOccurred())
 	})
-	var _ = Describe("NewActionClientGetter", func() {
+	_ = Describe("NewActionClientGetter", func() {
 		It("should return a valid ActionConfigGetter", func() {
 			actionConfigGetter, err := NewActionConfigGetter(cfg, rm)
 			Expect(err).ShouldNot(HaveOccurred())
@@ -253,7 +251,6 @@ var _ = Describe("ActionClient", func() {
 				Expect(err).ToNot(HaveOccurred())
 			})
 			It("should get clients with postrenderers", func() {
-
 				acg, err := NewActionClientGetter(actionConfigGetter, AppendPostRenderers(newMockPostRenderer("foo", "bar")))
 				Expect(err).ToNot(HaveOccurred())
 				Expect(acg).NotTo(BeNil())
@@ -289,7 +286,7 @@ var _ = Describe("ActionClient", func() {
 		})
 	})
 
-	var _ = Describe("ActionClientGetterFunc", func() {
+	_ = Describe("ActionClientGetterFunc", func() {
 		It("implements the ActionClientGetter interface", func() {
 			gvk := schema.GroupVersionKind{Group: "test", Version: "v1alpha1", Kind: "Test"}
 			expectedObj := &unstructured.Unstructured{}
@@ -304,7 +301,7 @@ var _ = Describe("ActionClient", func() {
 		})
 	})
 
-	var _ = Describe("ActionClientFor", func() {
+	_ = Describe("ActionClientFor", func() {
 		var obj client.Object
 		BeforeEach(func() {
 			obj = testutil.BuildTestCR(gvk)
@@ -320,7 +317,7 @@ var _ = Describe("ActionClient", func() {
 		})
 	})
 
-	var _ = Describe("ActionClient methods", func() {
+	_ = Describe("ActionClient methods", func() {
 		var (
 			obj  client.Object
 			cl   client.Client
@@ -357,7 +354,7 @@ var _ = Describe("ActionClient", func() {
 					panic(err)
 				}
 			})
-			var _ = Describe("Install", func() {
+			_ = Describe("Install", func() {
 				It("should succeed", func() {
 					var (
 						rel *release.Release
@@ -389,15 +386,51 @@ var _ = Describe("ActionClient", func() {
 						Expect(r).To(BeNil())
 					})
 				})
+				When("preflight checks are configured for install operation", func() {
+                    AfterEach(func() {
+                        // Reset preflights
+                        ac.(*actionClient).preflights = []Preflight{}
+                    })
+					It("should fail if preflight checks fail during install", func() {
+						ac.(*actionClient).preflights = []Preflight{
+							NewPreflightFunc("installFail", func(_ string, _ *release.Release) error {
+								return errors.New("expect this error")
+							}),
+						}
+
+						r, err := ac.Install(obj.GetName(), obj.GetNamespace(), &chrt, vals)
+						Expect(err).To(MatchError("preflight check \"installFail\" failed: expect this error"))
+						Expect(r).To(BeNil())
+					})
+					It("should succeed if preflight checks pass during install", func() {
+						var (
+							rel *release.Release
+							err error
+						)
+						ac.(*actionClient).preflights = []Preflight{
+							NewPreflightFunc("installPass", func(_ string, _ *release.Release) error {
+								return nil
+							}),
+						}
+
+						By("installing the release with preflights configured", func() {
+							opt := func(i *action.Install) error { i.Description = mockTestDesc; return nil }
+							rel, err = ac.Install(obj.GetName(), obj.GetNamespace(), &chrt, vals, opt)
+							Expect(err).ToNot(HaveOccurred())
+							Expect(rel).NotTo(BeNil())
+						})
+						verifyRelease(cl, obj, rel)
+					})
+				})
 			})
-			var _ = Describe("Upgrade", func() {
+			_ = Describe("Upgrade", func() {
 				It("should fail", func() {
 					r, err := ac.Upgrade(obj.GetName(), obj.GetNamespace(), &chrt, vals)
 					Expect(err).To(HaveOccurred())
 					Expect(r).To(BeNil())
 				})
 			})
-			var _ = Describe("Uninstall", func() {
+			_ = Describe("Uninstall", func() {
 				It("should fail", func() {
 					resp, err := ac.Uninstall(obj.GetName())
 					Expect(err).To(HaveOccurred())
@@ -407,9 +440,7 @@ var _ = Describe("ActionClient", func() {
 		})
 
 		When("release is installed", func() {
-			var (
-				installedRelease *release.Release
-			)
+			var installedRelease *release.Release
 			BeforeEach(func() {
 				var err error
 				opt := func(i *action.Install) error { i.Description = mockTestDesc; return nil }
@@ -426,7 +457,7 @@ var _ = Describe("ActionClient", func() {
 					panic(err)
 				}
 			})
-			var _ = Describe("Get", func() {
+			_ = Describe("Get", func() {
 				var (
 					rel *release.Release
 					err error
@@ -462,14 +493,14 @@ var _ = Describe("ActionClient", func() {
 					})
 				})
 			})
-			var _ = Describe("Install", func() {
+			_ = Describe("Install", func() {
 				It("should fail", func() {
 					r, err := ac.Install(obj.GetName(), obj.GetNamespace(), &chrt, vals)
 					Expect(err).To(HaveOccurred())
 					Expect(r).To(BeNil())
 				})
 			})
-			var _ = Describe("Upgrade", func() {
+			_ = Describe("Upgrade", func() {
 				It("should succeed", func() {
 					var (
 						rel *release.Release
@@ -503,8 +534,43 @@ var _ = Describe("ActionClient", func() {
 						Expect(r).To(BeNil())
 					})
 				})
+				When("preflight checks are configured for upgrade operation", func() {
+                    AfterEach(func() {
+                        ac.(*actionClient).preflights = []Preflight{}
+                    })
+					It("should fail if preflight checks fail during upgrade", func() {
+						ac.(*actionClient).preflights = []Preflight{
+							NewPreflightFunc("upgradeFail", func(_ string, _ *release.Release) error {
+								return errors.New("expect this error")
+							}),
+						}
+
+						r, err := ac.Upgrade(obj.GetName(), obj.GetNamespace(), &chrt, vals)
+						Expect(err).To(MatchError("preflight check \"upgradeFail\" failed: expect this error"))
+						Expect(r).To(BeNil())
+					})
+					It("should succeed if preflight checks pass during upgrade", func() {
+						ac.(*actionClient).preflights = []Preflight{
+							NewPreflightFunc("upgradePass", func(_ string, _ *release.Release) error {
+								return nil
+							}),
+						}
+
+						var (
+							rel *release.Release
+							err error
+						)
+						By("upgrading the release with preflights configured", func() {
+							opt := func(u *action.Upgrade) error { u.Description = mockTestDesc; return nil }
+							rel, err = ac.Upgrade(obj.GetName(), obj.GetNamespace(), &chrt, vals, opt)
+							Expect(err).ToNot(HaveOccurred())
+							Expect(rel).NotTo(BeNil())
+						})
+						verifyRelease(cl, obj, rel)
+					})
+				})
 			})
-			var _ = Describe("Uninstall", func() {
+			_ = Describe("Uninstall", func() {
 				It("should succeed", func() {
 					var (
 						resp *release.UninstallReleaseResponse
@@ -526,8 +592,43 @@ var _ = Describe("ActionClient", func() {
 						Expect(r).To(BeNil())
 					})
 				})
+				When("preflight checks are configured for uninstall operation", func() {
+                    AfterEach(func() {
+                        ac.(*actionClient).preflights = []Preflight{}
+                    })
+					It("should fail if preflight checks fail during uninstall", func() {
+						ac.(*actionClient).preflights = []Preflight{
+							NewPreflightFunc("uninstallFail", func(_ string, _ *release.Release) error {
+								return errors.New("expect this error")
+							}),
+						}
+
+						r, err := ac.Uninstall(obj.GetName())
+						Expect(err).To(MatchError("preflight check \"uninstallFail\" failed: expect this error"))
+						Expect(r).To(BeNil())
+					})
+					It("should succeed if preflight checks pass during uninstall", func() {
+						ac.(*actionClient).preflights = []Preflight{
+							NewPreflightFunc("uninstallPass", func(_ string, _ *release.Release) error {
+								return nil
+							}),
+						}
+
+						var (
+							resp *release.UninstallReleaseResponse
+							err  error
+						)
+						By("uninstalling the release with preflights configured", func() {
+							opt := func(i *action.Uninstall) error { i.Description = mockTestDesc; return nil }
+							resp, err = ac.Uninstall(obj.GetName(), opt)
+							Expect(err).ToNot(HaveOccurred())
+							Expect(resp).NotTo(BeNil())
+						})
+						verifyNoRelease(cl, obj.GetNamespace(), obj.GetName(), resp.Release)
+					})
+				})
 			})
-			var _ = Describe("Reconcile", func() {
+			_ = Describe("Reconcile", func() {
 				It("should succeed", func() {
 					By("reconciling the release", func() {
 						err := ac.Reconcile(installedRelease)
@@ -578,7 +679,7 @@ var _ = Describe("ActionClient", func() {
 		})
 	})
 
-	var _ = Describe("createPatch", func() {
+	_ = Describe("createPatch", func() {
 		It("ignores extra fields in custom resource types", func() {
 			o1 := newTestUnstructured([]interface{}{
 				map[string]interface{}{
