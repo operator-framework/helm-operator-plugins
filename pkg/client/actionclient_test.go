@@ -387,10 +387,10 @@ var _ = Describe("ActionClient", func() {
 					})
 				})
 				When("preflight checks are configured for install operation", func() {
-                    AfterEach(func() {
-                        // Reset preflights
-                        ac.(*actionClient).preflights = []Preflight{}
-                    })
+					AfterEach(func() {
+						// Reset preflights
+						ac.(*actionClient).preflights = []Preflight{}
+					})
 					It("should fail if preflight checks fail during install", func() {
 						ac.(*actionClient).preflights = []Preflight{
 							NewPreflightFunc("installFail", func(_ string, _ *release.Release) error {
@@ -535,9 +535,9 @@ var _ = Describe("ActionClient", func() {
 					})
 				})
 				When("preflight checks are configured for upgrade operation", func() {
-                    AfterEach(func() {
-                        ac.(*actionClient).preflights = []Preflight{}
-                    })
+					AfterEach(func() {
+						ac.(*actionClient).preflights = []Preflight{}
+					})
 					It("should fail if preflight checks fail during upgrade", func() {
 						ac.(*actionClient).preflights = []Preflight{
 							NewPreflightFunc("upgradeFail", func(_ string, _ *release.Release) error {
@@ -593,9 +593,9 @@ var _ = Describe("ActionClient", func() {
 					})
 				})
 				When("preflight checks are configured for uninstall operation", func() {
-                    AfterEach(func() {
-                        ac.(*actionClient).preflights = []Preflight{}
-                    })
+					AfterEach(func() {
+						ac.(*actionClient).preflights = []Preflight{}
+					})
 					It("should fail if preflight checks fail during uninstall", func() {
 						ac.(*actionClient).preflights = []Preflight{
 							NewPreflightFunc("uninstallFail", func(_ string, _ *release.Release) error {
