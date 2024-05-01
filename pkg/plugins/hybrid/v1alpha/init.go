@@ -18,8 +18,6 @@ import (
 	"fmt"
 	"path/filepath"
 
-	golangv4 "sigs.k8s.io/kubebuilder/v3/pkg/plugins/golang/v4/scaffolds"
-
 	"github.com/spf13/pflag"
 	"sigs.k8s.io/kubebuilder/v3/pkg/config"
 	"sigs.k8s.io/kubebuilder/v3/pkg/machinery"
@@ -109,19 +107,7 @@ func (p *initSubcommand) Scaffold(fs machinery.Filesystem) error {
 
 	scaffolder := scaffolds.NewInitScaffolder(p.config, p.license, p.owner)
 	scaffolder.InjectFS(fs)
-	err := scaffolder.Scaffold()
-	if err != nil {
-		return err
-	}
-
-	// Ensure that we are pinning the controller-runtime version
-	// xref: https://github.com/kubernetes-sigs/kubebuilder/issues/997
-	err = util.RunCmd("Get controller runtime", "go", "get",
-		"sigs.k8s.io/controller-runtime@"+golangv4.ControllerRuntimeVersion)
-	if err != nil {
-		return err
-	}
-	return nil
+	return scaffolder.Scaffold()
 }
 
 func (p *initSubcommand) PostScaffold() error {
