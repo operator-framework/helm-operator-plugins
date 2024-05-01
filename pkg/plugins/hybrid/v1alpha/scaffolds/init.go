@@ -41,10 +41,10 @@ const (
 	imageName = "controller:latest"
 
 	// TODO: This is a placeholder for now. This would probably be the operator-sdk version
-	hybridOperatorVersion = "0.2.0"
+	hybridOperatorVersion = "0.2.1"
 
 	// helmPluginVersion is the operator-framework/helm-operator-plugin version to be used in the project
-	helmPluginVersion = "v0.2.0"
+	helmPluginVersion = "v0.2.1"
 )
 
 var _ plugins.Scaffolder = &initScaffolder{}
