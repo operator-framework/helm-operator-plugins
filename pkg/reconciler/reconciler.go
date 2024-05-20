@@ -508,7 +508,7 @@ type ControllerSetup interface {
 	// Watch may be provided one or more Predicates to filter events before
 	// they are given to the EventHandler.  Events will be passed to the
 	// EventHandler if all provided Predicates evaluate to true.
-	Watch(src source.Source, eventhandler handler.EventHandler, predicates ...predicate.Predicate) error
+	Watch(src source.Source) error
 }
 
 // ControllerSetupFunc allows configuring a controller's builder.
@@ -953,9 +953,12 @@ func (r *Reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) err
 	}
 
 	if err := c.Watch(
-		source.Kind(mgr.GetCache(), obj),
-		&sdkhandler.InstrumentedEnqueueRequestForObject{},
-		preds...,
+		source.Kind(
+			mgr.GetCache(),
+			client.Object(obj),
+			&sdkhandler.InstrumentedEnqueueRequestForObject[client.Object]{},
+			preds...,
+		),
 	); err != nil {
 		return err
 	}
@@ -968,8 +971,16 @@ func (r *Reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) err
 	})
 
 	if err := c.Watch(
-		source.Kind(mgr.GetCache(), secret),
-		handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), obj, handler.OnlyControllerOwner()),
+		source.Kind(
+			mgr.GetCache(),
+			secret,
+			handler.TypedEnqueueRequestForOwner[*corev1.Secret](
+				mgr.GetScheme(),
+				mgr.GetRESTMapper(),
+				obj,
+				handler.OnlyControllerOwner(),
+			),
+		),
 	); err != nil {
 		return err
 	}

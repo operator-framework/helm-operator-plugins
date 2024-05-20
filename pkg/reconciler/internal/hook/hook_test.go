@@ -18,6 +18,9 @@ package hook_test
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -31,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/cache/informertest"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	sdkhandler "github.com/operator-framework/operator-lib/handler"
 
@@ -127,8 +131,8 @@ var _ = Describe("Hook", func() {
 				drw = internalhook.NewDependentResourceWatcher(c, rm, cache, sch)
 				Expect(drw.Exec(owner, *rel, log)).To(Succeed())
 				Expect(c.WatchCalls).To(HaveLen(2))
-				Expect(c.WatchCalls[0].Handler).To(BeAssignableToTypeOf(handler.EnqueueRequestForOwner(sch, rm, owner, handler.OnlyControllerOwner())))
-				Expect(c.WatchCalls[1].Handler).To(BeAssignableToTypeOf(handler.EnqueueRequestForOwner(sch, rm, owner, handler.OnlyControllerOwner())))
+				Expect(validateSourceHandlerType(c.WatchCalls[0].Source, handler.TypedEnqueueRequestForOwner[*unstructured.Unstructured](sch, rm, owner, handler.OnlyControllerOwner()))).To(Succeed())
+				Expect(validateSourceHandlerType(c.WatchCalls[1].Source, handler.TypedEnqueueRequestForOwner[*unstructured.Unstructured](sch, rm, owner, handler.OnlyControllerOwner()))).To(Succeed())
 			})
 
 			Context("when the owner is cluster-scoped", func() {
@@ -150,9 +154,8 @@ var _ = Describe("Hook", func() {
 					drw = internalhook.NewDependentResourceWatcher(c, rm, cache, sch)
 					Expect(drw.Exec(owner, *rel, log)).To(Succeed())
 					Expect(c.WatchCalls).To(HaveLen(2))
-					Expect(c.WatchCalls[0].Handler).To(BeAssignableToTypeOf(handler.EnqueueRequestForOwner(sch, rm, owner, handler.OnlyControllerOwner())))
-					Expect(c.WatchCalls[1].Handler).To(BeAssignableToTypeOf(handler.EnqueueRequestForOwner(sch, rm, owner, handler.OnlyControllerOwner())))
-
+					Expect(validateSourceHandlerType(c.WatchCalls[0].Source, handler.TypedEnqueueRequestForOwner[*unstructured.Unstructured](sch, rm, owner, handler.OnlyControllerOwner()))).To(Succeed())
+					Expect(validateSourceHandlerType(c.WatchCalls[1].Source, handler.TypedEnqueueRequestForOwner[*unstructured.Unstructured](sch, rm, owner, handler.OnlyControllerOwner()))).To(Succeed())
 				})
 				It("should watch cluster-scoped resources with ownerRef handler", func() {
 					rel = &release.Release{
@@ -161,8 +164,8 @@ var _ = Describe("Hook", func() {
 					drw = internalhook.NewDependentResourceWatcher(c, rm, cache, sch)
 					Expect(drw.Exec(owner, *rel, log)).To(Succeed())
 					Expect(c.WatchCalls).To(HaveLen(2))
-					Expect(c.WatchCalls[0].Handler).To(BeAssignableToTypeOf(handler.EnqueueRequestForOwner(sch, rm, owner, handler.OnlyControllerOwner())))
-					Expect(c.WatchCalls[1].Handler).To(BeAssignableToTypeOf(handler.EnqueueRequestForOwner(sch, rm, owner, handler.OnlyControllerOwner())))
+					Expect(validateSourceHandlerType(c.WatchCalls[0].Source, handler.TypedEnqueueRequestForOwner[*unstructured.Unstructured](sch, rm, owner, handler.OnlyControllerOwner()))).To(Succeed())
+					Expect(validateSourceHandlerType(c.WatchCalls[1].Source, handler.TypedEnqueueRequestForOwner[*unstructured.Unstructured](sch, rm, owner, handler.OnlyControllerOwner()))).To(Succeed())
 				})
 				It("should watch resource policy keep resources with annotation handler", func() {
 					rel = &release.Release{
@@ -171,10 +174,10 @@ var _ = Describe("Hook", func() {
 					drw = internalhook.NewDependentResourceWatcher(c, rm, cache, sch)
 					Expect(drw.Exec(owner, *rel, log)).To(Succeed())
 					Expect(c.WatchCalls).To(HaveLen(4))
-					Expect(c.WatchCalls[0].Handler).To(BeAssignableToTypeOf(&sdkhandler.EnqueueRequestForAnnotation{}))
-					Expect(c.WatchCalls[1].Handler).To(BeAssignableToTypeOf(&sdkhandler.EnqueueRequestForAnnotation{}))
-					Expect(c.WatchCalls[2].Handler).To(BeAssignableToTypeOf(&sdkhandler.EnqueueRequestForAnnotation{}))
-					Expect(c.WatchCalls[3].Handler).To(BeAssignableToTypeOf(&sdkhandler.EnqueueRequestForAnnotation{}))
+					Expect(validateSourceHandlerType(c.WatchCalls[0].Source, &sdkhandler.EnqueueRequestForAnnotation[*unstructured.Unstructured]{})).To(Succeed())
+					Expect(validateSourceHandlerType(c.WatchCalls[1].Source, &sdkhandler.EnqueueRequestForAnnotation[*unstructured.Unstructured]{})).To(Succeed())
+					Expect(validateSourceHandlerType(c.WatchCalls[2].Source, &sdkhandler.EnqueueRequestForAnnotation[*unstructured.Unstructured]{})).To(Succeed())
+					Expect(validateSourceHandlerType(c.WatchCalls[3].Source, &sdkhandler.EnqueueRequestForAnnotation[*unstructured.Unstructured]{})).To(Succeed())
 				})
 			})
 
@@ -198,7 +201,7 @@ var _ = Describe("Hook", func() {
 					drw = internalhook.NewDependentResourceWatcher(c, rm, cache, sch)
 					Expect(drw.Exec(owner, *rel, log)).To(Succeed())
 					Expect(c.WatchCalls).To(HaveLen(1))
-					Expect(c.WatchCalls[0].Handler).To(BeAssignableToTypeOf(handler.EnqueueRequestForOwner(sch, rm, owner, handler.OnlyControllerOwner())))
+					Expect(validateSourceHandlerType(c.WatchCalls[0].Source, handler.TypedEnqueueRequestForOwner[*unstructured.Unstructured](sch, rm, owner, handler.OnlyControllerOwner()))).To(Succeed())
 				})
 				It("should watch cluster-scoped resources with annotation handler", func() {
 					rel = &release.Release{
@@ -207,7 +210,7 @@ var _ = Describe("Hook", func() {
 					drw = internalhook.NewDependentResourceWatcher(c, rm, cache, sch)
 					Expect(drw.Exec(owner, *rel, log)).To(Succeed())
 					Expect(c.WatchCalls).To(HaveLen(1))
-					Expect(c.WatchCalls[0].Handler).To(BeAssignableToTypeOf(&sdkhandler.EnqueueRequestForAnnotation{}))
+					Expect(validateSourceHandlerType(c.WatchCalls[0].Source, &sdkhandler.EnqueueRequestForAnnotation[*unstructured.Unstructured]{})).To(Succeed())
 				})
 				It("should watch namespace-scoped resources in a different namespace with annotation handler", func() {
 					rel = &release.Release{
@@ -216,7 +219,7 @@ var _ = Describe("Hook", func() {
 					drw = internalhook.NewDependentResourceWatcher(c, rm, cache, sch)
 					Expect(drw.Exec(owner, *rel, log)).To(Succeed())
 					Expect(c.WatchCalls).To(HaveLen(1))
-					Expect(c.WatchCalls[0].Handler).To(BeAssignableToTypeOf(&sdkhandler.EnqueueRequestForAnnotation{}))
+					Expect(validateSourceHandlerType(c.WatchCalls[0].Source, &sdkhandler.EnqueueRequestForAnnotation[*unstructured.Unstructured]{})).To(Succeed())
 				})
 				It("should watch resource policy keep resources with annotation handler", func() {
 					rel = &release.Release{
@@ -225,9 +228,9 @@ var _ = Describe("Hook", func() {
 					drw = internalhook.NewDependentResourceWatcher(c, rm, cache, sch)
 					Expect(drw.Exec(owner, *rel, log)).To(Succeed())
 					Expect(c.WatchCalls).To(HaveLen(3))
-					Expect(c.WatchCalls[0].Handler).To(BeAssignableToTypeOf(&sdkhandler.EnqueueRequestForAnnotation{}))
-					Expect(c.WatchCalls[1].Handler).To(BeAssignableToTypeOf(&sdkhandler.EnqueueRequestForAnnotation{}))
-					Expect(c.WatchCalls[2].Handler).To(BeAssignableToTypeOf(&sdkhandler.EnqueueRequestForAnnotation{}))
+					Expect(validateSourceHandlerType(c.WatchCalls[0].Source, &sdkhandler.EnqueueRequestForAnnotation[*unstructured.Unstructured]{})).To(Succeed())
+					Expect(validateSourceHandlerType(c.WatchCalls[1].Source, &sdkhandler.EnqueueRequestForAnnotation[*unstructured.Unstructured]{})).To(Succeed())
+					Expect(validateSourceHandlerType(c.WatchCalls[2].Source, &sdkhandler.EnqueueRequestForAnnotation[*unstructured.Unstructured]{})).To(Succeed())
 				})
 				It("should iterate the kind list and be able to set watches on each item", func() {
 					rel = &release.Release{
@@ -236,8 +239,8 @@ var _ = Describe("Hook", func() {
 					drw = internalhook.NewDependentResourceWatcher(c, rm, cache, sch)
 					Expect(drw.Exec(owner, *rel, log)).To(Succeed())
 					Expect(c.WatchCalls).To(HaveLen(2))
-					Expect(c.WatchCalls[0].Handler).To(BeAssignableToTypeOf(handler.EnqueueRequestForOwner(sch, rm, owner, handler.OnlyControllerOwner())))
-					Expect(c.WatchCalls[1].Handler).To(BeAssignableToTypeOf(handler.EnqueueRequestForOwner(sch, rm, owner, handler.OnlyControllerOwner())))
+					Expect(validateSourceHandlerType(c.WatchCalls[0].Source, handler.TypedEnqueueRequestForOwner[*unstructured.Unstructured](sch, rm, owner, handler.OnlyControllerOwner()))).To(Succeed())
+					Expect(validateSourceHandlerType(c.WatchCalls[1].Source, handler.TypedEnqueueRequestForOwner[*unstructured.Unstructured](sch, rm, owner, handler.OnlyControllerOwner()))).To(Succeed())
 				})
 				It("should error when unable to list objects", func() {
 					rel = &release.Release{
@@ -251,6 +254,57 @@ var _ = Describe("Hook", func() {
 		})
 	})
 })
+
+var _ = Describe("validateSourceHandlerType", func() {
+	It("should return an error when source.Source is nil", func() {
+		Expect(validateSourceHandlerType(nil, &sdkhandler.EnqueueRequestForAnnotation[*unstructured.Unstructured]{})).To(HaveOccurred())
+	})
+	It("should return an error when source.Kind.Handler is nil", func() {
+		Expect(validateSourceHandlerType(source.Kind(nil, &unstructured.Unstructured{}, nil, nil), &sdkhandler.EnqueueRequestForAnnotation[*unstructured.Unstructured]{})).To(HaveOccurred())
+	})
+	It("should return an error when expected is nil", func() {
+		Expect(validateSourceHandlerType(source.Kind(nil, &unstructured.Unstructured{}, &sdkhandler.EnqueueRequestForAnnotation[*unstructured.Unstructured]{}, nil), nil)).To(HaveOccurred())
+	})
+	It("should return an error when source.Kind.Handler does not match expected type", func() {
+		Expect(validateSourceHandlerType(source.Kind(nil, &unstructured.Unstructured{}, &sdkhandler.EnqueueRequestForAnnotation[*unstructured.Unstructured]{}, nil), "string")).To(HaveOccurred())
+	})
+	It("should not return an error when source.Kind.Handler matches expectedType", func() {
+		Expect(validateSourceHandlerType(source.Kind(nil, &unstructured.Unstructured{}, &sdkhandler.EnqueueRequestForAnnotation[*unstructured.Unstructured]{}, nil), &sdkhandler.EnqueueRequestForAnnotation[*unstructured.Unstructured]{})).To(Succeed())
+	})
+})
+
+// validateSourceHandlerType takes in a source.Source and uses reflection to determine
+// if the handler used by the source matches the expected type.
+// It is assumed that the source.Source was created via the source.Kind() function.
+func validateSourceHandlerType(s source.Source, expected interface{}) error {
+	if s == nil {
+		return errors.New("nil source.Source provided")
+	}
+	sourceVal := reflect.Indirect(reflect.ValueOf(s))
+	if !sourceVal.IsValid() {
+		return errors.New("provided source.Source value is invalid")
+	}
+	handlerFieldVal := sourceVal.FieldByName("Handler")
+	if !handlerFieldVal.IsValid() {
+		return errors.New("provided source.Source's Handler field is invalid")
+	}
+	handlerField := reflect.Indirect(handlerFieldVal.Elem())
+	if !handlerField.IsValid() {
+		return errors.New("provided source.Source's Handler field value is invalid")
+	}
+	handlerType := handlerField.Type()
+
+	expectedValue := reflect.Indirect(reflect.ValueOf(expected))
+	if !expectedValue.IsValid() {
+		return errors.New("provided expected value is invalid")
+	}
+
+	expectedType := expectedValue.Type()
+	if handlerType != expectedType {
+		return fmt.Errorf("detected source.Source handler type %q does not match expected type %q", handlerType, expectedType)
+	}
+	return nil
+}
 
 var (
 	rsOwnerNamespace = `
