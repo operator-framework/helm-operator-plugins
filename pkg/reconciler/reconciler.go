@@ -282,7 +282,7 @@ func SkipDependentWatches(skip bool) Option {
 // Example for using a custom type for the GVK scheme instead of unstructured.Unstructured:
 //
 //	// Define custom type for GVK scheme.
-//	//+kubebuilder:object:root=true
+//	// +kubebuilder:object:root=true
 //	type Custom struct {
 //	  // [...]
 //	}

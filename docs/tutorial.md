@@ -119,7 +119,7 @@ type MemcachedBackupSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	//+kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Minimum=0
 	// Size is the size of the memcached deployment
 	Size int32 `json:"size"`
 }
