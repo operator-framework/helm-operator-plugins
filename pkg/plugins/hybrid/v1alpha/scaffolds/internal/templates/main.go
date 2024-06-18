@@ -227,7 +227,6 @@ func init() {
 }
 
 func main() {
-{{- if not .ComponentConfig }}
 	var (
 		metricsAddr          string
 		leaderElectionID     string
@@ -249,13 +248,6 @@ func main() {
 		"Whether or not the metrics endpoint should be served securely")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false, 
 		"Whether or not HTTP/2 should be enabled for the metrics and webhook servers")
-{{- else }}
-  var configFile string
-	flag.StringVar(&configFile, "config", "", 
-		"The controller will load its initial configuration from this file. " +
-		"Omit this flag to use the default configuration values. " +
-		"Command-line flags override configuration from this file.")
-{{- end }}
 	opts := zap.Options{
 		Development: true,
 	}
@@ -264,7 +256,6 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-{{ if not .ComponentConfig }}
 	disableHTTP2 := func(c *tls.Config) {
 		setupLog.Info("disabling http/2")
 		c.NextProtos = []string{"http/1.1"}
@@ -291,19 +282,6 @@ func main() {
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       leaderElectionID,
 	})
-{{- else }}
-	var err error
-	options := ctrl.Options{Scheme: scheme}
-	if configFile != "" {
-		options, err = options.AndFrom(ctrl.ConfigFile().AtPath(configFile))
-		if err != nil {
-			setupLog.Error(err, "unable to load the config file")
-			os.Exit(1)
-		}
-	}
-
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
-{{- end }}
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
