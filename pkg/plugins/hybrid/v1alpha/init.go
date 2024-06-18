@@ -126,16 +126,10 @@ func addInitCustomizations(projectName string) error {
 	// todo: we ought to use afero instead. Replace this methods to insert/update
 	// by https://github.com/kubernetes-sigs/kubebuilder/pull/2119
 
-	// Add leader election arg in config/manager/manager.yaml and in config/default/manager_auth_proxy_patch.yaml
+	// Add leader election arg in config/manager/manager.yaml
 	err := util.InsertCode(managerFile,
 		"--leader-elect",
-		fmt.Sprintf("\n        - --leader-election-id=%s", projectName))
-	if err != nil {
-		return err
-	}
-	err = util.InsertCode(filepath.Join("config", "default", "manager_auth_proxy_patch.yaml"),
-		"- \"--leader-elect\"",
-		fmt.Sprintf("\n        - \"--leader-election-id=%s\"", projectName))
+		fmt.Sprintf("\n          - --leader-election-id=%s", projectName))
 	if err != nil {
 		return err
 	}
