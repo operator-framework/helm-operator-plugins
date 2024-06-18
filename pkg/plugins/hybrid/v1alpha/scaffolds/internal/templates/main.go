@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"sigs.k8s.io/kubebuilder/v3/pkg/machinery"
+	"sigs.k8s.io/kubebuilder/v4/pkg/machinery"
 )
 
 const defaultMainPath = "cmd/main.go"
@@ -32,7 +32,6 @@ type Main struct {
 	machinery.BoilerplateMixin
 	machinery.DomainMixin
 	machinery.RepositoryMixin
-	machinery.ComponentConfigMixin
 }
 
 // SetTemplateDefaults implements file.Template
