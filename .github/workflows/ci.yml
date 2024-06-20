@@ -32,8 +32,8 @@ jobs:
 
     - uses: codecov/codecov-action@v4
       with:
+        disable_search: true
         files: cover.out
-        functionalities: fixes
 
   lint:
     name: Lint
