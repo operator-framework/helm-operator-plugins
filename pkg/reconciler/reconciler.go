@@ -758,6 +758,7 @@ func (r *Reconciler) getReleaseState(client helmclient.ActionInterface, obj meta
 	}
 	opts = append(opts, func(u *action.Upgrade) error {
 		u.DryRun = true
+		u.DryRunOption = "server"
 		return nil
 	})
 	specRelease, err := client.Upgrade(obj.GetName(), obj.GetNamespace(), r.chrt, vals, opts...)

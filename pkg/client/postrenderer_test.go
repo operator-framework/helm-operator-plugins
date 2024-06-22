@@ -206,6 +206,7 @@ func getTestManifest() string {
 	testChart := testutil.MustLoadChart("../../pkg/internal/testdata/test-chart-1.2.0.tgz")
 	i := action.NewInstall(&action.Configuration{})
 	i.DryRun = true
+	i.DryRunOption = "client"
 	i.Replace = true
 	i.ReleaseName = "release-name"
 	i.ClientOnly = true
