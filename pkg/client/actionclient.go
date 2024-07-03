@@ -115,8 +115,18 @@ func AppendPostRenderers(postRendererFns ...PostRendererProvider) ActionClientGe
 	}
 }
 
+func WithFailureRollbacks(enableFailureRollbacks bool) ActionClientGetterOption {
+	return func(getter *actionClientGetter) error {
+		getter.enableFailureRollbacks = enableFailureRollbacks
+		return nil
+	}
+}
+
 func NewActionClientGetter(acg ActionConfigGetter, opts ...ActionClientGetterOption) (ActionClientGetter, error) {
-	actionClientGetter := &actionClientGetter{acg: acg}
+	actionClientGetter := &actionClientGetter{
+		acg:                    acg,
+		enableFailureRollbacks: true,
+	}
 	for _, opt := range opts {
 		if err := opt(actionClientGetter); err != nil {
 			return nil, err
@@ -133,6 +143,7 @@ type actionClientGetter struct {
 	defaultUpgradeOpts   []UpgradeOption
 	defaultUninstallOpts []UninstallOption
 
+	enableFailureRollbacks      bool
 	installFailureUninstallOpts []UninstallOption
 	upgradeFailureRollbackOpts  []RollbackOption
 
@@ -167,6 +178,7 @@ func (hcg *actionClientGetter) ActionClientFor(ctx context.Context, obj client.O
 		defaultUpgradeOpts:   append([]UpgradeOption{WithUpgradePostRenderer(cpr)}, hcg.defaultUpgradeOpts...),
 		defaultUninstallOpts: hcg.defaultUninstallOpts,
 
+		enableFailureRollbacks:      hcg.enableFailureRollbacks,
 		installFailureUninstallOpts: hcg.installFailureUninstallOpts,
 		upgradeFailureRollbackOpts:  hcg.upgradeFailureRollbackOpts,
 	}, nil
@@ -180,6 +192,7 @@ type actionClient struct {
 	defaultUpgradeOpts   []UpgradeOption
 	defaultUninstallOpts []UninstallOption
 
+	enableFailureRollbacks      bool
 	installFailureUninstallOpts []UninstallOption
 	upgradeFailureRollbackOpts  []RollbackOption
 }
@@ -209,7 +222,7 @@ func (c *actionClient) Install(name, namespace string, chrt *chart.Chart, vals m
 	rel, err := install.Run(chrt, vals)
 	if err != nil {
 		c.conf.Log("Install failed")
-		if rel != nil {
+		if c.enableFailureRollbacks && rel != nil {
 			// Uninstall the failed release installation so that we can retry
 			// the installation again during the next reconciliation. In many
 			// cases, the issue is unresolvable without a change to the CR, but
@@ -228,7 +241,7 @@ func (c *actionClient) Install(name, namespace string, chrt *chart.Chart, vals m
 				return nil, fmt.Errorf("uninstall failed: %v: original install error: %w", uninstallErr, err)
 			}
 		}
-		return nil, err
+		return rel, err
 	}
 	return rel, nil
 }
@@ -243,7 +256,7 @@ func (c *actionClient) Upgrade(name, namespace string, chrt *chart.Chart, vals m
 	upgrade.Namespace = namespace
 	rel, err := upgrade.Run(name, chrt, vals)
 	if err != nil {
-		if rel != nil {
+		if c.enableFailureRollbacks && rel != nil {
 			rollbackOpts := append([]RollbackOption{func(rollback *action.Rollback) error {
 				rollback.Force = true
 				rollback.MaxHistory = upgrade.MaxHistory
@@ -260,7 +273,7 @@ func (c *actionClient) Upgrade(name, namespace string, chrt *chart.Chart, vals m
 				return nil, fmt.Errorf("rollback failed: %v: original upgrade error: %w", rollbackErr, err)
 			}
 		}
-		return nil, err
+		return rel, err
 	}
 	return rel, nil
 }
