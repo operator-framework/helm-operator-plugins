@@ -322,17 +322,19 @@ var _ = Describe("ActionClient", func() {
 
 	var _ = Describe("ActionClient methods", func() {
 		var (
-			obj  client.Object
-			cl   client.Client
-			ac   ActionInterface
-			vals = chartutil.Values{"service": map[string]interface{}{"type": "NodePort"}}
+			obj             client.Object
+			cl              client.Client
+			actionCfgGetter ActionConfigGetter
+			ac              ActionInterface
+			vals            = chartutil.Values{"service": map[string]interface{}{"type": "NodePort"}}
 		)
 		BeforeEach(func() {
 			obj = testutil.BuildTestCR(gvk)
 
-			actionConfigGetter, err := NewActionConfigGetter(cfg, rm)
+			var err error
+			actionCfgGetter, err = NewActionConfigGetter(cfg, rm)
 			Expect(err).ShouldNot(HaveOccurred())
-			acg, err := NewActionClientGetter(actionConfigGetter)
+			acg, err := NewActionClientGetter(actionCfgGetter)
 			Expect(err).ToNot(HaveOccurred())
 			ac, err = acg.ActionClientFor(context.Background(), obj)
 			Expect(err).ToNot(HaveOccurred())
@@ -373,13 +375,31 @@ var _ = Describe("ActionClient", func() {
 				})
 				It("should uninstall a failed install", func() {
 					By("failing to install the release", func() {
-						chrt := testutil.MustLoadChart("../../pkg/internal/testdata/test-chart-1.2.0.tgz")
-						chrt.Templates[2].Data = append(chrt.Templates[2].Data, []byte("\ngibberish")...)
+						vals := chartutil.Values{"service": map[string]interface{}{"type": "FooBar"}}
 						r, err := ac.Install(obj.GetName(), obj.GetNamespace(), &chrt, vals)
 						Expect(err).To(HaveOccurred())
-						Expect(r).To(BeNil())
+						Expect(r).NotTo(BeNil())
 					})
 					verifyNoRelease(cl, obj.GetNamespace(), obj.GetName(), nil)
+				})
+				When("failure uninstall is disabled", func() {
+					BeforeEach(func() {
+						acg, err := NewActionClientGetter(actionCfgGetter, WithFailureRollbacks(false))
+						Expect(err).ToNot(HaveOccurred())
+						ac, err = acg.ActionClientFor(context.Background(), obj)
+						Expect(err).ToNot(HaveOccurred())
+					})
+					It("should not uninstall a failed install", func() {
+						vals := chartutil.Values{"service": map[string]interface{}{"type": "FooBar"}}
+						returnedRelease, err := ac.Install(obj.GetName(), obj.GetNamespace(), &chrt, vals)
+						Expect(err).To(HaveOccurred())
+						Expect(returnedRelease).ToNot(BeNil())
+						Expect(returnedRelease.Info.Status).To(Equal(release.StatusFailed))
+						latestRelease, err := ac.Get(obj.GetName())
+						Expect(err).ToNot(HaveOccurred())
+						Expect(latestRelease).ToNot(BeNil())
+						Expect(latestRelease.Version).To(Equal(returnedRelease.Version))
+					})
 				})
 				When("using an option function that returns an error", func() {
 					It("should fail", func() {
@@ -484,16 +504,35 @@ var _ = Describe("ActionClient", func() {
 					verifyRelease(cl, obj, rel)
 				})
 				It("should rollback a failed upgrade", func() {
-					By("failing to install the release", func() {
+					By("failing to upgrade the release", func() {
 						vals := chartutil.Values{"service": map[string]interface{}{"type": "FooBar"}}
 						r, err := ac.Upgrade(obj.GetName(), obj.GetNamespace(), &chrt, vals)
 						Expect(err).To(HaveOccurred())
-						Expect(r).To(BeNil())
+						Expect(r).ToNot(BeNil())
 					})
 					tmp := *installedRelease
 					rollbackRelease := &tmp
 					rollbackRelease.Version = installedRelease.Version + 2
 					verifyRelease(cl, obj, rollbackRelease)
+				})
+				When("failure rollback is disabled", func() {
+					BeforeEach(func() {
+						acg, err := NewActionClientGetter(actionCfgGetter, WithFailureRollbacks(false))
+						Expect(err).ToNot(HaveOccurred())
+						ac, err = acg.ActionClientFor(context.Background(), obj)
+						Expect(err).ToNot(HaveOccurred())
+					})
+					It("should not rollback a failed upgrade", func() {
+						vals := chartutil.Values{"service": map[string]interface{}{"type": "FooBar"}}
+						returnedRelease, err := ac.Upgrade(obj.GetName(), obj.GetNamespace(), &chrt, vals)
+						Expect(err).To(HaveOccurred())
+						Expect(returnedRelease).ToNot(BeNil())
+						Expect(returnedRelease.Info.Status).To(Equal(release.StatusFailed))
+						latestRelease, err := ac.Get(obj.GetName())
+						Expect(err).ToNot(HaveOccurred())
+						Expect(latestRelease).ToNot(BeNil())
+						Expect(latestRelease.Version).To(Equal(returnedRelease.Version))
+					})
 				})
 				When("using an option function that returns an error", func() {
 					It("should fail", func() {
