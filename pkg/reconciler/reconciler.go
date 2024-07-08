@@ -78,7 +78,7 @@ type Reconciler struct {
 	skipDependentWatches             bool
 	maxConcurrentReconciles          int
 	reconcilePeriod                  time.Duration
-	maxHistory                       int
+	maxReleaseHistory                *int
 	skipPrimaryGVKSchemeRegistration bool
 	controllerSetupFuncs             []ControllerSetupFunc
 
@@ -347,13 +347,15 @@ func WithReconcilePeriod(rp time.Duration) Option {
 }
 
 // WithMaxReleaseHistory specifies the maximum size of the Helm release history maintained
-// on upgrades/rollbacks. Zero (default) means unlimited.
+// on upgrades/rollbacks. Zero means unlimited.
+//
+// Defaults is 10
 func WithMaxReleaseHistory(maxHistory int) Option {
 	return func(r *Reconciler) error {
 		if maxHistory < 0 {
 			return errors.New("maximum Helm release history size must not be negative")
 		}
-		r.maxHistory = maxHistory
+		r.maxReleaseHistory = &maxHistory
 		return nil
 	}
 }
@@ -745,9 +747,9 @@ func (r *Reconciler) getReleaseState(client helmclient.ActionInterface, obj meta
 	}
 
 	var opts []helmclient.UpgradeOption
-	if r.maxHistory > 0 {
+	if *r.maxReleaseHistory > 0 {
 		opts = append(opts, func(u *action.Upgrade) error {
-			u.MaxHistory = r.maxHistory
+			u.MaxHistory = *r.maxReleaseHistory
 			return nil
 		})
 	}
@@ -802,9 +804,9 @@ func (r *Reconciler) doInstall(actionClient helmclient.ActionInterface, u *updat
 
 func (r *Reconciler) doUpgrade(actionClient helmclient.ActionInterface, u *updater.Updater, obj *unstructured.Unstructured, vals map[string]interface{}, log logr.Logger) (*release.Release, error) {
 	var opts []helmclient.UpgradeOption
-	if r.maxHistory > 0 {
+	if *r.maxReleaseHistory > 0 {
 		opts = append(opts, func(u *action.Upgrade) error {
-			u.MaxHistory = r.maxHistory
+			u.MaxHistory = *r.maxReleaseHistory
 			return nil
 		})
 	}
@@ -936,6 +938,11 @@ func (r *Reconciler) addDefaults(mgr ctrl.Manager, controllerName string) error 
 	if r.valueMapper == nil {
 		r.valueMapper = internalvalues.DefaultMapper
 	}
+
+	if r.maxReleaseHistory == nil {
+		r.maxReleaseHistory = &internalvalues.DefaultMaxReleaseHistory
+	}
+
 	return nil
 }
 

@@ -27,6 +27,7 @@ import (
 	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	. "github.com/onsi/gomega/gstruct"
 	sdkhandler "github.com/operator-framework/operator-lib/handler"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
@@ -216,11 +217,11 @@ var _ = Describe("Reconciler", func() {
 		_ = Describe("WithMaxReleaseHistory", func() {
 			It("should set the max history size", func() {
 				Expect(WithMaxReleaseHistory(10)(r)).To(Succeed())
-				Expect(r.maxHistory).To(Equal(10))
+				Expect(r.maxReleaseHistory).To(PointTo(Equal(10)))
 			})
 			It("should allow setting the history to unlimited", func() {
 				Expect(WithMaxReleaseHistory(0)(r)).To(Succeed())
-				Expect(r.maxHistory).To(Equal(0))
+				Expect(r.maxReleaseHistory).To(PointTo(Equal(0)))
 			})
 			It("should fail if value is less than 0", func() {
 				Expect(WithMaxReleaseHistory(-1)(r)).NotTo(Succeed())
