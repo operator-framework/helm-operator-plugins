@@ -30,28 +30,28 @@ var log = logf.Log.WithName("predicate")
 type GenerationChangedPredicate = crtpredicate.GenerationChangedPredicate
 
 // DependentPredicateFuncs returns functions defined for filtering events
-func DependentPredicateFuncs() crtpredicate.Funcs {
-	dependentPredicate := crtpredicate.Funcs{
+func DependentPredicateFuncs() crtpredicate.TypedFuncs[*unstructured.Unstructured] {
+	dependentPredicate := crtpredicate.TypedFuncs[*unstructured.Unstructured]{
 		// We don't need to reconcile dependent resource creation events
 		// because dependent resources are only ever created during
 		// reconciliation. Another reconcile would be redundant.
-		CreateFunc: func(e event.CreateEvent) bool {
-			o := e.Object.(*unstructured.Unstructured)
+		CreateFunc: func(e event.TypedCreateEvent[*unstructured.Unstructured]) bool {
+			o := e.Object
 			log.V(1).Info("Skipping reconciliation for dependent resource creation", "name", o.GetName(), "namespace", o.GetNamespace(), "apiVersion", o.GroupVersionKind().GroupVersion(), "kind", o.GroupVersionKind().Kind)
 			return false
 		},
 
 		// Reconcile when a dependent resource is deleted so that it can be
 		// recreated.
-		DeleteFunc: func(e event.DeleteEvent) bool {
-			o := e.Object.(*unstructured.Unstructured)
+		DeleteFunc: func(e event.TypedDeleteEvent[*unstructured.Unstructured]) bool {
+			o := e.Object
 			log.V(1).Info("Reconciling due to dependent resource deletion", "name", o.GetName(), "namespace", o.GetNamespace(), "apiVersion", o.GroupVersionKind().GroupVersion(), "kind", o.GroupVersionKind().Kind)
 			return true
 		},
 
 		// Don't reconcile when a generic event is received for a dependent
-		GenericFunc: func(e event.GenericEvent) bool {
-			o := e.Object.(*unstructured.Unstructured)
+		GenericFunc: func(e event.TypedGenericEvent[*unstructured.Unstructured]) bool {
+			o := e.Object
 			log.V(1).Info("Skipping reconcile due to generic event", "name", o.GetName(), "namespace", o.GetNamespace(), "apiVersion", o.GroupVersionKind().GroupVersion(), "kind", o.GroupVersionKind().Kind)
 			return false
 		},
@@ -60,9 +60,9 @@ func DependentPredicateFuncs() crtpredicate.Funcs {
 		// be patched back to the resource managed by the CR, if
 		// necessary. Ignore updates that only change the status and
 		// resourceVersion.
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			old := e.ObjectOld.(*unstructured.Unstructured).DeepCopy()
-			updated := e.ObjectNew.(*unstructured.Unstructured).DeepCopy()
+		UpdateFunc: func(e event.TypedUpdateEvent[*unstructured.Unstructured]) bool {
+			old := e.ObjectOld.DeepCopy()
+			updated := e.ObjectNew.DeepCopy()
 
 			delete(old.Object, "status")
 			delete(updated.Object, "status")

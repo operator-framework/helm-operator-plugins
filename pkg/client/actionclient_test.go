@@ -24,7 +24,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"helm.sh/helm/v3/pkg/action"
@@ -45,8 +44,10 @@ import (
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/rest"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/yaml"
@@ -71,7 +72,7 @@ var _ = Describe("ActionClient", func() {
 	})
 	var _ = Describe("NewActionClientGetter", func() {
 		It("should return a valid ActionConfigGetter", func() {
-			actionConfigGetter, err := NewActionConfigGetter(cfg, rm, logr.Discard())
+			actionConfigGetter, err := NewActionConfigGetter(cfg, rm)
 			Expect(err).ShouldNot(HaveOccurred())
 			acg, err := NewActionClientGetter(actionConfigGetter)
 			Expect(err).ToNot(HaveOccurred())
@@ -88,9 +89,12 @@ var _ = Describe("ActionClient", func() {
 			)
 			BeforeEach(func() {
 				var err error
-				actionConfigGetter, err = NewActionConfigGetter(cfg, rm, logr.Discard())
+				actionConfigGetter, err = NewActionConfigGetter(cfg, rm)
 				Expect(err).ShouldNot(HaveOccurred())
-				cli = kube.New(newRESTClientGetter(cfg, rm, ""))
+				dc, err := discovery.NewDiscoveryClientForConfig(cfg)
+				Expect(err).ShouldNot(HaveOccurred())
+				cdc := memory.NewMemCacheClient(dc)
+				cli = kube.New(newRESTClientGetter(cfg, rm, cdc, ""))
 				Expect(err).ShouldNot(HaveOccurred())
 				obj = testutil.BuildTestCR(gvk)
 			})
@@ -110,7 +114,7 @@ var _ = Describe("ActionClient", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(acg).NotTo(BeNil())
 
-				ac, err := acg.ActionClientFor(obj)
+				ac, err := acg.ActionClientFor(context.Background(), obj)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(ac).NotTo(BeNil())
 
@@ -131,7 +135,7 @@ var _ = Describe("ActionClient", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(acg).NotTo(BeNil())
 
-				ac, err := acg.ActionClientFor(obj)
+				ac, err := acg.ActionClientFor(context.Background(), obj)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(ac).NotTo(BeNil())
 
@@ -152,7 +156,7 @@ var _ = Describe("ActionClient", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(acg).NotTo(BeNil())
 
-				ac, err := acg.ActionClientFor(obj)
+				ac, err := acg.ActionClientFor(context.Background(), obj)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(ac).NotTo(BeNil())
 
@@ -173,7 +177,7 @@ var _ = Describe("ActionClient", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(acg).NotTo(BeNil())
 
-				ac, err := acg.ActionClientFor(obj)
+				ac, err := acg.ActionClientFor(context.Background(), obj)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(ac).NotTo(BeNil())
 
@@ -194,7 +198,7 @@ var _ = Describe("ActionClient", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(acg).NotTo(BeNil())
 
-				ac, err := acg.ActionClientFor(obj)
+				ac, err := acg.ActionClientFor(context.Background(), obj)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(ac).NotTo(BeNil())
 
@@ -226,7 +230,7 @@ var _ = Describe("ActionClient", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(acg).NotTo(BeNil())
 
-				ac, err := acg.ActionClientFor(obj)
+				ac, err := acg.ActionClientFor(context.Background(), obj)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(ac).NotTo(BeNil())
 
@@ -254,7 +258,7 @@ var _ = Describe("ActionClient", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(acg).NotTo(BeNil())
 
-				ac, err := acg.ActionClientFor(obj)
+				ac, err := acg.ActionClientFor(context.Background(), obj)
 				Expect(err).ToNot(HaveOccurred())
 
 				_, err = ac.Install(obj.GetName(), obj.GetNamespace(), &chrt, chartutil.Values{})
@@ -291,11 +295,11 @@ var _ = Describe("ActionClient", func() {
 			expectedObj := &unstructured.Unstructured{}
 			expectedObj.SetGroupVersionKind(gvk)
 			var actualObj client.Object
-			f := ActionClientGetterFunc(func(obj client.Object) (ActionInterface, error) {
+			f := ActionClientGetterFunc(func(_ context.Context, obj client.Object) (ActionInterface, error) {
 				actualObj = obj
 				return nil, nil
 			})
-			_, _ = f.ActionClientFor(expectedObj)
+			_, _ = f.ActionClientFor(context.Background(), expectedObj)
 			Expect(actualObj.GetObjectKind().GroupVersionKind()).To(Equal(gvk))
 		})
 	})
@@ -306,11 +310,11 @@ var _ = Describe("ActionClient", func() {
 			obj = testutil.BuildTestCR(gvk)
 		})
 		It("should return a valid ActionClient", func() {
-			actionConfGetter, err := NewActionConfigGetter(cfg, rm, logr.Discard())
+			actionConfGetter, err := NewActionConfigGetter(cfg, rm)
 			Expect(err).ShouldNot(HaveOccurred())
 			acg, err := NewActionClientGetter(actionConfGetter)
 			Expect(err).ToNot(HaveOccurred())
-			ac, err := acg.ActionClientFor(obj)
+			ac, err := acg.ActionClientFor(context.Background(), obj)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ac).NotTo(BeNil())
 		})
@@ -326,11 +330,11 @@ var _ = Describe("ActionClient", func() {
 		BeforeEach(func() {
 			obj = testutil.BuildTestCR(gvk)
 
-			actionConfigGetter, err := NewActionConfigGetter(cfg, rm, logr.Discard())
+			actionConfigGetter, err := NewActionConfigGetter(cfg, rm)
 			Expect(err).ShouldNot(HaveOccurred())
 			acg, err := NewActionClientGetter(actionConfigGetter)
 			Expect(err).ToNot(HaveOccurred())
-			ac, err = acg.ActionClientFor(obj)
+			ac, err = acg.ActionClientFor(context.Background(), obj)
 			Expect(err).ToNot(HaveOccurred())
 
 			cl, err = client.New(cfg, client.Options{})
@@ -781,8 +785,8 @@ func verifyRelease(cl client.Client, owner client.Object, rel *release.Release) 
 					Kind:               owner.GetObjectKind().GroupVersionKind().Kind,
 					Name:               owner.GetName(),
 					UID:                owner.GetUID(),
-					Controller:         pointer.Bool(true),
-					BlockOwnerDeletion: pointer.Bool(true),
+					Controller:         ptr.To(true),
+					BlockOwnerDeletion: ptr.To(true),
 				}),
 			)
 		}

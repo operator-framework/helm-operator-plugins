@@ -28,6 +28,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gstruct"
+	sdkhandler "github.com/operator-framework/operator-lib/handler"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chartutil"
@@ -52,8 +53,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	"sigs.k8s.io/yaml"
-
-	sdkhandler "github.com/operator-framework/operator-lib/handler"
 
 	"github.com/operator-framework/helm-operator-plugins/internal/sdk/controllerutil"
 	"github.com/operator-framework/helm-operator-plugins/pkg/annotation"
@@ -104,7 +103,7 @@ type reconcilerTestSuiteOpts struct {
 }
 
 var _ = Describe("Reconciler", func() {
-	var _ = Describe("New", func() {
+	_ = Describe("New", func() {
 		It("should fail without a GVK", func() {
 			r, err := New(WithChart(chart.Chart{}))
 			Expect(r).To(BeNil())
@@ -127,54 +126,54 @@ var _ = Describe("Reconciler", func() {
 		})
 	})
 
-	var _ = Describe("Option", func() {
+	_ = Describe("Option", func() {
 		var r *Reconciler
 		BeforeEach(func() {
 			r = &Reconciler{}
 		})
-		var _ = Describe("WithClient", func() {
+		_ = Describe("WithClient", func() {
 			It("should set the reconciler client", func() {
 				client := fake.NewClientBuilder().Build()
 				Expect(WithClient(client)(r)).To(Succeed())
 				Expect(r.client).To(Equal(client))
 			})
 		})
-		var _ = Describe("WithActionClientGetter", func() {
+		_ = Describe("WithActionClientGetter", func() {
 			It("should set the reconciler action client getter", func() {
 				fakeActionClientGetter := helmfake.NewActionClientGetter(nil, nil)
 				Expect(WithActionClientGetter(fakeActionClientGetter)(r)).To(Succeed())
 				Expect(r.actionClientGetter).To(Equal(fakeActionClientGetter))
 			})
 		})
-		var _ = Describe("WithEventRecorder", func() {
+		_ = Describe("WithEventRecorder", func() {
 			It("should set the reconciler event recorder", func() {
 				rec := record.NewFakeRecorder(0)
 				Expect(WithEventRecorder(rec)(r)).To(Succeed())
 				Expect(r.eventRecorder).To(Equal(rec))
 			})
 		})
-		var _ = Describe("WithLog", func() {
+		_ = Describe("WithLog", func() {
 			It("should set the reconciler log", func() {
 				log := logr.Discard()
 				Expect(WithLog(log)(r)).To(Succeed())
 				Expect(r.log).To(Equal(log))
 			})
 		})
-		var _ = Describe("WithGroupVersionKind", func() {
+		_ = Describe("WithGroupVersionKind", func() {
 			It("should set the reconciler GVK", func() {
 				gvk := schema.GroupVersionKind{Group: "mygroup", Version: "v1", Kind: "MyApp"}
 				Expect(WithGroupVersionKind(gvk)(r)).To(Succeed())
 				Expect(r.gvk).To(Equal(&gvk))
 			})
 		})
-		var _ = Describe("WithChart", func() {
+		_ = Describe("WithChart", func() {
 			It("should set the reconciler chart", func() {
 				chrt := chart.Chart{Metadata: &chart.Metadata{Name: "my-chart"}}
 				Expect(WithChart(chrt)(r)).To(Succeed())
 				Expect(r.chrt).To(Equal(&chrt))
 			})
 		})
-		var _ = Describe("WithOverrideValues", func() {
+		_ = Describe("WithOverrideValues", func() {
 			It("should succeed with valid overrides", func() {
 				overrides := map[string]string{"foo": "bar"}
 				Expect(WithOverrideValues(overrides)(r)).To(Succeed())
@@ -186,7 +185,7 @@ var _ = Describe("Reconciler", func() {
 				Expect(WithOverrideValues(overrides)(r)).NotTo(Succeed())
 			})
 		})
-		var _ = Describe("SkipDependentWatches", func() {
+		_ = Describe("SkipDependentWatches", func() {
 			It("should set to false", func() {
 				Expect(SkipDependentWatches(false)(r)).To(Succeed())
 				Expect(r.skipDependentWatches).To(BeFalse())
@@ -196,7 +195,7 @@ var _ = Describe("Reconciler", func() {
 				Expect(r.skipDependentWatches).To(BeTrue())
 			})
 		})
-		var _ = Describe("WithMaxConcurrentReconciles", func() {
+		_ = Describe("WithMaxConcurrentReconciles", func() {
 			It("should set the reconciler max concurrent reconciled", func() {
 				Expect(WithMaxConcurrentReconciles(1)(r)).To(Succeed())
 				Expect(r.maxConcurrentReconciles).To(Equal(1))
@@ -206,7 +205,7 @@ var _ = Describe("Reconciler", func() {
 				Expect(WithMaxConcurrentReconciles(-1)(r)).NotTo(Succeed())
 			})
 		})
-		var _ = Describe("WithReconcilePeriod", func() {
+		_ = Describe("WithReconcilePeriod", func() {
 			It("should set the reconciler reconcile period", func() {
 				Expect(WithReconcilePeriod(0)(r)).To(Succeed())
 				Expect(r.reconcilePeriod).To(Equal(time.Duration(0)))
@@ -215,7 +214,7 @@ var _ = Describe("Reconciler", func() {
 				Expect(WithReconcilePeriod(-time.Nanosecond)(r)).NotTo(Succeed())
 			})
 		})
-		var _ = Describe("WithMaxReleaseHistory", func() {
+		_ = Describe("WithMaxReleaseHistory", func() {
 			It("should set the max history size", func() {
 				Expect(WithMaxReleaseHistory(10)(r)).To(Succeed())
 				Expect(r.maxReleaseHistory).To(PointTo(Equal(10)))
@@ -228,7 +227,7 @@ var _ = Describe("Reconciler", func() {
 				Expect(WithMaxReleaseHistory(-1)(r)).NotTo(Succeed())
 			})
 		})
-		var _ = Describe("WithInstallAnnotations", func() {
+		_ = Describe("WithInstallAnnotations", func() {
 			It("should set multiple reconciler install annotations", func() {
 				a1 := annotation.InstallDisableHooks{CustomName: "my.domain/custom-name1"}
 				a2 := annotation.InstallDisableHooks{CustomName: "my.domain/custom-name2"}
@@ -278,7 +277,7 @@ var _ = Describe("Reconciler", func() {
 				}))
 			})
 		})
-		var _ = Describe("WithUpgradeAnnotations", func() {
+		_ = Describe("WithUpgradeAnnotations", func() {
 			It("should set multiple reconciler upgrade annotations", func() {
 				a1 := annotation.UpgradeDisableHooks{CustomName: "my.domain/custom-name1"}
 				a2 := annotation.UpgradeDisableHooks{CustomName: "my.domain/custom-name2"}
@@ -328,7 +327,7 @@ var _ = Describe("Reconciler", func() {
 				}))
 			})
 		})
-		var _ = Describe("WithUninstallAnnotations", func() {
+		_ = Describe("WithUninstallAnnotations", func() {
 			It("should set multiple reconciler uninstall annotations", func() {
 				a1 := annotation.UninstallDisableHooks{CustomName: "my.domain/custom-name1"}
 				a2 := annotation.UninstallDisableHooks{CustomName: "my.domain/custom-name2"}
@@ -378,7 +377,7 @@ var _ = Describe("Reconciler", func() {
 				}))
 			})
 		})
-		var _ = Describe("WithPreHook", func() {
+		_ = Describe("WithPreHook", func() {
 			It("should set a reconciler prehook", func() {
 				called := false
 				preHook := hook.PreHookFunc(func(*unstructured.Unstructured, chartutil.Values, logr.Logger) error {
@@ -391,7 +390,7 @@ var _ = Describe("Reconciler", func() {
 				Expect(called).To(BeTrue())
 			})
 		})
-		var _ = Describe("WithPostHook", func() {
+		_ = Describe("WithPostHook", func() {
 			It("should set a reconciler posthook", func() {
 				called := false
 				postHook := hook.PostHookFunc(func(*unstructured.Unstructured, release.Release, logr.Logger) error {
@@ -404,7 +403,7 @@ var _ = Describe("Reconciler", func() {
 				Expect(called).To(BeTrue())
 			})
 		})
-		var _ = Describe("WithValueMapper", func() {
+		_ = Describe("WithValueMapper", func() {
 			It("should set the reconciler value mapper", func() {
 				mapper := values.MapperFunc(func(chartutil.Values) chartutil.Values {
 					return chartutil.Values{"mapped": true}
@@ -414,7 +413,7 @@ var _ = Describe("Reconciler", func() {
 				Expect(r.valueMapper.Map(chartutil.Values{})).To(Equal(chartutil.Values{"mapped": true}))
 			})
 		})
-		var _ = Describe("WithValueTranslator", func() {
+		_ = Describe("WithValueTranslator", func() {
 			It("should set the reconciler value translator", func() {
 				translator := values.TranslatorFunc(func(ctx context.Context, u *unstructured.Unstructured) (chartutil.Values, error) {
 					return chartutil.Values{"translated": true}, nil
@@ -424,7 +423,7 @@ var _ = Describe("Reconciler", func() {
 				Expect(r.valueTranslator.Translate(context.Background(), &unstructured.Unstructured{})).To(Equal(chartutil.Values{"translated": true}))
 			})
 		})
-		var _ = Describe("WithSelector", func() {
+		_ = Describe("WithSelector", func() {
 			It("should set the reconciler selector", func() {
 				objUnlabeled := &unstructured.Unstructured{}
 
@@ -449,7 +448,7 @@ var _ = Describe("Reconciler", func() {
 		})
 	})
 
-	var _ = Describe("Reconcile", func() {
+	_ = Describe("Reconcile", func() {
 		var (
 			obj    *unstructured.Unstructured
 			objKey types.NamespacedName
@@ -472,7 +471,6 @@ var _ = Describe("Reconciler", func() {
 			obj = testutil.BuildTestCR(gvk)
 			objKey = types.NamespacedName{Namespace: obj.GetNamespace(), Name: obj.GetName()}
 			req = reconcile.Request{NamespacedName: objKey}
-
 		})
 
 		AfterEach(func() {
@@ -542,7 +540,7 @@ var _ = Describe("Reconciler", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(r.SetupWithManager(mgr)).To(Succeed())
 
-				ac, err = r.actionClientGetter.ActionClientFor(obj)
+				ac, err = r.actionClientGetter.ActionClientFor(ctx, obj)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -580,7 +578,7 @@ var _ = Describe("Reconciler", func() {
 							acgErr := errors.New("broken action client getter: error getting action client")
 
 							By("creating a reconciler with a broken action client getter", func() {
-								r.actionClientGetter = helmclient.ActionClientGetterFunc(func(client.Object) (helmclient.ActionInterface, error) {
+								r.actionClientGetter = helmclient.ActionClientGetterFunc(func(context.Context, client.Object) (helmclient.ActionInterface, error) {
 									return nil, acgErr
 								})
 							})
@@ -616,7 +614,7 @@ var _ = Describe("Reconciler", func() {
 						})
 						It("returns an error getting the release", func() {
 							By("creating a reconciler with a broken action client getter", func() {
-								r.actionClientGetter = helmclient.ActionClientGetterFunc(func(client.Object) (helmclient.ActionInterface, error) {
+								r.actionClientGetter = helmclient.ActionClientGetterFunc(func(context.Context, client.Object) (helmclient.ActionInterface, error) {
 									cl := helmfake.NewActionClient()
 									return &cl, nil
 								})
@@ -808,9 +806,7 @@ var _ = Describe("Reconciler", func() {
 					})
 				})
 				When("requested CR release is present", func() {
-					var (
-						currentRelease *release.Release
-					)
+					var currentRelease *release.Release
 					BeforeEach(func() {
 						// Reconcile once to get the release installed and finalizers added
 						var err error
@@ -826,7 +822,7 @@ var _ = Describe("Reconciler", func() {
 							acgErr := errors.New("broken action client getter: error getting action client")
 
 							By("creating a reconciler with a broken action client getter", func() {
-								r.actionClientGetter = helmclient.ActionClientGetterFunc(func(client.Object) (helmclient.ActionInterface, error) {
+								r.actionClientGetter = helmclient.ActionClientGetterFunc(func(context.Context, client.Object) (helmclient.ActionInterface, error) {
 									return nil, acgErr
 								})
 							})
@@ -862,7 +858,7 @@ var _ = Describe("Reconciler", func() {
 						})
 						It("returns an error getting the release", func() {
 							By("creating a reconciler with a broken action client getter", func() {
-								r.actionClientGetter = helmclient.ActionClientGetterFunc(func(client.Object) (helmclient.ActionInterface, error) {
+								r.actionClientGetter = helmclient.ActionClientGetterFunc(func(context.Context, client.Object) (helmclient.ActionInterface, error) {
 									cl := helmfake.NewActionClient()
 									return &cl, nil
 								})
@@ -979,9 +975,9 @@ var _ = Describe("Reconciler", func() {
 						var actionConf *action.Configuration
 						BeforeEach(func() {
 							By("getting the current release and config", func() {
-								acg, err := helmclient.NewActionConfigGetter(mgr.GetConfig(), mgr.GetRESTMapper(), logr.Discard())
+								acg, err := helmclient.NewActionConfigGetter(mgr.GetConfig(), mgr.GetRESTMapper())
 								Expect(err).ShouldNot(HaveOccurred())
-								actionConf, err = acg.ActionConfigFor(obj)
+								actionConf, err = acg.ActionConfigFor(ctx, obj)
 								Expect(err).ToNot(HaveOccurred())
 							})
 						})
@@ -1321,7 +1317,6 @@ var _ = Describe("Reconciler", func() {
 					})
 				})
 			})
-
 		}
 
 		When("generic GVK scheme setup", func() {
@@ -1331,10 +1326,9 @@ var _ = Describe("Reconciler", func() {
 		When("custom type GVK scheme setup ", func() {
 			parameterizedReconcilerTests(reconcilerTestSuiteOpts{customGVKSchemeSetup: true})
 		})
-
 	})
 
-	var _ = Describe("Test custom controller setup", func() {
+	_ = Describe("Test custom controller setup", func() {
 		var (
 			mgr                   manager.Manager
 			r                     *Reconciler
@@ -1346,7 +1340,13 @@ var _ = Describe("Reconciler", func() {
 			controllerSetupCalled = true
 			u := &unstructured.Unstructured{}
 			u.SetGroupVersionKind(additionalGVK)
-			return c.Watch(source.Kind(mgr.GetCache(), u), &sdkhandler.InstrumentedEnqueueRequestForObject{})
+			return c.Watch(
+				source.Kind(
+					mgr.GetCache(),
+					u,
+					&sdkhandler.InstrumentedEnqueueRequestForObject[*unstructured.Unstructured]{},
+				),
+			)
 		}
 
 		It("Registering builder setup function for reconciler works", func() {

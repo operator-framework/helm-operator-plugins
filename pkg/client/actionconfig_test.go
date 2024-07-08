@@ -21,7 +21,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"helm.sh/helm/v3/pkg/action"
@@ -29,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -50,12 +50,12 @@ var _ = Describe("ActionConfig", func() {
 			httpClient, err := rest.HTTPClientFor(cfg)
 			Expect(err).NotTo(HaveOccurred())
 
-			rm, err = apiutil.NewDiscoveryRESTMapper(cfg, httpClient)
+			rm, err = apiutil.NewDynamicRESTMapper(cfg, httpClient)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("should return a valid ActionConfigGetter", func() {
-			acg, err := NewActionConfigGetter(cfg, nil, logr.Discard())
+			acg, err := NewActionConfigGetter(cfg, nil)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(acg).NotTo(BeNil())
 		})
@@ -77,11 +77,9 @@ var _ = Describe("ActionConfig", func() {
 			It("should use a custom client namespace", func() {
 				clientNs := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("client-%s", rand.String(8))}}
 				clientNsMapper := func(_ client.Object) (string, error) { return clientNs.Name, nil }
-				acg, err := NewActionConfigGetter(cfg, rm, logr.Discard(),
-					ClientNamespaceMapper(clientNsMapper),
-				)
+				acg, err := NewActionConfigGetter(cfg, rm, ClientNamespaceMapper(clientNsMapper))
 				Expect(err).ToNot(HaveOccurred())
-				ac, err := acg.ActionConfigFor(obj)
+				ac, err := acg.ActionConfigFor(context.Background(), obj)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(ac.KubeClient.(*kube.Client).Namespace).To(Equal(clientNs.Name))
 				Expect(ac.RESTClientGetter.(*namespacedRCG).namespaceConfig.Namespace()).To(Equal(clientNs.Name))
@@ -101,12 +99,10 @@ metadata:
 			It("should use a custom storage namespace", func() {
 				storageNs := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("storage-%s", rand.String(8))}}
 				storageNsMapper := func(_ client.Object) (string, error) { return storageNs.Name, nil }
-				acg, err := NewActionConfigGetter(cfg, rm, logr.Discard(),
-					StorageNamespaceMapper(storageNsMapper),
-				)
+				acg, err := NewActionConfigGetter(cfg, rm, StorageNamespaceMapper(storageNsMapper))
 				Expect(err).ToNot(HaveOccurred())
 
-				ac, err := acg.ActionConfigFor(obj)
+				ac, err := acg.ActionConfigFor(context.Background(), obj)
 				Expect(err).ToNot(HaveOccurred())
 
 				By("Creating the storage namespace")
@@ -138,12 +134,10 @@ metadata:
 			})
 
 			It("should disable storage owner ref injection", func() {
-				acg, err := NewActionConfigGetter(cfg, rm, logr.Discard(),
-					DisableStorageOwnerRefInjection(true),
-				)
+				acg, err := NewActionConfigGetter(cfg, rm, DisableStorageOwnerRefInjection(true))
 				Expect(err).ToNot(HaveOccurred())
 
-				ac, err := acg.ActionConfigFor(obj)
+				ac, err := acg.ActionConfigFor(context.Background(), obj)
 				Expect(err).ToNot(HaveOccurred())
 
 				By("Installing a release")
@@ -167,6 +161,30 @@ metadata:
 				_, err = action.NewUninstall(ac).Run(i.ReleaseName)
 				Expect(err).ToNot(HaveOccurred())
 			})
+
+			It("should use a custom rest config mapping", func() {
+				restConfigMapper := func(ctx context.Context, obj client.Object, cfg *rest.Config) (*rest.Config, error) {
+					return &rest.Config{
+						BearerToken: obj.GetName(),
+					}, nil
+				}
+				acg, err := NewActionConfigGetter(cfg, rm, RestConfigMapper(restConfigMapper))
+				Expect(err).ToNot(HaveOccurred())
+
+				testObject := func(name string) client.Object {
+					u := unstructured.Unstructured{}
+					u.SetName(name)
+					return &u
+				}
+
+				ac1, err := acg.ActionConfigFor(context.Background(), testObject("test1"))
+				Expect(err).ToNot(HaveOccurred())
+				Expect(ac1.RESTClientGetter.ToRESTConfig()).To(WithTransform(func(c *rest.Config) string { return c.BearerToken }, Equal("test1")))
+
+				ac2, err := acg.ActionConfigFor(context.Background(), testObject("test2"))
+				Expect(err).ToNot(HaveOccurred())
+				Expect(ac2.RESTClientGetter.ToRESTConfig()).To(WithTransform(func(c *rest.Config) string { return c.BearerToken }, Equal("test2")))
+			})
 		})
 	})
 
@@ -179,12 +197,12 @@ metadata:
 			httpClient, err := rest.HTTPClientFor(cfg)
 			Expect(err).NotTo(HaveOccurred())
 
-			rm, err := apiutil.NewDiscoveryRESTMapper(cfg, httpClient)
+			rm, err := apiutil.NewDynamicRESTMapper(cfg, httpClient)
 			Expect(err).ToNot(HaveOccurred())
 
-			acg, err := NewActionConfigGetter(cfg, rm, logr.Discard())
+			acg, err := NewActionConfigGetter(cfg, rm)
 			Expect(err).ShouldNot(HaveOccurred())
-			ac, err := acg.ActionConfigFor(obj)
+			ac, err := acg.ActionConfigFor(context.Background(), obj)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ac).NotTo(BeNil())
 		})

@@ -30,10 +30,10 @@ jobs:
     - name: Test Sanity
       run: make test-sanity
 
-    - uses: codecov/codecov-action@v3
+    - uses: codecov/codecov-action@v4
       with:
+        disable_search: true
         files: cover.out
-        functionalities: fixes
 
   lint:
     name: Lint
@@ -48,9 +48,9 @@ jobs:
         go-version-file: "go.mod"
 
     - name: Lint
-      uses: golangci/golangci-lint-action@v3
+      uses: golangci/golangci-lint-action@v6
       with:
-        version: v1.51.2
+        version: v1.54.1
 
   go-apidiff:
     name: go-apidiff

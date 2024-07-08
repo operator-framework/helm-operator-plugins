@@ -21,8 +21,6 @@ import (
 
 	"github.com/go-logr/logr"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
@@ -34,22 +32,22 @@ type Controller struct {
 }
 
 type watchCall struct {
-	Source     source.Source
-	Handler    handler.EventHandler
-	Predicates []predicate.Predicate
+	Source source.Source
 }
 
 var _ controller.Controller = &Controller{}
 
-func (c *Controller) Watch(s source.Source, h handler.EventHandler, ps ...predicate.Predicate) error {
-	c.WatchCalls = append(c.WatchCalls, watchCall{s, h, ps})
+func (c *Controller) Watch(s source.Source) error {
+	c.WatchCalls = append(c.WatchCalls, watchCall{s})
 	return nil
 }
+
 func (c *Controller) Start(ctx context.Context) error {
 	c.Started = true
 	<-ctx.Done()
 	return ctx.Err()
 }
+
 func (c *Controller) Reconcile(_ context.Context, r reconcile.Request) (reconcile.Result, error) {
 	c.ReconcileRequests = append(c.ReconcileRequests, r)
 	return reconcile.Result{}, nil

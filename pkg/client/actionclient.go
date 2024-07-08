@@ -18,6 +18,7 @@ package client
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -40,13 +41,13 @@ import (
 )
 
 type ActionClientGetter interface {
-	ActionClientFor(obj client.Object) (ActionInterface, error)
+	ActionClientFor(ctx context.Context, obj client.Object) (ActionInterface, error)
 }
 
-type ActionClientGetterFunc func(obj client.Object) (ActionInterface, error)
+type ActionClientGetterFunc func(ctx context.Context, obj client.Object) (ActionInterface, error)
 
-func (acgf ActionClientGetterFunc) ActionClientFor(obj client.Object) (ActionInterface, error) {
-	return acgf(obj)
+func (acgf ActionClientGetterFunc) ActionClientFor(ctx context.Context, obj client.Object) (ActionInterface, error) {
+	return acgf(ctx, obj)
 }
 
 type ActionInterface interface {
@@ -140,8 +141,8 @@ type actionClientGetter struct {
 
 var _ ActionClientGetter = &actionClientGetter{}
 
-func (hcg *actionClientGetter) ActionClientFor(obj client.Object) (ActionInterface, error) {
-	actionConfig, err := hcg.acg.ActionConfigFor(obj)
+func (hcg *actionClientGetter) ActionClientFor(ctx context.Context, obj client.Object) (ActionInterface, error) {
+	actionConfig, err := hcg.acg.ActionConfigFor(ctx, obj)
 	if err != nil {
 		return nil, err
 	}

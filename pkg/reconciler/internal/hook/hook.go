@@ -79,7 +79,7 @@ func (d *dependentResourceWatcher) Exec(owner *unstructured.Unstructured, rel re
 			continue
 		}
 
-		var setWatchOnResource = func(dependent runtime.Object) error {
+		setWatchOnResource := func(dependent runtime.Object) error {
 			unstructuredObj := dependent.(*unstructured.Unstructured)
 			gvkDependent := unstructuredObj.GroupVersionKind()
 
@@ -98,13 +98,27 @@ func (d *dependentResourceWatcher) Exec(owner *unstructured.Unstructured, rel re
 			}
 
 			if useOwnerRef && !manifestutil.HasResourcePolicyKeep(unstructuredObj.GetAnnotations()) { // Setup watch using owner references.
-				if err := d.controller.Watch(source.Kind(d.cache, unstructuredObj), handler.EnqueueRequestForOwner(d.scheme, d.restMapper, owner, handler.OnlyControllerOwner()), dependentPredicate); err != nil {
+				if err := d.controller.Watch(
+					source.Kind(
+						d.cache,
+						unstructuredObj,
+						handler.TypedEnqueueRequestForOwner[*unstructured.Unstructured](d.scheme, d.restMapper, owner, handler.OnlyControllerOwner()),
+						dependentPredicate,
+					),
+				); err != nil {
 					return err
 				}
 			} else { // Setup watch using annotations.
-				if err := d.controller.Watch(source.Kind(d.cache, unstructuredObj), &sdkhandler.EnqueueRequestForAnnotation{
-					Type: owner.GetObjectKind().GroupVersionKind().GroupKind(),
-				}, dependentPredicate); err != nil {
+				if err := d.controller.Watch(
+					source.Kind(
+						d.cache,
+						unstructuredObj,
+						&sdkhandler.EnqueueRequestForAnnotation[*unstructured.Unstructured]{
+							Type: owner.GetObjectKind().GroupVersionKind().GroupKind(),
+						},
+						dependentPredicate,
+					),
+				); err != nil {
 					return err
 				}
 			}
