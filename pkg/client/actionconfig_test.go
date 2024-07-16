@@ -23,8 +23,11 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/kube"
+	"helm.sh/helm/v3/pkg/release"
+	"helm.sh/helm/v3/pkg/storage/driver"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -184,6 +187,32 @@ metadata:
 				ac2, err := acg.ActionConfigFor(context.Background(), testObject("test2"))
 				Expect(err).ToNot(HaveOccurred())
 				Expect(ac2.RESTClientGetter.ToRESTConfig()).To(WithTransform(func(c *rest.Config) string { return c.BearerToken }, Equal("test2")))
+			})
+
+			It("should use a custom storage driver", func() {
+				storageDriver := driver.NewMemory()
+
+				storageDriverMapper := func(ctx context.Context, obj client.Object, cfg *rest.Config) (driver.Driver, error) {
+					return storageDriver, nil
+				}
+				acg, err := NewActionConfigGetter(cfg, rm, StorageDriverMapper(storageDriverMapper))
+				Expect(err).ToNot(HaveOccurred())
+
+				testObject := func(name string) client.Object {
+					u := unstructured.Unstructured{}
+					u.SetName(name)
+					return &u
+				}
+
+				ac, err := acg.ActionConfigFor(context.Background(), testObject("test1"))
+				Expect(err).ToNot(HaveOccurred())
+
+				expected := &release.Release{Name: "test1", Version: 2, Info: &release.Info{Status: release.StatusDeployed}}
+				Expect(ac.Releases.Create(expected)).To(Succeed())
+				actual, err := storageDriver.List(func(r *release.Release) bool { return true })
+				Expect(err).ToNot(HaveOccurred())
+				Expect(actual).To(HaveLen(1))
+				Expect(actual[0]).To(Equal(expected))
 			})
 		})
 	})
