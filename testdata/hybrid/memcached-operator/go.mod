@@ -2,12 +2,12 @@ module github.com/example/memcached-operator
 
 go 1.21
 
-toolchain go1.21.9
+toolchain go1.21.12
 
 require (
 	github.com/onsi/ginkgo/v2 v2.17.1
 	github.com/onsi/gomega v1.32.0
-	github.com/operator-framework/helm-operator-plugins v0.2.0
+	github.com/operator-framework/helm-operator-plugins v0.2.1
 	k8s.io/apimachinery v0.29.2
 	k8s.io/client-go v0.29.2
 	sigs.k8s.io/controller-runtime v0.17.2
