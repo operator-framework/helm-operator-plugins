@@ -25,7 +25,6 @@ import (
 	"helm.sh/helm/v3/pkg/kube"
 	"helm.sh/helm/v3/pkg/storage"
 	"helm.sh/helm/v3/pkg/storage/driver"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery"
@@ -57,13 +56,24 @@ func NewActionConfigGetter(baseRestConfig *rest.Config, rm meta.RESTMapper, opts
 	if acg.objectToClientNamespace == nil {
 		acg.objectToClientNamespace = getObjectNamespace
 	}
-	if acg.objectToStorageNamespace == nil {
-		acg.objectToStorageNamespace = getObjectNamespace
-	}
-	if acg.objectToRestConfig == nil {
-		acg.objectToRestConfig = func(_ context.Context, _ client.Object, baseRestConfig *rest.Config) (*rest.Config, error) {
+	if acg.objectToClientRestConfig == nil {
+		acg.objectToClientRestConfig = func(_ context.Context, _ client.Object, baseRestConfig *rest.Config) (*rest.Config, error) {
 			return rest.CopyConfig(baseRestConfig), nil
 		}
+	}
+	if acg.objectToStorageRestConfig == nil {
+		acg.objectToStorageRestConfig = func(_ context.Context, _ client.Object, baseRestConfig *rest.Config) (*rest.Config, error) {
+			return rest.CopyConfig(baseRestConfig), nil
+		}
+	}
+	if acg.objectToStorageDriver == nil {
+		if acg.objectToStorageNamespace == nil {
+			acg.objectToStorageNamespace = getObjectNamespace
+		}
+		acg.objectToStorageDriver = DefaultSecretsStorageDriver(SecretsStorageDriverOpts{
+			DisableOwnerRefInjection: acg.disableStorageOwnerRefInjection,
+			StorageNamespaceMapper:   acg.objectToStorageNamespace,
+		})
 	}
 	return acg, nil
 }
@@ -73,6 +83,14 @@ var _ ActionConfigGetter = &actionConfigGetter{}
 type ActionConfigGetterOption func(getter *actionConfigGetter)
 
 type ObjectToStringMapper func(client.Object) (string, error)
+type ObjectToRestConfigMapper func(context.Context, client.Object, *rest.Config) (*rest.Config, error)
+type ObjectToStorageDriverMapper func(context.Context, client.Object, *rest.Config) (driver.Driver, error)
+
+func ClientRestConfigMapper(f ObjectToRestConfigMapper) ActionConfigGetterOption { // nolint:revive
+	return func(getter *actionConfigGetter) {
+		getter.objectToClientRestConfig = f
+	}
+}
 
 func ClientNamespaceMapper(m ObjectToStringMapper) ActionConfigGetterOption { // nolint:revive
 	return func(getter *actionConfigGetter) {
@@ -80,21 +98,37 @@ func ClientNamespaceMapper(m ObjectToStringMapper) ActionConfigGetterOption { //
 	}
 }
 
+func StorageRestConfigMapper(f ObjectToRestConfigMapper) ActionConfigGetterOption {
+	return func(getter *actionConfigGetter) {
+		getter.objectToStorageRestConfig = f
+	}
+}
+
+func StorageDriverMapper(f ObjectToStorageDriverMapper) ActionConfigGetterOption {
+	return func(getter *actionConfigGetter) {
+		getter.objectToStorageDriver = f
+	}
+}
+
+// Deprecated: use StorageDriverMapper(DefaultSecretsStorageDriver(SecretsStorageDriverOpts)) instead.
 func StorageNamespaceMapper(m ObjectToStringMapper) ActionConfigGetterOption {
 	return func(getter *actionConfigGetter) {
 		getter.objectToStorageNamespace = m
 	}
 }
 
+// Deprecated: use StorageDriverMapper(DefaultSecretsStorageDriver(SecretsStorageDriverOpts)) instead.
 func DisableStorageOwnerRefInjection(v bool) ActionConfigGetterOption {
 	return func(getter *actionConfigGetter) {
 		getter.disableStorageOwnerRefInjection = v
 	}
 }
 
+// Deprecated: use ClientRestConfigMapper and StorageRestConfigMapper instead.
 func RestConfigMapper(f func(context.Context, client.Object, *rest.Config) (*rest.Config, error)) ActionConfigGetterOption {
 	return func(getter *actionConfigGetter) {
-		getter.objectToRestConfig = f
+		getter.objectToClientRestConfig = f
+		getter.objectToStorageRestConfig = f
 	}
 }
 
@@ -107,21 +141,22 @@ type actionConfigGetter struct {
 	restMapper      meta.RESTMapper
 	discoveryClient discovery.CachedDiscoveryInterface
 
-	objectToClientNamespace         ObjectToStringMapper
-	objectToStorageNamespace        ObjectToStringMapper
-	objectToRestConfig              func(context.Context, client.Object, *rest.Config) (*rest.Config, error)
+	objectToClientRestConfig ObjectToRestConfigMapper
+	objectToClientNamespace  ObjectToStringMapper
+
+	objectToStorageRestConfig ObjectToRestConfigMapper
+	objectToStorageDriver     ObjectToStorageDriverMapper
+
+	// Deprecated: only keep around for backward compatibility with StorageNamespaceMapper option.
+	objectToStorageNamespace ObjectToStringMapper
+	// Deprecated: only keep around for backward compatibility with DisableStorageOwnerRefInjection option.
 	disableStorageOwnerRefInjection bool
 }
 
 func (acg *actionConfigGetter) ActionConfigFor(ctx context.Context, obj client.Object) (*action.Configuration, error) {
-	storageNs, err := acg.objectToStorageNamespace(obj)
+	clientRestConfig, err := acg.objectToClientRestConfig(ctx, obj, acg.baseRestConfig)
 	if err != nil {
-		return nil, fmt.Errorf("get storage namespace for object: %v", err)
-	}
-
-	restConfig, err := acg.objectToRestConfig(ctx, obj, acg.baseRestConfig)
-	if err != nil {
-		return nil, fmt.Errorf("get rest config for object: %v", err)
+		return nil, fmt.Errorf("get client rest config for object: %v", err)
 	}
 
 	clientNamespace, err := acg.objectToClientNamespace(obj)
@@ -129,36 +164,30 @@ func (acg *actionConfigGetter) ActionConfigFor(ctx context.Context, obj client.O
 		return nil, fmt.Errorf("get client namespace for object: %v", err)
 	}
 
-	rcg := newRESTClientGetter(restConfig, acg.restMapper, acg.discoveryClient, clientNamespace)
-	kc := kube.New(rcg)
-	kc.Namespace = clientNamespace
-
-	kcs, err := kc.Factory.KubernetesClientSet()
-	if err != nil {
-		return nil, fmt.Errorf("create kubernetes clientset: %v", err)
-	}
+	clientRCG := newRESTClientGetter(clientRestConfig, acg.restMapper, acg.discoveryClient, clientNamespace)
+	clientKC := kube.New(clientRCG)
+	clientKC.Namespace = clientNamespace
 
 	// Setup the debug log function that Helm will use
 	debugLog := getDebugLogger(ctx)
 
-	secretClient := kcs.CoreV1().Secrets(storageNs)
-	if !acg.disableStorageOwnerRefInjection {
-		ownerRef := metav1.NewControllerRef(obj, obj.GetObjectKind().GroupVersionKind())
-		secretClient = &ownerRefSecretClient{
-			SecretInterface: secretClient,
-			refs:            []metav1.OwnerReference{*ownerRef},
-		}
+	storageRestConfig, err := acg.objectToStorageRestConfig(ctx, obj, acg.baseRestConfig)
+	if err != nil {
+		return nil, fmt.Errorf("get storage rest config for object: %v", err)
 	}
-	d := driver.NewSecrets(secretClient)
-	d.Log = debugLog
+
+	d, err := acg.objectToStorageDriver(ctx, obj, storageRestConfig)
+	if err != nil {
+		return nil, fmt.Errorf("get storage driver for object: %v", err)
+	}
 
 	// Initialize the storage backend
 	s := storage.Init(d)
 
 	return &action.Configuration{
-		RESTClientGetter: rcg,
+		RESTClientGetter: clientRCG,
 		Releases:         s,
-		KubeClient:       kc,
+		KubeClient:       clientKC,
 		Log:              debugLog,
 	}, nil
 }
@@ -173,19 +202,32 @@ func getDebugLogger(ctx context.Context) func(format string, v ...interface{}) {
 	}
 }
 
-var _ v1.SecretInterface = &ownerRefSecretClient{}
-
-type ownerRefSecretClient struct {
-	v1.SecretInterface
-	refs []metav1.OwnerReference
+type SecretsStorageDriverOpts struct {
+	DisableOwnerRefInjection bool
+	StorageNamespaceMapper   ObjectToStringMapper
 }
 
-func (c *ownerRefSecretClient) Create(ctx context.Context, in *corev1.Secret, opts metav1.CreateOptions) (*corev1.Secret, error) {
-	in.OwnerReferences = append(in.OwnerReferences, c.refs...)
-	return c.SecretInterface.Create(ctx, in, opts)
-}
+func DefaultSecretsStorageDriver(opts SecretsStorageDriverOpts) ObjectToStorageDriverMapper {
+	if opts.StorageNamespaceMapper == nil {
+		opts.StorageNamespaceMapper = getObjectNamespace
+	}
+	return func(ctx context.Context, obj client.Object, restConfig *rest.Config) (driver.Driver, error) {
+		storageNamespace, err := opts.StorageNamespaceMapper(obj)
+		if err != nil {
+			return nil, fmt.Errorf("get storage namespace for object: %v", err)
+		}
+		secretsInterface, err := v1.NewForConfig(restConfig)
+		if err != nil {
+			return nil, fmt.Errorf("create secrets client for storage: %v", err)
+		}
 
-func (c *ownerRefSecretClient) Update(ctx context.Context, in *corev1.Secret, opts metav1.UpdateOptions) (*corev1.Secret, error) {
-	in.OwnerReferences = append(in.OwnerReferences, c.refs...)
-	return c.SecretInterface.Update(ctx, in, opts)
+		secretClient := secretsInterface.Secrets(storageNamespace)
+		if !opts.DisableOwnerRefInjection {
+			ownerRef := metav1.NewControllerRef(obj, obj.GetObjectKind().GroupVersionKind())
+			secretClient = NewOwnerRefSecretClient(secretClient, []metav1.OwnerReference{*ownerRef}, MatchAllSecrets)
+		}
+		d := driver.NewSecrets(secretClient)
+		d.Log = getDebugLogger(ctx)
+		return d, nil
+	}
 }
