@@ -88,7 +88,7 @@ jobs:
         registry: quay.io
 
     - name: Build helm-operator image
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v6
       with:
         context: .
         platforms: linux/amd64,linux/arm64,linux/ppc64le,linux/s390x
