@@ -24,7 +24,7 @@ import (
 	"regexp"
 	"strings"
 
-	kbtestutils "sigs.k8s.io/kubebuilder/v3/test/e2e/utils"
+	kbtestutils "sigs.k8s.io/kubebuilder/v4/test/e2e/utils"
 )
 
 // TestContext wraps kubebuilder's e2e TestContext.

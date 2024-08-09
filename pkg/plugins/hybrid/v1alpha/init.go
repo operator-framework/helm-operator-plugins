@@ -19,11 +19,11 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/pflag"
-	"sigs.k8s.io/kubebuilder/v3/pkg/config"
-	"sigs.k8s.io/kubebuilder/v3/pkg/machinery"
-	"sigs.k8s.io/kubebuilder/v3/pkg/plugin"
-	"sigs.k8s.io/kubebuilder/v3/pkg/plugin/util"
-	"sigs.k8s.io/kubebuilder/v3/pkg/plugins/golang"
+	"sigs.k8s.io/kubebuilder/v4/pkg/config"
+	"sigs.k8s.io/kubebuilder/v4/pkg/machinery"
+	"sigs.k8s.io/kubebuilder/v4/pkg/plugin"
+	"sigs.k8s.io/kubebuilder/v4/pkg/plugin/util"
+	"sigs.k8s.io/kubebuilder/v4/pkg/plugins/golang"
 
 	"github.com/operator-framework/helm-operator-plugins/pkg/plugins/hybrid/v1alpha/scaffolds"
 	projutil "github.com/operator-framework/helm-operator-plugins/pkg/plugins/util"
@@ -126,16 +126,10 @@ func addInitCustomizations(projectName string) error {
 	// todo: we ought to use afero instead. Replace this methods to insert/update
 	// by https://github.com/kubernetes-sigs/kubebuilder/pull/2119
 
-	// Add leader election arg in config/manager/manager.yaml and in config/default/manager_auth_proxy_patch.yaml
+	// Add leader election arg in config/manager/manager.yaml
 	err := util.InsertCode(managerFile,
 		"--leader-elect",
-		fmt.Sprintf("\n        - --leader-election-id=%s", projectName))
-	if err != nil {
-		return err
-	}
-	err = util.InsertCode(filepath.Join("config", "default", "manager_auth_proxy_patch.yaml"),
-		"- \"--leader-elect\"",
-		fmt.Sprintf("\n        - \"--leader-election-id=%s\"", projectName))
+		fmt.Sprintf("\n          - --leader-election-id=%s", projectName))
 	if err != nil {
 		return err
 	}
