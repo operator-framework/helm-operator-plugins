@@ -26,7 +26,10 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/operator-framework/helm-operator-plugins/pkg/values"
+	"time"
 )
+
+var DefaultWaitForDeletionTimeout = 30 * time.Second
 
 var DefaultMaxReleaseHistory = 10
 

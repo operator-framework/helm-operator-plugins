@@ -84,41 +84,40 @@ func (u *Updater) Apply(ctx context.Context, obj *unstructured.Unstructured) err
 
 	backoff := retry.DefaultRetry
 
+	st := statusFor(obj)
+	needsStatusUpdate := false
+	for _, f := range u.updateStatusFuncs {
+		needsStatusUpdate = f(st) || needsStatusUpdate
+	}
+
 	// Always update the status first. During uninstall, if
 	// we remove the finalizer, updating the status will fail
 	// because the object and its status will be garbage-collected.
-	if err := retryOnRetryableUpdateError(backoff, func() error {
-		st := statusFor(obj)
-		needsStatusUpdate := false
-		for _, f := range u.updateStatusFuncs {
-			needsStatusUpdate = f(st) || needsStatusUpdate
+	if needsStatusUpdate {
+		uSt, err := runtime.DefaultUnstructuredConverter.ToUnstructured(st)
+		if err != nil {
+			return err
 		}
-		if needsStatusUpdate {
-			uSt, err := runtime.DefaultUnstructuredConverter.ToUnstructured(st)
-			if err != nil {
-				return err
-			}
-			obj.Object["status"] = uSt
+		obj.Object["status"] = uSt
+
+		if err := retryOnRetryableUpdateError(backoff, func() error {
 			return u.client.Status().Update(ctx, obj)
+		}); err != nil {
+			return err
 		}
-		return nil
-	}); err != nil {
-		return err
 	}
 
-	if err := retryOnRetryableUpdateError(backoff, func() error {
-		needsUpdate := false
-		for _, f := range u.updateFuncs {
-			needsUpdate = f(obj) || needsUpdate
-		}
-		if needsUpdate {
+	needsUpdate := false
+	for _, f := range u.updateFuncs {
+		needsUpdate = f(obj) || needsUpdate
+	}
+	if needsUpdate {
+		if err := retryOnRetryableUpdateError(backoff, func() error {
 			return u.client.Update(ctx, obj)
+		}); err != nil {
+			return err
 		}
-		return nil
-	}); err != nil {
-		return err
 	}
-
 	return nil
 }
 
