@@ -2,7 +2,6 @@
 
 # GO_BUILD_ARGS should be set when running 'go build' or 'go install'.
 VERSION_PKG = "$(shell go list -m)/internal/version"
-export SCAFFOLD_VERSION = $(shell git describe --tags --abbrev=0)
 export GIT_VERSION = $(shell git describe --dirty --tags --always)
 export GIT_COMMIT = $(shell git rev-parse HEAD)
 BUILD_DIR = $(PWD)/bin
@@ -12,7 +11,6 @@ GO_BUILD_ARGS = \
   -ldflags " \
     -s \
     -w \
-    -X '$(VERSION_PKG).ScaffoldVersion=$(SCAFFOLD_VERSION)' \
     -X '$(VERSION_PKG).GitVersion=$(GIT_VERSION)' \
     -X '$(VERSION_PKG).GitCommit=$(GIT_COMMIT)' \
   " \
@@ -28,12 +26,6 @@ export PATH := $(BUILD_DIR):$(PATH)
 include .bingo/Variables.mk
 
 ##@ Development
-
-.PHONY: generate
-generate: build # Generate CLI docs and samples
-	rm -rf testdata/
-	go run ./hack/generate/samples/generate_testdata.go
-	go generate ./...
 
 .PHONY: all
 all: test lint build
@@ -51,7 +43,7 @@ test: build $(SETUP_ENVTEST)
 	eval $$($(SETUP_ENVTEST) use -p env $(CLIENT_GO_VERSION)) && go test -race -covermode atomic -coverprofile cover.out $(TESTPKG)
 
 .PHONY: test-sanity
-test-sanity: generate fix lint ## Test repo formatting, linting, etc.
+test-sanity: fix lint ## Test repo formatting, linting, etc.
 	go vet ./...
 	git diff --exit-code # diff again to ensure other checks don't change repo
 

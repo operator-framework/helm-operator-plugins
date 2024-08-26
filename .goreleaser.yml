@@ -23,7 +23,6 @@ builds:
     ldflags:
       - -s
       - -w
-      - -X {{ .Env.VERSION_PKG }}.ScaffoldVersion={{ .Env.SCAFFOLD_VERSION }}
       - -X {{ .Env.VERSION_PKG }}.GitVersion={{ .Env.GIT_VERSION }}
       - -X {{ .Env.VERSION_PKG }}.GitCommit={{ .Env.GIT_COMMIT }}
     targets:
