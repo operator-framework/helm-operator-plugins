@@ -1,6 +1,6 @@
 module github.com/operator-framework/helm-operator-plugins
 
-go 1.22.0
+go 1.22.5
 
 require (
 	github.com/blang/semver/v4 v4.0.0
