@@ -75,4 +75,5 @@ linters-settings:
     - name: redefines-builtin-id
 
 output:
-  format: tab
+  formats:
+    - format: tab

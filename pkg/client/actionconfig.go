@@ -195,7 +195,7 @@ func (acg *actionConfigGetter) ActionConfigFor(ctx context.Context, obj client.O
 func getDebugLogger(ctx context.Context) func(format string, v ...interface{}) {
 	logger, err := logr.FromContext(ctx)
 	if err != nil {
-		return func(format string, v ...interface{}) {}
+		return func(_ string, _ ...interface{}) {}
 	}
 	return func(format string, v ...interface{}) {
 		logger.V(1).Info(fmt.Sprintf(format, v...))
