@@ -20,13 +20,13 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"helm.sh/helm/v3/pkg/chartutil"
 	"helm.sh/helm/v3/pkg/strvals"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/operator-framework/helm-operator-plugins/pkg/values"
-	"time"
 )
 
 var DefaultWaitForDeletionTimeout = 30 * time.Second
