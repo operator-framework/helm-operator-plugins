@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	sdkhandler "github.com/operator-framework/operator-lib/handler"
 	errs "github.com/pkg/errors"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
@@ -45,6 +44,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	sdkhandler "github.com/operator-framework/operator-lib/handler"
 
 	"github.com/operator-framework/helm-operator-plugins/internal/sdk/controllerutil"
 	"github.com/operator-framework/helm-operator-plugins/pkg/annotation"
@@ -78,6 +79,7 @@ type Reconciler struct {
 	skipDependentWatches             bool
 	maxConcurrentReconciles          int
 	reconcilePeriod                  time.Duration
+	waitForDeletionTimeout           time.Duration
 	maxReleaseHistory                *int
 	skipPrimaryGVKSchemeRegistration bool
 	controllerSetupFuncs             []ControllerSetupFunc
@@ -328,6 +330,20 @@ func WithMaxConcurrentReconciles(max int) Option {
 			return errors.New("maxConcurrentReconciles must be at least 1")
 		}
 		r.maxConcurrentReconciles = max
+		return nil
+	}
+}
+
+// WithWaitForDeletionTimeout is an Option that configures how long to wait for the client to
+// report that the primary resource has been deleted. If the primary resource is not deleted
+// within this time, the reconciler will return an error and retry reconciliation. By default,
+// the reconciler will wait for 30s. This function requires positive values.
+func WithWaitForDeletionTimeout(timeout time.Duration) Option {
+	return func(r *Reconciler) error {
+		if timeout <= 0 {
+			return errors.New("wait for deletion timeout must be a positive value")
+		}
+		r.waitForDeletionTimeout = timeout
 		return nil
 	}
 }
@@ -727,13 +743,15 @@ func (r *Reconciler) handleDeletion(ctx context.Context, actionClient helmclient
 	}
 
 	// Since the client is hitting a cache, waiting for the
-	// deletion here will guarantee that the next reconciliation
+	// deletion here will help ensure that the next reconciliation
 	// will see that the CR has been deleted and that there's
 	// nothing left to do.
-	if err := controllerutil.WaitForDeletion(ctx, r.client, obj); err != nil {
-		return err
-	}
-	return nil
+	//
+	// If the CR is not deleted within the timeout, the next reconciliation
+	// will attempt to uninstall the release again.
+	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, r.waitForDeletionTimeout)
+	defer timeoutCancel()
+	return controllerutil.WaitForDeletion(timeoutCtx, r.client, obj)
 }
 
 func (r *Reconciler) getReleaseState(client helmclient.ActionInterface, obj metav1.Object, vals map[string]interface{}) (*release.Release, helmReleaseState, error) {
@@ -937,6 +955,10 @@ func (r *Reconciler) addDefaults(mgr ctrl.Manager, controllerName string) error 
 	}
 	if r.valueMapper == nil {
 		r.valueMapper = internalvalues.DefaultMapper
+	}
+
+	if r.waitForDeletionTimeout == 0 {
+		r.waitForDeletionTimeout = internalvalues.DefaultWaitForDeletionTimeout
 	}
 
 	if r.maxReleaseHistory == nil {

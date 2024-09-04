@@ -24,11 +24,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gstruct"
-	sdkhandler "github.com/operator-framework/operator-lib/handler"
+
+	"github.com/go-logr/logr"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chartutil"
@@ -46,6 +46,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -53,6 +54,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	"sigs.k8s.io/yaml"
+
+	sdkhandler "github.com/operator-framework/operator-lib/handler"
 
 	"github.com/operator-framework/helm-operator-plugins/internal/sdk/controllerutil"
 	"github.com/operator-framework/helm-operator-plugins/pkg/annotation"
@@ -203,6 +206,18 @@ var _ = Describe("Reconciler", func() {
 			It("should fail if value is less than 1", func() {
 				Expect(WithMaxConcurrentReconciles(0)(r)).NotTo(Succeed())
 				Expect(WithMaxConcurrentReconciles(-1)(r)).NotTo(Succeed())
+			})
+		})
+		_ = Describe("WithWaitForDeletionTimeout", func() {
+			It("should set the reconciler wait for deletion timeout", func() {
+				Expect(WithWaitForDeletionTimeout(time.Second)(r)).To(Succeed())
+				Expect(r.waitForDeletionTimeout).To(Equal(time.Second))
+			})
+			It("should fail if value is zero", func() {
+				Expect(WithWaitForDeletionTimeout(0)(r)).NotTo(Succeed())
+			})
+			It("should fail if value is negative", func() {
+				Expect(WithWaitForDeletionTimeout(-time.Second)(r)).NotTo(Succeed())
 			})
 		})
 		_ = Describe("WithReconcilePeriod", func() {
@@ -683,6 +698,55 @@ var _ = Describe("Reconciler", func() {
 
 							By("verifying the uninstall finalizer is present on the CR", func() {
 								Expect(controllerutil.ContainsFinalizer(obj, uninstallFinalizer)).To(BeTrue())
+							})
+						})
+					})
+					When("cache contains stale CR that has actually been deleted", func() {
+						// This test simulates what we expect to happen when we time out waiting for a CR that we
+						// deleted to be removed from the cache.
+						It("ignores not found errors and returns successfully", func() {
+							By("deleting the CR and then setting a finalizer on the stale CR", func() {
+								// We _actually_ remove the CR from the API server, but we'll make a fake client
+								// that returns the stale CR.
+								Expect(mgr.GetClient().Delete(ctx, obj)).To(Succeed())
+								Eventually(func() error {
+									return mgr.GetAPIReader().Get(ctx, objKey, obj)
+								}).Should(WithTransform(apierrors.IsNotFound, BeTrue()))
+
+								// We set the finalizer on the stale CR to simulate the typical state of the CR from a
+								// prior reconcile run that timed out waiting for the CR to be removed from the cache.
+								obj.SetFinalizers([]string{uninstallFinalizer})
+							})
+
+							By("configuring a client that returns the stale CR", func() {
+								// Make a client that returns the stale CR, but sends writes to the real client.
+								cl := fake.NewClientBuilder().WithObjects(obj).WithInterceptorFuncs(interceptor.Funcs{
+									Create: func(ctx context.Context, _ client.WithWatch, fakeObj client.Object, opts ...client.CreateOption) error {
+										return mgr.GetClient().Create(ctx, fakeObj, opts...)
+									},
+									Delete: func(ctx context.Context, _ client.WithWatch, fakeObj client.Object, opts ...client.DeleteOption) error {
+										return mgr.GetClient().Delete(ctx, fakeObj, opts...)
+									},
+									DeleteAllOf: func(ctx context.Context, _ client.WithWatch, fakeObj client.Object, opts ...client.DeleteAllOfOption) error {
+										return mgr.GetClient().DeleteAllOf(ctx, fakeObj, opts...)
+									},
+									Update: func(ctx context.Context, _ client.WithWatch, fakeObj client.Object, opts ...client.UpdateOption) error {
+										return mgr.GetClient().Update(ctx, fakeObj, opts...)
+									},
+									Patch: func(ctx context.Context, _ client.WithWatch, fakeObj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+										return mgr.GetClient().Patch(ctx, fakeObj, patch, opts...)
+									},
+									SubResource: func(_ client.WithWatch, subresource string) client.SubResourceClient {
+										return mgr.GetClient().SubResource(subresource)
+									},
+								}).WithStatusSubresource(obj).Build()
+								r.client = cl
+							})
+
+							By("successfully ignoring not found errors and returning a nil error", func() {
+								res, err := r.Reconcile(ctx, req)
+								Expect(res).To(Equal(reconcile.Result{}))
+								Expect(err).ToNot(HaveOccurred())
 							})
 						})
 					})

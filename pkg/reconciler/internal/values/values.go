@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"helm.sh/helm/v3/pkg/chartutil"
 	"helm.sh/helm/v3/pkg/strvals"
@@ -27,6 +28,8 @@ import (
 
 	"github.com/operator-framework/helm-operator-plugins/pkg/values"
 )
+
+var DefaultWaitForDeletionTimeout = 30 * time.Second
 
 var DefaultMaxReleaseHistory = 10
 

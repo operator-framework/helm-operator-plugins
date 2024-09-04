@@ -18,9 +18,11 @@ package updater
 
 import (
 	"context"
+	"errors"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	"helm.sh/helm/v3/pkg/release"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -28,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	"github.com/operator-framework/helm-operator-plugins/pkg/reconciler/internal/conditions"
 )
@@ -36,14 +39,15 @@ const testFinalizer = "testFinalizer"
 
 var _ = Describe("Updater", func() {
 	var (
-		client client.Client
-		u      Updater
-		obj    *unstructured.Unstructured
+		cl               client.Client
+		u                Updater
+		obj              *unstructured.Unstructured
+		interceptorFuncs interceptor.Funcs
 	)
 
-	BeforeEach(func() {
-		client = fake.NewClientBuilder().Build()
-		u = New(client)
+	JustBeforeEach(func() {
+		cl = fake.NewClientBuilder().WithInterceptorFuncs(interceptorFuncs).Build()
+		u = New(cl)
 		obj = &unstructured.Unstructured{Object: map[string]interface{}{
 			"apiVersion": "apps/v1",
 			"kind":       "Deployment",
@@ -53,12 +57,12 @@ var _ = Describe("Updater", func() {
 			},
 			"spec": map[string]interface{}{},
 		}}
-		Expect(client.Create(context.TODO(), obj)).To(Succeed())
+		Expect(cl.Create(context.TODO(), obj)).To(Succeed())
 	})
 
 	When("the object does not exist", func() {
 		It("should fail", func() {
-			Expect(client.Delete(context.TODO(), obj)).To(Succeed())
+			Expect(cl.Delete(context.TODO(), obj)).To(Succeed())
 			u.Update(func(u *unstructured.Unstructured) bool {
 				u.SetAnnotations(map[string]string{"foo": "bar"})
 				return true
@@ -70,6 +74,18 @@ var _ = Describe("Updater", func() {
 	})
 
 	When("an update is a change", func() {
+		var updateCallCount int
+
+		BeforeEach(func() {
+			// On the first update of (status) subresource, return an error. After that do what is expected.
+			interceptorFuncs.SubResourceUpdate = func(ctx context.Context, interceptorClient client.Client, subResourceName string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+				updateCallCount++
+				if updateCallCount == 1 {
+					return errors.New("transient error")
+				}
+				return interceptorClient.SubResource(subResourceName).Update(ctx, obj, opts...)
+			}
+		})
 		It("should apply an update function", func() {
 			u.Update(func(u *unstructured.Unstructured) bool {
 				u.SetAnnotations(map[string]string{"foo": "bar"})
@@ -78,7 +94,7 @@ var _ = Describe("Updater", func() {
 			resourceVersion := obj.GetResourceVersion()
 
 			Expect(u.Apply(context.TODO(), obj)).To(Succeed())
-			Expect(client.Get(context.TODO(), types.NamespacedName{Namespace: "testNamespace", Name: "testDeployment"}, obj)).To(Succeed())
+			Expect(cl.Get(context.TODO(), types.NamespacedName{Namespace: "testNamespace", Name: "testDeployment"}, obj)).To(Succeed())
 			Expect(obj.GetAnnotations()["foo"]).To(Equal("bar"))
 			Expect(obj.GetResourceVersion()).NotTo(Equal(resourceVersion))
 		})
@@ -88,7 +104,7 @@ var _ = Describe("Updater", func() {
 			resourceVersion := obj.GetResourceVersion()
 
 			Expect(u.Apply(context.TODO(), obj)).To(Succeed())
-			Expect(client.Get(context.TODO(), types.NamespacedName{Namespace: "testNamespace", Name: "testDeployment"}, obj)).To(Succeed())
+			Expect(cl.Get(context.TODO(), types.NamespacedName{Namespace: "testNamespace", Name: "testDeployment"}, obj)).To(Succeed())
 			Expect((obj.Object["status"].(map[string]interface{}))["conditions"]).To(HaveLen(1))
 			Expect(obj.GetResourceVersion()).NotTo(Equal(resourceVersion))
 		})
