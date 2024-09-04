@@ -902,7 +902,7 @@ type mockPostRenderer struct {
 var _ postrender.PostRenderer = &mockPostRenderer{}
 
 func newMockPostRenderer(key, value string) PostRendererProvider {
-	return func(rm meta.RESTMapper, kubeClient kube.Interface, obj client.Object) postrender.PostRenderer {
+	return func(_ meta.RESTMapper, kubeClient kube.Interface, _ client.Object) postrender.PostRenderer {
 		return &mockPostRenderer{
 			k8sCli: kubeClient,
 			key:    key,

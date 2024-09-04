@@ -123,7 +123,7 @@ var _ = Describe("Reconciler", func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 		It("should return an error if an option func fails", func() {
-			r, err := New(func(r *Reconciler) error { return errors.New("expect this error") })
+			r, err := New(func(_ *Reconciler) error { return errors.New("expect this error") })
 			Expect(r).To(BeNil())
 			Expect(err).To(MatchError("expect this error"))
 		})
@@ -430,7 +430,7 @@ var _ = Describe("Reconciler", func() {
 		})
 		_ = Describe("WithValueTranslator", func() {
 			It("should set the reconciler value translator", func() {
-				translator := values.TranslatorFunc(func(ctx context.Context, u *unstructured.Unstructured) (chartutil.Values, error) {
+				translator := values.TranslatorFunc(func(_ context.Context, _ *unstructured.Unstructured) (chartutil.Values, error) {
 					return chartutil.Values{"translated": true}, nil
 				})
 				Expect(WithValueTranslator(translator)(r)).To(Succeed())
@@ -998,7 +998,7 @@ var _ = Describe("Reconciler", func() {
 					})
 					When("value translator fails", func() {
 						BeforeEach(func() {
-							r.valueTranslator = values.TranslatorFunc(func(ctx context.Context, u *unstructured.Unstructured) (chartutil.Values, error) {
+							r.valueTranslator = values.TranslatorFunc(func(_ context.Context, _ *unstructured.Unstructured) (chartutil.Values, error) {
 								return nil, errors.New("translation failure")
 							})
 						})

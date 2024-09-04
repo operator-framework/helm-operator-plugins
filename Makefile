@@ -64,6 +64,13 @@ fix: $(GOLANGCI_LINT) ## Fixup files in the repo.
 	go fmt ./...
 	$(GOLANGCI_LINT) run --fix
 
+.PHONY: bingo-upgrade
+bingo-upgrade: $(BINGO) ## Upgrade tools
+	@for pkg in $$($(BINGO) list | awk '{ print $$1 }' | tail -n +3); do \
+		echo "Upgrading $$pkg to latest..."; \
+		$(BINGO) get "$$pkg@latest"; \
+	done
+
 .PHONY: release
 release: GORELEASER_ARGS ?= --snapshot --clean --skip-sign
 release: $(GORELEASER)

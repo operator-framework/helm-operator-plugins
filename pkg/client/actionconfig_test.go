@@ -166,7 +166,7 @@ metadata:
 			})
 
 			It("should use a custom rest config mapping", func() {
-				restConfigMapper := func(ctx context.Context, obj client.Object, cfg *rest.Config) (*rest.Config, error) {
+				restConfigMapper := func(_ context.Context, obj client.Object, _ *rest.Config) (*rest.Config, error) {
 					return &rest.Config{
 						BearerToken: obj.GetName(),
 					}, nil
@@ -192,7 +192,7 @@ metadata:
 			It("should use a custom storage driver", func() {
 				storageDriver := driver.NewMemory()
 
-				storageDriverMapper := func(ctx context.Context, obj client.Object, cfg *rest.Config) (driver.Driver, error) {
+				storageDriverMapper := func(_ context.Context, _ client.Object, _ *rest.Config) (driver.Driver, error) {
 					return storageDriver, nil
 				}
 				acg, err := NewActionConfigGetter(cfg, rm, StorageDriverMapper(storageDriverMapper))
@@ -209,7 +209,7 @@ metadata:
 
 				expected := &release.Release{Name: "test1", Version: 2, Info: &release.Info{Status: release.StatusDeployed}}
 				Expect(ac.Releases.Create(expected)).To(Succeed())
-				actual, err := storageDriver.List(func(r *release.Release) bool { return true })
+				actual, err := storageDriver.List(func(_ *release.Release) bool { return true })
 				Expect(err).ToNot(HaveOccurred())
 				Expect(actual).To(HaveLen(1))
 				Expect(actual[0]).To(Equal(expected))

@@ -221,7 +221,7 @@ var _ = Describe("chunkedSecrets", func() {
 				MaxReadChunks:  1,
 				MaxWriteChunks: 2,
 			})
-			actual, err := maxReadDriver.List(func(rel *release.Release) bool { return true })
+			actual, err := maxReadDriver.List(func(_ *release.Release) bool { return true })
 			Expect(err).To(MatchError(ContainSubstring("release too large")))
 			Expect(actual).To(BeNil())
 		})

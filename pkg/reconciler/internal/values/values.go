@@ -35,7 +35,7 @@ var DefaultMaxReleaseHistory = 10
 
 var DefaultMapper = values.MapperFunc(func(v chartutil.Values) chartutil.Values { return v })
 
-var DefaultTranslator = values.TranslatorFunc(func(ctx context.Context, u *unstructured.Unstructured) (chartutil.Values, error) {
+var DefaultTranslator = values.TranslatorFunc(func(_ context.Context, u *unstructured.Unstructured) (chartutil.Values, error) {
 	return getSpecMap(u)
 })
 
