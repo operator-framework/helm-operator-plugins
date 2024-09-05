@@ -5,7 +5,7 @@ go 1.22.5
 require (
 	github.com/go-logr/logr v1.4.2
 	github.com/go-task/slim-sprig/v3 v3.0.0
-	github.com/onsi/ginkgo/v2 v2.20.1
+	github.com/onsi/ginkgo/v2 v2.20.2
 	github.com/onsi/gomega v1.34.2
 	github.com/operator-framework/operator-lib v0.14.0
 	github.com/pkg/errors v0.9.1
