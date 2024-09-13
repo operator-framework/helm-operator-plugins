@@ -44,9 +44,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
+	"sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -1447,6 +1449,9 @@ func getManagerOrFail() manager.Manager {
 			BindAddress: "0",
 		},
 		Scheme: sch,
+		Controller: config.Controller{
+			SkipNameValidation: ptr.To(true),
+		},
 	})
 	Expect(err).ToNot(HaveOccurred())
 	return mgr
