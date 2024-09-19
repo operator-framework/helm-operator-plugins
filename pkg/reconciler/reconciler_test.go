@@ -738,8 +738,15 @@ var _ = Describe("Reconciler", func() {
 									Patch: func(ctx context.Context, _ client.WithWatch, fakeObj client.Object, patch client.Patch, opts ...client.PatchOption) error {
 										return mgr.GetClient().Patch(ctx, fakeObj, patch, opts...)
 									},
-									SubResource: func(_ client.WithWatch, subresource string) client.SubResourceClient {
-										return mgr.GetClient().SubResource(subresource)
+									SubResourceUpdate: func(ctx context.Context, client client.Client, subResourceName string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+										// workaround https://github.com/kubernetes/kubernetes/issues/124347
+										err := mgr.GetClient().SubResource(subResourceName).Update(ctx, obj, opts...)
+										if err != nil {
+											if apierrors.IsConflict(err) {
+												return apierrors.NewNotFound(gvk.GroupVersion().WithResource("testapps").GroupResource(), obj.GetName())
+											}
+										}
+										return nil
 									},
 								}).WithStatusSubresource(obj).Build()
 								r.client = cl
@@ -749,6 +756,41 @@ var _ = Describe("Reconciler", func() {
 								res, err := r.Reconcile(ctx, req)
 								Expect(res).To(Equal(reconcile.Result{}))
 								Expect(err).ToNot(HaveOccurred())
+							})
+						})
+					})
+					When("errors that were not 'NotFound' occurred while applying CR status", func() {
+						It("should propagate apply errors to reconciler", func() {
+							By("configuring a client that will error during apply", func() {
+								// Make a client that returns the stale CR, but sends writes to the real client.
+								cl := fake.NewClientBuilder().WithObjects(obj).WithInterceptorFuncs(interceptor.Funcs{
+									Create: func(ctx context.Context, _ client.WithWatch, fakeObj client.Object, opts ...client.CreateOption) error {
+										return mgr.GetClient().Create(ctx, fakeObj, opts...)
+									},
+									Delete: func(ctx context.Context, _ client.WithWatch, fakeObj client.Object, opts ...client.DeleteOption) error {
+										return mgr.GetClient().Delete(ctx, fakeObj, opts...)
+									},
+									DeleteAllOf: func(ctx context.Context, _ client.WithWatch, fakeObj client.Object, opts ...client.DeleteAllOfOption) error {
+										return mgr.GetClient().DeleteAllOf(ctx, fakeObj, opts...)
+									},
+									Update: func(ctx context.Context, _ client.WithWatch, fakeObj client.Object, opts ...client.UpdateOption) error {
+										return mgr.GetClient().Update(ctx, fakeObj, opts...)
+									},
+									Patch: func(ctx context.Context, _ client.WithWatch, fakeObj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+										return mgr.GetClient().Patch(ctx, fakeObj, patch, opts...)
+									},
+									SubResourceUpdate: func(ctx context.Context, client client.Client, subResourceName string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+										return apierrors.NewBadRequest("XXXInvalidXXX")
+									},
+								}).WithStatusSubresource(obj).Build()
+								r.client = cl
+							})
+
+							By("successfully ignoring not found errors and returning a nil error", func() {
+								res, err := r.Reconcile(ctx, req)
+								Expect(res).To(Equal(reconcile.Result{}))
+								Expect(err).To(HaveOccurred())
+								Expect(apierrors.IsBadRequest(err)).To(BeTrue())
 							})
 						})
 					})
