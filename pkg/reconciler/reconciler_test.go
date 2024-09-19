@@ -739,10 +739,10 @@ var _ = Describe("Reconciler", func() {
 										return mgr.GetClient().Patch(ctx, fakeObj, patch, opts...)
 									},
 									SubResourceUpdate: func(ctx context.Context, client client.Client, subResourceName string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
-										// workaround https://github.com/kubernetes/kubernetes/issues/124347
 										err := mgr.GetClient().SubResource(subResourceName).Update(ctx, obj, opts...)
 										if err != nil {
 											if apierrors.IsConflict(err) {
+												// workaround https://github.com/kubernetes/kubernetes/issues/124347
 												return apierrors.NewNotFound(gvk.GroupVersion().WithResource("testapps").GroupResource(), obj.GetName())
 											}
 										}
@@ -762,7 +762,6 @@ var _ = Describe("Reconciler", func() {
 					When("errors that were not 'NotFound' occurred while applying CR status", func() {
 						It("should propagate apply errors to reconciler", func() {
 							By("configuring a client that will error during apply", func() {
-								// Make a client that returns the stale CR, but sends writes to the real client.
 								cl := fake.NewClientBuilder().WithObjects(obj).WithInterceptorFuncs(interceptor.Funcs{
 									Create: func(ctx context.Context, _ client.WithWatch, fakeObj client.Object, opts ...client.CreateOption) error {
 										return mgr.GetClient().Create(ctx, fakeObj, opts...)
@@ -786,7 +785,7 @@ var _ = Describe("Reconciler", func() {
 								r.client = cl
 							})
 
-							By("successfully ignoring not found errors and returning a nil error", func() {
+							By("propagating the error from status update", func() {
 								res, err := r.Reconcile(ctx, req)
 								Expect(res).To(Equal(reconcile.Result{}))
 								Expect(err).To(HaveOccurred())
