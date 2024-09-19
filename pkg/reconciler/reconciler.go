@@ -556,7 +556,7 @@ type ControllerSetupFunc func(c ControllerSetup) error
 //   - Deployed - a release for this CR is deployed (but not necessarily ready).
 //   - ReleaseFailed - an installation or upgrade failed.
 //   - Irreconcilable - an error occurred during reconciliation
-func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, err error) {
+func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl.Result, err error) {
 	log := r.log.WithValues(strings.ToLower(r.gvk.Kind), req.NamespacedName)
 	log.V(1).Info("Reconciliation triggered")
 

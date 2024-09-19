@@ -738,7 +738,7 @@ var _ = Describe("Reconciler", func() {
 									Patch: func(ctx context.Context, _ client.WithWatch, fakeObj client.Object, patch client.Patch, opts ...client.PatchOption) error {
 										return mgr.GetClient().Patch(ctx, fakeObj, patch, opts...)
 									},
-									SubResourceUpdate: func(ctx context.Context, client client.Client, subResourceName string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+									SubResourceUpdate: func(ctx context.Context, _ client.Client, subResourceName string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
 										err := mgr.GetClient().SubResource(subResourceName).Update(ctx, obj, opts...)
 										if err != nil {
 											if apierrors.IsConflict(err) {
@@ -778,7 +778,7 @@ var _ = Describe("Reconciler", func() {
 									Patch: func(ctx context.Context, _ client.WithWatch, fakeObj client.Object, patch client.Patch, opts ...client.PatchOption) error {
 										return mgr.GetClient().Patch(ctx, fakeObj, patch, opts...)
 									},
-									SubResourceUpdate: func(ctx context.Context, client client.Client, subResourceName string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+									SubResourceUpdate: func(_ context.Context, _ client.Client, _ string, _ client.Object, _ ...client.SubResourceUpdateOption) error {
 										return apierrors.NewBadRequest("XXXInvalidXXX")
 									},
 								}).WithStatusSubresource(obj).Build()
