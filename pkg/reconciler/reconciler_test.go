@@ -790,6 +790,10 @@ var _ = Describe("Reconciler", func() {
 								Expect(res).To(Equal(reconcile.Result{}))
 								Expect(err).To(HaveOccurred())
 								Expect(apierrors.IsBadRequest(err)).To(BeTrue())
+
+								var statusErr apierrors.APIStatus
+								Expect(errors.As(err, &statusErr)).To(BeTrue())
+								Expect(statusErr.Status().Message).To(Equal("XXXInvalidXXX"))
 							})
 						})
 					})
