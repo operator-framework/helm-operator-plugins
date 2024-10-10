@@ -556,13 +556,13 @@ type ControllerSetupFunc func(c ControllerSetup) error
 //   - Deployed - a release for this CR is deployed (but not necessarily ready).
 //   - ReleaseFailed - an installation or upgrade failed.
 //   - Irreconcilable - an error occurred during reconciliation
-func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl.Result, err error) {
 	log := r.log.WithValues(strings.ToLower(r.gvk.Kind), req.NamespacedName)
 	log.V(1).Info("Reconciliation triggered")
 
 	obj := &unstructured.Unstructured{}
 	obj.SetGroupVersionKind(*r.gvk)
-	err := r.client.Get(ctx, req.NamespacedName, obj)
+	err = r.client.Get(ctx, req.NamespacedName, obj)
 	if apierrors.IsNotFound(err) {
 		log.V(1).Info("Resource %s/%s not found, nothing to do", req.NamespacedName.Namespace, req.NamespacedName.Name)
 		return ctrl.Result{}, nil
