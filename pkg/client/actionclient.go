@@ -28,6 +28,7 @@ import (
 	"helm.sh/helm/v3/pkg/chart"
 	helmkube "helm.sh/helm/v3/pkg/kube"
 	"helm.sh/helm/v3/pkg/release"
+	"helm.sh/helm/v3/pkg/releaseutil"
 	"helm.sh/helm/v3/pkg/storage/driver"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -52,6 +53,7 @@ func (acgf ActionClientGetterFunc) ActionClientFor(ctx context.Context, obj clie
 
 type ActionInterface interface {
 	Get(name string, opts ...GetOption) (*release.Release, error)
+	History(name string, opts ...HistoryOption) ([]*release.Release, error)
 	Install(name, namespace string, chrt *chart.Chart, vals map[string]interface{}, opts ...InstallOption) (*release.Release, error)
 	Upgrade(name, namespace string, chrt *chart.Chart, vals map[string]interface{}, opts ...UpgradeOption) (*release.Release, error)
 	Uninstall(name string, opts ...UninstallOption) (*release.UninstallReleaseResponse, error)
@@ -59,6 +61,7 @@ type ActionInterface interface {
 }
 
 type GetOption func(*action.Get) error
+type HistoryOption func(*action.History) error
 type InstallOption func(*action.Install) error
 type UpgradeOption func(*action.Upgrade) error
 type UninstallOption func(*action.Uninstall) error
@@ -69,6 +72,13 @@ type ActionClientGetterOption func(*actionClientGetter) error
 func AppendGetOptions(opts ...GetOption) ActionClientGetterOption {
 	return func(getter *actionClientGetter) error {
 		getter.defaultGetOpts = append(getter.defaultGetOpts, opts...)
+		return nil
+	}
+}
+
+func AppendHistoryOptions(opts ...HistoryOption) ActionClientGetterOption {
+	return func(getter *actionClientGetter) error {
+		getter.defaultHistoryOpts = append(getter.defaultHistoryOpts, opts...)
 		return nil
 	}
 }
@@ -139,6 +149,7 @@ type actionClientGetter struct {
 	acg ActionConfigGetter
 
 	defaultGetOpts       []GetOption
+	defaultHistoryOpts   []HistoryOption
 	defaultInstallOpts   []InstallOption
 	defaultUpgradeOpts   []UpgradeOption
 	defaultUninstallOpts []UninstallOption
@@ -174,6 +185,7 @@ func (hcg *actionClientGetter) ActionClientFor(ctx context.Context, obj client.O
 		// on purpose because we want user-provided defaults to be able to override the
 		// post-renderer that we automatically configure for the client.
 		defaultGetOpts:       hcg.defaultGetOpts,
+		defaultHistoryOpts:   hcg.defaultHistoryOpts,
 		defaultInstallOpts:   append([]InstallOption{WithInstallPostRenderer(cpr)}, hcg.defaultInstallOpts...),
 		defaultUpgradeOpts:   append([]UpgradeOption{WithUpgradePostRenderer(cpr)}, hcg.defaultUpgradeOpts...),
 		defaultUninstallOpts: hcg.defaultUninstallOpts,
@@ -188,6 +200,7 @@ type actionClient struct {
 	conf *action.Configuration
 
 	defaultGetOpts       []GetOption
+	defaultHistoryOpts   []HistoryOption
 	defaultInstallOpts   []InstallOption
 	defaultUpgradeOpts   []UpgradeOption
 	defaultUninstallOpts []UninstallOption
@@ -207,6 +220,23 @@ func (c *actionClient) Get(name string, opts ...GetOption) (*release.Release, er
 		}
 	}
 	return get.Run(name)
+}
+
+// History returns the release history for a given release name. The releases are sorted
+// by revision number in descending order.
+func (c *actionClient) History(name string, opts ...HistoryOption) ([]*release.Release, error) {
+	history := action.NewHistory(c.conf)
+	for _, o := range concat(c.defaultHistoryOpts, opts...) {
+		if err := o(history); err != nil {
+			return nil, err
+		}
+	}
+	rels, err := history.Run(name)
+	if err != nil {
+		return nil, err
+	}
+	releaseutil.Reverse(rels, releaseutil.SortByRevision)
+	return rels, nil
 }
 
 func (c *actionClient) Install(name, namespace string, chrt *chart.Chart, vals map[string]interface{}, opts ...InstallOption) (*release.Release, error) {
