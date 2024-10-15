@@ -26,6 +26,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chartutil"
 	"helm.sh/helm/v3/pkg/kube"
@@ -119,6 +120,28 @@ var _ = Describe("ActionClient", func() {
 				Expect(ac).NotTo(BeNil())
 
 				_, err = ac.Get(obj.GetName())
+				Expect(err).To(MatchError(expectErr))
+			})
+			It("should get clients with custom history options", func() {
+				expectMax := rand.Int()
+				acg, err := NewActionClientGetter(actionConfigGetter, AppendHistoryOptions(
+					func(history *action.History) error {
+						history.Max = expectMax
+						return nil
+					},
+					func(history *action.History) error {
+						Expect(history.Max).To(Equal(expectMax))
+						return expectErr
+					},
+				))
+				Expect(err).ToNot(HaveOccurred())
+				Expect(acg).NotTo(BeNil())
+
+				ac, err := acg.ActionClientFor(context.Background(), obj)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(ac).NotTo(BeNil())
+
+				_, err = ac.History(obj.GetName())
 				Expect(err).To(MatchError(expectErr))
 			})
 			It("should get clients with custom install options", func() {
@@ -359,6 +382,13 @@ var _ = Describe("ActionClient", func() {
 					panic(err)
 				}
 			})
+			var _ = Describe("History", func() {
+				It("should return a not found error", func() {
+					rels, err := ac.History(obj.GetName())
+					Expect(err).To(MatchError(driver.ErrReleaseNotFound))
+					Expect(rels).To(BeNil())
+				})
+			})
 			var _ = Describe("Install", func() {
 				It("should succeed", func() {
 					var (
@@ -479,6 +509,36 @@ var _ = Describe("ActionClient", func() {
 						rel, err = ac.Get(obj.GetName(), opt)
 						Expect(err).To(HaveOccurred())
 						Expect(rel).To(BeNil())
+					})
+				})
+			})
+			var _ = Describe("History", func() {
+				When("one revision exists", func() {
+					It("should return a slice of releases of length 1", func() {
+						rels, err := ac.History(obj.GetName())
+						Expect(err).ToNot(HaveOccurred())
+						Expect(rels).To(HaveLen(1))
+						Expect(rels[0].Name).To(Equal(obj.GetName()))
+						Expect(rels[0].Version).To(Equal(1))
+						Expect(rels[0].Info.Status).To(Equal(release.StatusDeployed))
+					})
+				})
+				When("multiple revisions exist", func() {
+					BeforeEach(func() {
+						// Upgrade the release to create a new revision.
+						_, err := ac.Upgrade(obj.GetName(), obj.GetNamespace(), &chrt, vals)
+						Expect(err).ToNot(HaveOccurred())
+					})
+					It("should return a slice of releases of length 2", func() {
+						rels, err := ac.History(obj.GetName())
+						Expect(err).ToNot(HaveOccurred())
+						Expect(rels).To(HaveLen(2))
+						Expect(rels[0].Name).To(Equal(obj.GetName()))
+						Expect(rels[0].Version).To(Equal(2))
+						Expect(rels[0].Info.Status).To(Equal(release.StatusDeployed))
+						Expect(rels[1].Name).To(Equal(obj.GetName()))
+						Expect(rels[1].Version).To(Equal(1))
+						Expect(rels[1].Info.Status).To(Equal(release.StatusSuperseded))
 					})
 				})
 			})

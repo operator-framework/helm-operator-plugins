@@ -50,12 +50,14 @@ func (hcg *fakeActionClientGetter) ActionClientFor(_ context.Context, _ crclient
 
 type ActionClient struct {
 	Gets       []GetCall
+	Histories  []HistoryCall
 	Installs   []InstallCall
 	Upgrades   []UpgradeCall
 	Uninstalls []UninstallCall
 	Reconciles []ReconcileCall
 
 	HandleGet       func() (*release.Release, error)
+	HandleHistory   func() ([]*release.Release, error)
 	HandleInstall   func() (*release.Release, error)
 	HandleUpgrade   func() (*release.Release, error)
 	HandleUninstall func() (*release.UninstallReleaseResponse, error)
@@ -66,6 +68,9 @@ func NewActionClient() ActionClient {
 	relFunc := func(err error) func() (*release.Release, error) {
 		return func() (*release.Release, error) { return nil, err }
 	}
+	historyFunc := func(err error) func() ([]*release.Release, error) {
+		return func() ([]*release.Release, error) { return nil, err }
+	}
 	uninstFunc := func(err error) func() (*release.UninstallReleaseResponse, error) {
 		return func() (*release.UninstallReleaseResponse, error) { return nil, err }
 	}
@@ -74,12 +79,14 @@ func NewActionClient() ActionClient {
 	}
 	return ActionClient{
 		Gets:       make([]GetCall, 0),
+		Histories:  make([]HistoryCall, 0),
 		Installs:   make([]InstallCall, 0),
 		Upgrades:   make([]UpgradeCall, 0),
 		Uninstalls: make([]UninstallCall, 0),
 		Reconciles: make([]ReconcileCall, 0),
 
 		HandleGet:       relFunc(errors.New("get not implemented")),
+		HandleHistory:   historyFunc(errors.New("history not implemented")),
 		HandleInstall:   relFunc(errors.New("install not implemented")),
 		HandleUpgrade:   relFunc(errors.New("upgrade not implemented")),
 		HandleUninstall: uninstFunc(errors.New("uninstall not implemented")),
@@ -92,6 +99,11 @@ var _ client.ActionInterface = &ActionClient{}
 type GetCall struct {
 	Name string
 	Opts []client.GetOption
+}
+
+type HistoryCall struct {
+	Name string
+	Opts []client.HistoryOption
 }
 
 type InstallCall struct {
@@ -122,6 +134,11 @@ type ReconcileCall struct {
 func (c *ActionClient) Get(name string, opts ...client.GetOption) (*release.Release, error) {
 	c.Gets = append(c.Gets, GetCall{name, opts})
 	return c.HandleGet()
+}
+
+func (c *ActionClient) History(name string, opts ...client.HistoryOption) ([]*release.Release, error) {
+	c.Histories = append(c.Histories, HistoryCall{name, opts})
+	return c.HandleHistory()
 }
 
 func (c *ActionClient) Install(name, namespace string, chrt *chart.Chart, vals map[string]interface{}, opts ...client.InstallOption) (*release.Release, error) {
