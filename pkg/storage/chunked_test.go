@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -94,6 +95,28 @@ var _ = Describe("chunkedSecrets", func() {
 			})
 			_, err := maxReadDriver.Get(releaseKey(rel))
 			Expect(err).To(MatchError(ContainSubstring("release too large")))
+		})
+		It("should handle release labels that are invalid metadata labels", func() {
+			invalidMetadataLabelKey := "stored-as-annotation"
+			invalidMetadataLabelValue := strings.Repeat("a", 64)
+
+			expected := genRelease("test-release", 1, release.StatusPendingInstall, map[string]string{invalidMetadataLabelKey: invalidMetadataLabelValue}, chunkSize/2)
+			Expect(expected.Labels).To(HaveKey(invalidMetadataLabelKey))
+			Expect(chunkedDriver.Create(releaseKey(expected), expected)).To(Succeed())
+
+			// Make sure the release-only label is in the release metadata
+			actual, err := chunkedDriver.Get(releaseKey(expected))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(actual).To(Equal(expected))
+			Expect(actual.Labels).To(HaveKey(invalidMetadataLabelKey))
+			Expect(actual.Labels[invalidMetadataLabelKey]).To(Equal(invalidMetadataLabelValue))
+
+			// Make sure the invalid label is stored in the secret annotations, not labels
+			items, err := secretInterface.List(context.Background(), metav1.ListOptions{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(items.Items).To(HaveLen(1))
+			Expect(items.Items[0].Labels).ToNot(HaveKey(invalidMetadataLabelKey))
+			Expect(items.Items[0].Annotations).To(HaveKey(invalidMetadataLabelKey))
 		})
 	})
 

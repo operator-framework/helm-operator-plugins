@@ -10,6 +10,7 @@ import (
 	"hash"
 	"hash/fnv"
 	"io"
+	"maps"
 	"strconv"
 	"sync"
 	"time"
@@ -147,12 +148,13 @@ func (c *chunkedSecrets) indexSecretFromChunks(key string, rls *release.Release,
 		panic(err)
 	}
 
-	indexLabels := newIndexLabels(c.owner, key, rls)
+	indexLabels, indexAnnotations := newIndexLabelsAndAnnotations(c.owner, key, rls)
 	indexSecret := &corev1.Secret{
 		Type: SecretTypeChunkedIndex,
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   key,
-			Labels: indexLabels,
+			Name:        key,
+			Labels:      indexLabels,
+			Annotations: indexAnnotations,
 		},
 		Immutable: ptr.To(false),
 		Data: map[string][]byte{
@@ -403,6 +405,7 @@ func (c *chunkedSecrets) decodeRelease(ctx context.Context, indexSecret *corev1.
 		return nil, fmt.Errorf("failed to decode release: %w", err)
 	}
 	r.Labels = filterSystemLabels(indexSecret.Labels)
+	maps.Copy(r.Labels, indexSecret.Annotations)
 	return &r, nil
 }
 
