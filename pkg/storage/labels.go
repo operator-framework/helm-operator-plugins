@@ -6,32 +6,17 @@ import (
 	"helm.sh/helm/v3/pkg/release"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/validation"
 )
 
-func newIndexLabelsAndAnnotations(owner, key string, rls *release.Release) (map[string]string, map[string]string) {
+func newIndexLabels(owner, key string, rls *release.Release) map[string]string {
 	labels := map[string]string{}
-	annotations := map[string]string{}
-	for k, v := range rls.Labels {
-		if promoteToAnnotation(k, v) {
-			annotations[k] = v
-		} else {
-			labels[k] = v
-		}
-	}
-
 	labels["name"] = rls.Name
 	labels["owner"] = owner
 	labels["status"] = rls.Info.Status.String()
 	labels["version"] = strconv.Itoa(rls.Version)
 	labels["key"] = key
 	labels["type"] = "index"
-	return labels, annotations
-}
-
-func promoteToAnnotation(k, v string) bool {
-	isValidLabel := len(validation.IsQualifiedName(k)) == 0 && len(validation.IsValidLabelValue(v)) == 0
-	return !isValidLabel
+	return labels
 }
 
 func newChunkLabels(owner, key string) map[string]string {
