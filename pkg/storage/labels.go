@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"maps"
 	"strconv"
 
 	"helm.sh/helm/v3/pkg/release"
@@ -11,7 +10,6 @@ import (
 
 func newIndexLabels(owner, key string, rls *release.Release) map[string]string {
 	labels := map[string]string{}
-	maps.Copy(labels, rls.Labels)
 	labels["name"] = rls.Name
 	labels["owner"] = owner
 	labels["status"] = rls.Info.Status.String()

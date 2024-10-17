@@ -94,6 +94,18 @@ type chunk struct {
 	data []byte
 }
 
+type releaseWrapper struct {
+	release.Release
+	Labels map[string]string `json:"labels"`
+}
+
+func wrapRelease(rls *release.Release) *releaseWrapper {
+	return &releaseWrapper{
+		Release: *rls,
+		Labels:  rls.Labels,
+	}
+}
+
 // encodeRelease encodes a release returning a base64 encoded
 // gzipped string representation, or error.
 func (c *chunkedSecrets) encodeReleaseAsChunks(key string, rls *release.Release) ([]chunk, error) {
@@ -105,7 +117,7 @@ func (c *chunkedSecrets) encodeReleaseAsChunks(key string, rls *release.Release)
 			return err
 		}
 		defer gzw.Close()
-		return json.NewEncoder(gzw).Encode(rls)
+		return json.NewEncoder(gzw).Encode(wrapRelease(rls))
 	}(); err != nil {
 		return nil, err
 	}
@@ -318,29 +330,51 @@ func (c *chunkedSecrets) Query(queryLabels map[string]string) ([]*release.Releas
 	c.Log("query: labels=%v", queryLabels)
 	defer c.Log("queried: labels=%v", queryLabels)
 
-	selector := newListIndicesLabelSelector(c.owner)
-	if queryRequirements, selectable := labels.Set(queryLabels).AsSelector().Requirements(); selectable {
-		selector = selector.Add(queryRequirements...)
+	// The only labels that get stored on the index secret are system labels, so we'll do a two-pass
+	// query. First, we'll request index secrets from the API server that match the query labels that
+	// are system labels. From there, we decode the releases that match, and then further filter those
+	// based on the rest of the query labels that are not system labels.
+	serverSelectorSet := labels.Set{}
+	clientSelectorSet := labels.Set{}
+	for k, v := range queryLabels {
+		if isSystemLabel(k) {
+			serverSelectorSet[k] = v
+		} else {
+			clientSelectorSet[k] = v
+		}
 	}
 
-	indexSecrets, err := c.client.List(context.Background(), metav1.ListOptions{LabelSelector: selector.String()})
+	// Pass 1: build the server selector and query for index secrets
+	serverSelector := newListIndicesLabelSelector(c.owner)
+	if queryRequirements, selectable := serverSelectorSet.AsSelector().Requirements(); selectable {
+		serverSelector = serverSelector.Add(queryRequirements...)
+	}
+
+	indexSecrets, err := c.client.List(context.Background(), metav1.ListOptions{LabelSelector: serverSelector.String()})
 	if err != nil {
 		return nil, fmt.Errorf("query: %w", err)
 	}
 
-	if len(indexSecrets.Items) == 0 {
-		return nil, driver.ErrReleaseNotFound
-	}
-
+	// Pass 2: decode the releases that matched the server selector and filter based on the client selector
 	results := make([]*release.Release, 0, len(indexSecrets.Items))
+	clientSelector := clientSelectorSet.AsSelector()
 	for _, indexSecret := range indexSecrets.Items {
 		indexSecret := indexSecret
 		rls, err := c.decodeRelease(context.Background(), &indexSecret)
 		if err != nil {
 			return nil, fmt.Errorf("query: failed to decode release: %w", err)
 		}
+
+		if !clientSelector.Matches(labels.Set(rls.Labels)) {
+			continue
+		}
 		results = append(results, rls)
 	}
+
+	if len(results) == 0 {
+		return nil, driver.ErrReleaseNotFound
+	}
+
 	return results, nil
 }
 
@@ -398,11 +432,13 @@ func (c *chunkedSecrets) decodeRelease(ctx context.Context, indexSecret *corev1.
 		return nil, fmt.Errorf("failed to create gzip reader: %w", err)
 	}
 	releaseDecoder := json.NewDecoder(gzr)
-	var r release.Release
-	if err := releaseDecoder.Decode(&r); err != nil {
+	var wrappedRelease releaseWrapper
+	if err := releaseDecoder.Decode(&wrappedRelease); err != nil {
 		return nil, fmt.Errorf("failed to decode release: %w", err)
 	}
-	r.Labels = filterSystemLabels(indexSecret.Labels)
+
+	r := wrappedRelease.Release
+	r.Labels = filterSystemLabels(wrappedRelease.Labels)
 	return &r, nil
 }
 
