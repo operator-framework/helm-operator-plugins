@@ -1,4 +1,4 @@
-This document walks through the release process for helm-operator-plugins.
+# Release process for `helm-operator-plugins`
 
 1. Creation of pre-release PR:
 
