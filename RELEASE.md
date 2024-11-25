@@ -18,23 +18,25 @@ Run `make generate` to re-generate the `testdata/` with above modifications.
 **Note**
 The release PR with the above mentioned change will **fail** the `sanity` test and needs to be merged forcefully. This step is done because the packages which are to be imported in the scaffolded project and the plugin code reside in the same repository. This will ensure that after the release, the plugin will also import the updated version of library helpers.
 
-2. Create a release branch with the name vX.Y.x. Example: `git checkout -b v0.0.10`.
+2. For convenience, create a variable for the target version: `VER=v0.0.10`
 
-3. Tag the release commit and verify the generated tag.
+3. Create a release branch with the name vX.Y.Z. Example: `git checkout -b $VER`.
+
+4. Tag the release commit and verify the generated tag.
 
 ```
-export VER=v0.0.10
+VER=v0.0.10
 git tag --sign --message "helm-operator-plugin $VER" "$VER"
 git verify-tag --verbose $VER
 ```
 
-4. Push the release branch and tag:
+5. Push the release branch and tag:
 
 ```
 git push upstream <release-branch>
 git push upstream $VER
 ```
 
-5. Make sure that the release notes are updated in the github release page (Github provides an option to auto-generate the notes).
+6. Make sure that the release notes are updated in the github release page (Github provides an option to auto-generate the notes).
 
-6. After the release, make sure to run `make test-sanity` from the main branch to ensure that `testdata` is up-to date. If not, create a PR to update the changes.
+7. After the release, make sure to run `make test-sanity` from the main branch to ensure that `testdata` is up-to date. If not, create a PR to update the changes.
