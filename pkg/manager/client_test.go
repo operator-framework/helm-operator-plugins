@@ -87,9 +87,9 @@ var _ = Describe("NewCachingClientBuilder", func() {
 			Expect(cl.Create(context.TODO(), cfgMap)).To(Succeed())
 		})
 		AfterEach(func() {
-			Eventually(func() error { return client.IgnoreNotFound(cl.Delete(context.TODO(), pod)) }).Should(BeNil())
-			Eventually(func() error { return client.IgnoreNotFound(cl.Delete(context.TODO(), cfgMap)) }).Should(BeNil())
-			Eventually(func() error { return client.IgnoreNotFound(cl.Delete(context.TODO(), ns)) }).Should(BeNil())
+			Eventually(func() error { return client.IgnoreNotFound(cl.Delete(context.TODO(), pod)) }).Should(Succeed())
+			Eventually(func() error { return client.IgnoreNotFound(cl.Delete(context.TODO(), cfgMap)) }).Should(Succeed())
+			Eventually(func() error { return client.IgnoreNotFound(cl.Delete(context.TODO(), ns)) }).Should(Succeed())
 		})
 
 		When("caches are not started", func() {

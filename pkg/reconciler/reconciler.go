@@ -324,12 +324,12 @@ func SkipPrimaryGVKSchemeRegistration(skip bool) Option {
 // concurrent reconciles that the controller will run.
 //
 // The default is 1.
-func WithMaxConcurrentReconciles(max int) Option {
+func WithMaxConcurrentReconciles(value int) Option {
 	return func(r *Reconciler) error {
-		if max < 1 {
+		if value < 1 {
 			return errors.New("maxConcurrentReconciles must be at least 1")
 		}
-		r.maxConcurrentReconciles = max
+		r.maxConcurrentReconciles = value
 		return nil
 	}
 }
