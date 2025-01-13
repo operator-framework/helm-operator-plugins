@@ -1,6 +1,8 @@
 module github.com/operator-framework/helm-operator-plugins
 
-go 1.22.1
+go 1.23.0
+
+toolchain go1.23.4
 
 require (
 	github.com/go-logr/logr v1.4.2
