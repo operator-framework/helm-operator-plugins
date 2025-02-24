@@ -394,6 +394,13 @@ var _ = Describe("Reconciler", func() {
 				}))
 			})
 		})
+		_ = Describe("WithPauseReconcileAnnotation", func() {
+			It("should set the pauseReconcileAnnotation field to the annotation name", func() {
+				a := "my.domain/pause-reconcile"
+				Expect(WithPauseReconcileAnnotation(a)(r)).To(Succeed())
+				Expect(r.pauseReconcileAnnotation).To(Equal(a))
+			})
+		})
 		_ = Describe("WithPreHook", func() {
 			It("should set a reconciler prehook", func() {
 				called := false
@@ -535,6 +542,7 @@ var _ = Describe("Reconciler", func() {
 						WithInstallAnnotations(annotation.InstallDescription{}),
 						WithUpgradeAnnotations(annotation.UpgradeDescription{}),
 						WithUninstallAnnotations(annotation.UninstallDescription{}),
+						WithPauseReconcileAnnotation("my.domain/pause-reconcile"),
 						WithOverrideValues(map[string]string{
 							"image.repository": "custom-nginx",
 						}),
@@ -549,6 +557,7 @@ var _ = Describe("Reconciler", func() {
 						WithInstallAnnotations(annotation.InstallDescription{}),
 						WithUpgradeAnnotations(annotation.UpgradeDescription{}),
 						WithUninstallAnnotations(annotation.UninstallDescription{}),
+						WithPauseReconcileAnnotation("my.domain/pause-reconcile"),
 						WithOverrideValues(map[string]string{
 							"image.repository": "custom-nginx",
 						}),
@@ -1407,6 +1416,64 @@ var _ = Describe("Reconciler", func() {
 							It("uninstalls the release and removes the finalizer", func() {
 								By("deleting the CR", func() {
 									Expect(mgr.GetClient().Delete(ctx, obj)).To(Succeed())
+								})
+
+								By("successfully reconciling a request", func() {
+									res, err := r.Reconcile(ctx, req)
+									Expect(res).To(Equal(reconcile.Result{}))
+									Expect(err).ToNot(HaveOccurred())
+								})
+
+								By("verifying the release is uninstalled", func() {
+									verifyNoRelease(ctx, mgr.GetClient(), obj.GetNamespace(), obj.GetName(), currentRelease)
+								})
+
+								By("ensuring the finalizer is removed and the CR is deleted", func() {
+									err := mgr.GetAPIReader().Get(ctx, objKey, obj)
+									Expect(apierrors.IsNotFound(err)).To(BeTrue())
+								})
+							})
+						})
+						When("pause-reconcile annotation is present", func() {
+							It("pauses reconciliation", func() {
+								By("adding the pause-reconcile annotation to the CR", func() {
+									Expect(mgr.GetClient().Get(ctx, objKey, obj)).To(Succeed())
+									obj.SetAnnotations(map[string]string{"my.domain/pause-reconcile": "true"})
+									obj.Object["spec"] = map[string]interface{}{"replicaCount": "666"}
+									Expect(mgr.GetClient().Update(ctx, obj)).To(Succeed())
+								})
+
+								By("deleting the CR", func() {
+									Expect(mgr.GetClient().Delete(ctx, obj)).To(Succeed())
+								})
+
+								By("successfully reconciling a request when paused", func() {
+									res, err := r.Reconcile(ctx, req)
+									Expect(res).To(Equal(reconcile.Result{}))
+									Expect(err).ToNot(HaveOccurred())
+								})
+
+								By("getting the CR", func() {
+									Expect(mgr.GetAPIReader().Get(ctx, objKey, obj)).To(Succeed())
+								})
+
+								By("verifying the CR status is Paused", func() {
+									objStat := &objStatus{}
+									Expect(runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, objStat)).To(Succeed())
+									Expect(objStat.Status.Conditions.IsTrueFor(conditions.TypePaused)).To(BeTrue())
+								})
+
+								By("verifying the release has not changed", func() {
+									rel, err := ac.Get(obj.GetName())
+									Expect(err).ToNot(HaveOccurred())
+									Expect(rel).NotTo(BeNil())
+									Expect(*rel).To(Equal(*currentRelease))
+								})
+
+								By("removing the pause-reconcile annotation from the CR", func() {
+									Expect(mgr.GetClient().Get(ctx, objKey, obj)).To(Succeed())
+									obj.SetAnnotations(nil)
+									Expect(mgr.GetClient().Update(ctx, obj)).To(Succeed())
 								})
 
 								By("successfully reconciling a request", func() {

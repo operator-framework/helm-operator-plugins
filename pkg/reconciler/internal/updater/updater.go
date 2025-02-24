@@ -146,6 +146,12 @@ func EnsureConditionUnknown(t status.ConditionType) UpdateStatusFunc {
 	}
 }
 
+func EnsureConditionAbsent(t status.ConditionType) UpdateStatusFunc {
+	return func(status *helmAppStatus) bool {
+		return status.Conditions.RemoveCondition(t)
+	}
+}
+
 func EnsureDeployedRelease(rel *release.Release) UpdateStatusFunc {
 	return func(status *helmAppStatus) bool {
 		newRel := helmAppReleaseFor(rel)
