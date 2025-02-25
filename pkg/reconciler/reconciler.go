@@ -621,13 +621,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl.Re
 		}
 	}
 
-	u.UpdateStatus(
-		// TODO(ROX-12637): change to updater.EnsureCondition(conditions.Paused(corev1.ConditionFalse, "", "")))
-		// once stackrox operator with pause support is released.
-		// At that time also add `Paused` to the list of conditions expected in stackrox operator e2e tests.
-		// Otherwise, the number of conditions in the `status.conditions` list will vary depending on the version
-		// of used operator, which is cumbersome due to https://github.com/kudobuilder/kuttl/issues/76
-		updater.EnsureConditionAbsent(conditions.TypePaused))
+	u.UpdateStatus(updater.EnsureCondition(conditions.Paused(corev1.ConditionFalse, "", "")))
 
 	actionClient, err := r.actionClientGetter.ActionClientFor(ctx, obj)
 	if err != nil {
