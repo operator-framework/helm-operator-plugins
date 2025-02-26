@@ -200,6 +200,16 @@ var _ = Describe("Reconciler", func() {
 				Expect(r.skipDependentWatches).To(BeTrue())
 			})
 		})
+		_ = Describe("StripManifestFromStatus", func() {
+			It("should set to false", func() {
+				Expect(StripManifestFromStatus(false)(r)).To(Succeed())
+				Expect(r.stripManifestFromStatus).To(BeFalse())
+			})
+			It("should set to true", func() {
+				Expect(StripManifestFromStatus(true)(r)).To(Succeed())
+				Expect(r.stripManifestFromStatus).To(BeTrue())
+			})
+		})
 		_ = Describe("WithMaxConcurrentReconciles", func() {
 			It("should set the reconciler max concurrent reconciled", func() {
 				Expect(WithMaxConcurrentReconciles(1)(r)).To(Succeed())
