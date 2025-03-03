@@ -518,7 +518,7 @@ func WithControllerSetupFunc(f ControllerSetupFunc) Option {
 }
 
 // ControllerSetup allows restricted access to the Controller using the WithControllerSetupFunc option.
-// Currently, the only supposed configuration is adding additional watches to the controller.
+// Currently, the only supported configuration is adding additional watches to the controller.
 type ControllerSetup interface {
 	// Watch takes events provided by a Source and uses the EventHandler to
 	// enqueue reconcile.Requests in response to the events.
