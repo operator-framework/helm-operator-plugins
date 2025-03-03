@@ -394,13 +394,6 @@ var _ = Describe("Reconciler", func() {
 				}))
 			})
 		})
-		_ = Describe("WithPauseReconcileAnnotation", func() {
-			It("should set the pauseReconcileAnnotation field to the annotation name", func() {
-				a := "my.domain/pause-reconcile"
-				Expect(WithPauseReconcileAnnotation(a)(r)).To(Succeed())
-				Expect(r.pauseReconcileAnnotation).To(Equal(a))
-			})
-		})
 		_ = Describe("WithPreHook", func() {
 			It("should set a reconciler prehook", func() {
 				called := false
@@ -542,7 +535,7 @@ var _ = Describe("Reconciler", func() {
 						WithInstallAnnotations(annotation.InstallDescription{}),
 						WithUpgradeAnnotations(annotation.UpgradeDescription{}),
 						WithUninstallAnnotations(annotation.UninstallDescription{}),
-						WithPauseReconcileAnnotation("my.domain/pause-reconcile"),
+						WithPauseReconcileHandler(PauseReconcileIfAnnotationTrue("my.domain/pause-reconcile")),
 						WithOverrideValues(map[string]string{
 							"image.repository": "custom-nginx",
 						}),
@@ -557,7 +550,7 @@ var _ = Describe("Reconciler", func() {
 						WithInstallAnnotations(annotation.InstallDescription{}),
 						WithUpgradeAnnotations(annotation.UpgradeDescription{}),
 						WithUninstallAnnotations(annotation.UninstallDescription{}),
-						WithPauseReconcileAnnotation("my.domain/pause-reconcile"),
+						WithPauseReconcileHandler(PauseReconcileIfAnnotationTrue("my.domain/pause-reconcile")),
 						WithOverrideValues(map[string]string{
 							"image.repository": "custom-nginx",
 						}),

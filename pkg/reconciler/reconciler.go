@@ -83,13 +83,13 @@ type Reconciler struct {
 	maxReleaseHistory                *int
 	skipPrimaryGVKSchemeRegistration bool
 	controllerSetupFuncs             []ControllerSetupFunc
+	pauseHandler                     PauseReconcileHandlerFunc
 
-	annotSetupOnce           sync.Once
-	annotations              map[string]struct{}
-	installAnnotations       map[string]annotation.Install
-	upgradeAnnotations       map[string]annotation.Upgrade
-	uninstallAnnotations     map[string]annotation.Uninstall
-	pauseReconcileAnnotation string
+	annotSetupOnce       sync.Once
+	annotations          map[string]struct{}
+	installAnnotations   map[string]annotation.Install
+	upgradeAnnotations   map[string]annotation.Upgrade
+	uninstallAnnotations map[string]annotation.Uninstall
 }
 
 // New creates a new Reconciler that reconciles custom resources that define a
@@ -440,15 +440,32 @@ func WithUninstallAnnotations(as ...annotation.Uninstall) Option {
 	}
 }
 
-// WithPauseReconcileAnnotation is an Option that sets
-// a PauseReconcile annotation. If the Custom Resource watched by this
-// reconciler has the given annotation, and its value is set to `true`,
-// then reconciliation for this CR will not be performed until this annotation
-// is removed.
-func WithPauseReconcileAnnotation(annotationName string) Option {
+// PauseReconcileHandlerFunc defines a function type that determines whether reconciliation should be paused
+// for a given custom resource
+type PauseReconcileHandlerFunc func(ctx context.Context, obj *unstructured.Unstructured) (bool, error)
+
+// WithPauseReconcileHandler is an Option that sets a PauseReconcile handler, which is a function that
+// that determines whether reconciliation should be paused for the custom resource watched by this reconciler.
+//
+// Example usage: WithPauseReconcileHandler(PauseReconcileIfAnnotationTrue("my.domain/pause-reconcile"))
+func WithPauseReconcileHandler(handler PauseReconcileHandlerFunc) Option {
 	return func(r *Reconciler) error {
-		r.pauseReconcileAnnotation = annotationName
+		r.pauseHandler = handler
 		return nil
+	}
+}
+
+// PauseReconcileIfAnnotationTrue returns a PauseReconcileHandlerFunc that pauses reconciliation if the given
+// annotation is present and set to "true"
+func PauseReconcileIfAnnotationTrue(annotationName string) PauseReconcileHandlerFunc {
+	return func(ctx context.Context, obj *unstructured.Unstructured) (bool, error) {
+		if v, ok := obj.GetAnnotations()[annotationName]; ok {
+			if v == "true" {
+				return true, nil
+			}
+		}
+
+		return false, nil
 	}
 }
 
@@ -604,21 +621,22 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl.Re
 		}
 	}()
 
-	if r.pauseReconcileAnnotation != "" {
-		if v, ok := obj.GetAnnotations()[r.pauseReconcileAnnotation]; ok {
-			if v == "true" {
-				log.Info(fmt.Sprintf("Resource has '%s' annotation set to 'true', reconcile paused.", r.pauseReconcileAnnotation))
-				u.UpdateStatus(
-					updater.EnsureCondition(conditions.Paused(corev1.ConditionTrue, conditions.ReasonPauseReconcileAnnotationTrue, "")),
-					updater.EnsureConditionUnknown(conditions.TypeIrreconcilable),
-					updater.EnsureConditionUnknown(conditions.TypeDeployed),
-					updater.EnsureConditionUnknown(conditions.TypeInitialized),
-					updater.EnsureConditionUnknown(conditions.TypeReleaseFailed),
-					updater.EnsureDeployedRelease(nil),
-				)
-				return ctrl.Result{}, nil
-			}
-		}
+	paused, err := r.pauseHandler(ctx, obj)
+	if err != nil {
+		log.Error(err, "pause reconcile handler failed")
+	}
+
+	if paused {
+		log.Info("Reconcile is paused for this resource.")
+		u.UpdateStatus(
+			updater.EnsureCondition(conditions.Paused(corev1.ConditionTrue, conditions.ReasonPauseReconcileAnnotationTrue, "")),
+			updater.EnsureConditionUnknown(conditions.TypeIrreconcilable),
+			updater.EnsureConditionUnknown(conditions.TypeDeployed),
+			updater.EnsureConditionUnknown(conditions.TypeInitialized),
+			updater.EnsureConditionUnknown(conditions.TypeReleaseFailed),
+			updater.EnsureDeployedRelease(nil),
+		)
+		return ctrl.Result{}, nil
 	}
 
 	u.UpdateStatus(updater.EnsureCondition(conditions.Paused(corev1.ConditionFalse, "", "")))
