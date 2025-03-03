@@ -621,22 +621,24 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl.Re
 		}
 	}()
 
-	paused, err := r.pauseHandler(ctx, obj)
-	if err != nil {
-		log.Error(err, "pause reconcile handler failed")
-	}
+	if r.pauseHandler != nil {
+		paused, err := r.pauseHandler(ctx, obj)
+		if err != nil {
+			log.Error(err, "pause reconcile handler failed")
+		}
 
-	if paused {
-		log.Info("Reconcile is paused for this resource.")
-		u.UpdateStatus(
-			updater.EnsureCondition(conditions.Paused(corev1.ConditionTrue, conditions.ReasonPauseReconcileAnnotationTrue, "")),
-			updater.EnsureConditionUnknown(conditions.TypeIrreconcilable),
-			updater.EnsureConditionUnknown(conditions.TypeDeployed),
-			updater.EnsureConditionUnknown(conditions.TypeInitialized),
-			updater.EnsureConditionUnknown(conditions.TypeReleaseFailed),
-			updater.EnsureDeployedRelease(nil),
-		)
-		return ctrl.Result{}, nil
+		if paused {
+			log.Info("Reconcile is paused for this resource.")
+			u.UpdateStatus(
+				updater.EnsureCondition(conditions.Paused(corev1.ConditionTrue, conditions.ReasonPauseReconcileAnnotationTrue, "")),
+				updater.EnsureConditionUnknown(conditions.TypeIrreconcilable),
+				updater.EnsureConditionUnknown(conditions.TypeDeployed),
+				updater.EnsureConditionUnknown(conditions.TypeInitialized),
+				updater.EnsureConditionUnknown(conditions.TypeReleaseFailed),
+				updater.EnsureDeployedRelease(nil),
+			)
+			return ctrl.Result{}, nil
+		}
 	}
 
 	u.UpdateStatus(updater.EnsureCondition(conditions.Paused(corev1.ConditionFalse, "", "")))

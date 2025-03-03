@@ -535,7 +535,6 @@ var _ = Describe("Reconciler", func() {
 						WithInstallAnnotations(annotation.InstallDescription{}),
 						WithUpgradeAnnotations(annotation.UpgradeDescription{}),
 						WithUninstallAnnotations(annotation.UninstallDescription{}),
-						WithPauseReconcileHandler(PauseReconcileIfAnnotationTrue("my.domain/pause-reconcile")),
 						WithOverrideValues(map[string]string{
 							"image.repository": "custom-nginx",
 						}),
@@ -550,7 +549,6 @@ var _ = Describe("Reconciler", func() {
 						WithInstallAnnotations(annotation.InstallDescription{}),
 						WithUpgradeAnnotations(annotation.UpgradeDescription{}),
 						WithUninstallAnnotations(annotation.UninstallDescription{}),
-						WithPauseReconcileHandler(PauseReconcileIfAnnotationTrue("my.domain/pause-reconcile")),
 						WithOverrideValues(map[string]string{
 							"image.repository": "custom-nginx",
 						}),
@@ -1429,6 +1427,11 @@ var _ = Describe("Reconciler", func() {
 						})
 						When("pause-reconcile annotation is present", func() {
 							It("pauses reconciliation", func() {
+								By("adding a pause-reconcile handler to the Reconciler", func() {
+									pauseHandler := WithPauseReconcileHandler(PauseReconcileIfAnnotationTrue("my.domain/pause-reconcile"))
+									pauseHandler(r)
+								})
+
 								By("adding the pause-reconcile annotation to the CR", func() {
 									Expect(mgr.GetClient().Get(ctx, objKey, obj)).To(Succeed())
 									obj.SetAnnotations(map[string]string{"my.domain/pause-reconcile": "true"})
