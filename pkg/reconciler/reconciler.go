@@ -445,7 +445,7 @@ func WithUninstallAnnotations(as ...annotation.Uninstall) Option {
 type PauseReconcileHandlerFunc func(ctx context.Context, obj *unstructured.Unstructured) (bool, error)
 
 // WithPauseReconcileHandler is an Option that sets a PauseReconcile handler, which is a function that
-// that determines whether reconciliation should be paused for the custom resource watched by this reconciler.
+// determines whether reconciliation should be paused for the custom resource watched by this reconciler.
 //
 // Example usage: WithPauseReconcileHandler(PauseReconcileIfAnnotationTrue("my.domain/pause-reconcile"))
 func WithPauseReconcileHandler(handler PauseReconcileHandlerFunc) Option {
@@ -459,10 +459,8 @@ func WithPauseReconcileHandler(handler PauseReconcileHandlerFunc) Option {
 // annotation is present and set to "true"
 func PauseReconcileIfAnnotationTrue(annotationName string) PauseReconcileHandlerFunc {
 	return func(ctx context.Context, obj *unstructured.Unstructured) (bool, error) {
-		if v, ok := obj.GetAnnotations()[annotationName]; ok {
-			if v == "true" {
-				return true, nil
-			}
+		if v, ok := obj.GetAnnotations()[annotationName]; ok && v == "true" {
+			return true, nil
 		}
 
 		return false, nil
