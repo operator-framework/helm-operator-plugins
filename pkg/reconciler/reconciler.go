@@ -564,7 +564,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl.Re
 	obj.SetGroupVersionKind(*r.gvk)
 	err = r.client.Get(ctx, req.NamespacedName, obj)
 	if apierrors.IsNotFound(err) {
-		log.V(1).Info("Resource %s/%s not found, nothing to do", req.NamespacedName.Namespace, req.NamespacedName.Name)
+		log.V(1).Info("Resource not found, nothing to do")
 		return ctrl.Result{}, nil
 	}
 	if err != nil {
