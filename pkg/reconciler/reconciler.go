@@ -83,6 +83,7 @@ type Reconciler struct {
 	maxReleaseHistory                *int
 	skipPrimaryGVKSchemeRegistration bool
 	controllerSetupFuncs             []ControllerSetupFunc
+	pauseHandler                     PauseReconcileHandlerFunc
 
 	annotSetupOnce       sync.Once
 	annotations          map[string]struct{}
@@ -439,6 +440,33 @@ func WithUninstallAnnotations(as ...annotation.Uninstall) Option {
 	}
 }
 
+// PauseReconcileHandlerFunc defines a function type that determines whether reconciliation should be paused
+// for a given custom resource
+type PauseReconcileHandlerFunc func(ctx context.Context, obj *unstructured.Unstructured) (bool, error)
+
+// WithPauseReconcileHandler is an Option that sets a PauseReconcile handler, which is a function that
+// determines whether reconciliation should be paused for the custom resource watched by this reconciler.
+//
+// Example usage: WithPauseReconcileHandler(PauseReconcileIfAnnotationTrue("my.domain/pause-reconcile"))
+func WithPauseReconcileHandler(handler PauseReconcileHandlerFunc) Option {
+	return func(r *Reconciler) error {
+		r.pauseHandler = handler
+		return nil
+	}
+}
+
+// PauseReconcileIfAnnotationTrue returns a PauseReconcileHandlerFunc that pauses reconciliation if the given
+// annotation is present and set to "true"
+func PauseReconcileIfAnnotationTrue(annotationName string) PauseReconcileHandlerFunc {
+	return func(_ context.Context, obj *unstructured.Unstructured) (bool, error) {
+		if v, ok := obj.GetAnnotations()[annotationName]; ok && v == "true" {
+			return true, nil
+		}
+
+		return false, nil
+	}
+}
+
 // WithPreHook is an Option that configures the reconciler to run the given
 // PreHook just before performing any actions (e.g. install, upgrade, uninstall,
 // or reconciliation).
@@ -590,6 +618,28 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl.Re
 			err = applyErr
 		}
 	}()
+
+	if r.pauseHandler != nil {
+		paused, err := r.pauseHandler(ctx, obj)
+		if err != nil {
+			log.Error(err, "pause reconcile handler failed")
+		}
+
+		if paused {
+			log.Info("Reconcile is paused for this resource.")
+			u.UpdateStatus(
+				updater.EnsureCondition(conditions.Paused(corev1.ConditionTrue, conditions.ReasonPauseReconcileAnnotationTrue, "")),
+				updater.EnsureConditionUnknown(conditions.TypeIrreconcilable),
+				updater.EnsureConditionUnknown(conditions.TypeDeployed),
+				updater.EnsureConditionUnknown(conditions.TypeInitialized),
+				updater.EnsureConditionUnknown(conditions.TypeReleaseFailed),
+				updater.EnsureDeployedRelease(nil),
+			)
+			return ctrl.Result{}, nil
+		}
+	}
+
+	u.UpdateStatus(updater.EnsureCondition(conditions.Paused(corev1.ConditionFalse, "", "")))
 
 	actionClient, err := r.actionClientGetter.ActionClientFor(ctx, obj)
 	if err != nil {
