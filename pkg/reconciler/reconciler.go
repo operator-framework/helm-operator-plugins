@@ -458,7 +458,7 @@ func WithPauseReconcileHandler(handler PauseReconcileHandlerFunc) Option {
 // PauseReconcileIfAnnotationTrue returns a PauseReconcileHandlerFunc that pauses reconciliation if the given
 // annotation is present and set to "true"
 func PauseReconcileIfAnnotationTrue(annotationName string) PauseReconcileHandlerFunc {
-	return func(ctx context.Context, obj *unstructured.Unstructured) (bool, error) {
+	return func(_ context.Context, obj *unstructured.Unstructured) (bool, error) {
 		if v, ok := obj.GetAnnotations()[annotationName]; ok && v == "true" {
 			return true, nil
 		}

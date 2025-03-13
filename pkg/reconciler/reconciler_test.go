@@ -1429,7 +1429,7 @@ var _ = Describe("Reconciler", func() {
 							It("pauses reconciliation", func() {
 								By("adding a pause-reconcile handler to the Reconciler", func() {
 									pauseHandler := WithPauseReconcileHandler(PauseReconcileIfAnnotationTrue("my.domain/pause-reconcile"))
-									pauseHandler(r)
+									Expect(pauseHandler(r)).To(Succeed())
 								})
 
 								By("adding the pause-reconcile annotation to the CR", func() {
