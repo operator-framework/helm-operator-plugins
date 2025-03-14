@@ -85,6 +85,8 @@ type Reconciler struct {
 	controllerSetupFuncs             []ControllerSetupFunc
 	pauseHandler                     PauseReconcileHandlerFunc
 
+	stripManifestFromStatus bool
+
 	annotSetupOnce       sync.Once
 	annotations          map[string]struct{}
 	installAnnotations   map[string]annotation.Install
@@ -271,6 +273,17 @@ func WithOverrideValues(overrides map[string]string) Option {
 func SkipDependentWatches(skip bool) Option {
 	return func(r *Reconciler) error {
 		r.skipDependentWatches = skip
+		return nil
+	}
+}
+
+// StripManifestFromStatus is an Option that configures whether the manifest
+// should be removed from the automatically populated status.
+// This is recommended if the manifest might return sensitive data (i.e.,
+// secrets).
+func StripManifestFromStatus(strip bool) Option {
+	return func(r *Reconciler) error {
+		r.stripManifestFromStatus = strip
 		return nil
 	}
 }
@@ -668,7 +681,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl.Re
 	if errors.Is(err, driver.ErrReleaseNotFound) {
 		u.UpdateStatus(updater.EnsureCondition(conditions.Deployed(corev1.ConditionFalse, "", "")))
 	} else if err == nil {
-		ensureDeployedRelease(&u, rel)
+		r.ensureDeployedRelease(&u, rel)
 	}
 	u.UpdateStatus(updater.EnsureCondition(conditions.Initialized(corev1.ConditionTrue, "", "")))
 
@@ -734,7 +747,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl.Re
 		}
 	}
 
-	ensureDeployedRelease(&u, rel)
+	r.ensureDeployedRelease(&u, rel)
 	u.UpdateStatus(
 		updater.EnsureCondition(conditions.ReleaseFailed(corev1.ConditionFalse, "", "")),
 		updater.EnsureCondition(conditions.Irreconcilable(corev1.ConditionFalse, "", "")),
@@ -1071,7 +1084,7 @@ func (r *Reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) err
 	return nil
 }
 
-func ensureDeployedRelease(u *updater.Updater, rel *release.Release) {
+func (r *Reconciler) ensureDeployedRelease(u *updater.Updater, rel *release.Release) {
 	reason := conditions.ReasonInstallSuccessful
 	message := "release was successfully installed"
 	if rel.Version > 1 {
@@ -1081,6 +1094,13 @@ func ensureDeployedRelease(u *updater.Updater, rel *release.Release) {
 	if rel.Info != nil && len(rel.Info.Notes) > 0 {
 		message = rel.Info.Notes
 	}
+
+	if r.stripManifestFromStatus {
+		relCopy := *rel
+		relCopy.Manifest = ""
+		rel = &relCopy
+	}
+
 	u.UpdateStatus(
 		updater.EnsureCondition(conditions.Deployed(corev1.ConditionTrue, reason, message)),
 		updater.EnsureDeployedRelease(rel),
