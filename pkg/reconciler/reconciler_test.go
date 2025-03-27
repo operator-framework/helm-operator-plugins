@@ -53,6 +53,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	"sigs.k8s.io/yaml"
@@ -449,18 +450,21 @@ var _ = Describe("Reconciler", func() {
 
 				selector := metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}
 				Expect(WithSelector(selector)(r)).To(Succeed())
-				Expect(r.selectorPredicate).NotTo(BeNil())
+				Expect(r.labelSelector).NotTo(BeNil())
 
-				Expect(r.selectorPredicate.Create(event.CreateEvent{Object: objLabeled})).To(BeTrue())
-				Expect(r.selectorPredicate.Update(event.UpdateEvent{ObjectOld: objUnlabeled, ObjectNew: objLabeled})).To(BeTrue())
-				Expect(r.selectorPredicate.Delete(event.DeleteEvent{Object: objLabeled})).To(BeTrue())
-				Expect(r.selectorPredicate.Generic(event.GenericEvent{Object: objLabeled})).To(BeTrue())
+				selectorPredicate, err := predicate.LabelSelectorPredicate(r.labelSelector)
+				Expect(err).ToNot(HaveOccurred())
 
-				Expect(r.selectorPredicate.Create(event.CreateEvent{Object: objUnlabeled})).To(BeFalse())
-				Expect(r.selectorPredicate.Update(event.UpdateEvent{ObjectOld: objLabeled, ObjectNew: objUnlabeled})).To(BeFalse())
-				Expect(r.selectorPredicate.Update(event.UpdateEvent{ObjectOld: objUnlabeled, ObjectNew: objUnlabeled})).To(BeFalse())
-				Expect(r.selectorPredicate.Delete(event.DeleteEvent{Object: objUnlabeled})).To(BeFalse())
-				Expect(r.selectorPredicate.Generic(event.GenericEvent{Object: objUnlabeled})).To(BeFalse())
+				Expect(selectorPredicate.Create(event.CreateEvent{Object: objLabeled})).To(BeTrue())
+				Expect(selectorPredicate.Update(event.UpdateEvent{ObjectOld: objUnlabeled, ObjectNew: objLabeled})).To(BeTrue())
+				Expect(selectorPredicate.Delete(event.DeleteEvent{Object: objLabeled})).To(BeTrue())
+				Expect(selectorPredicate.Generic(event.GenericEvent{Object: objLabeled})).To(BeTrue())
+
+				Expect(selectorPredicate.Create(event.CreateEvent{Object: objUnlabeled})).To(BeFalse())
+				Expect(selectorPredicate.Update(event.UpdateEvent{ObjectOld: objLabeled, ObjectNew: objUnlabeled})).To(BeFalse())
+				Expect(selectorPredicate.Update(event.UpdateEvent{ObjectOld: objUnlabeled, ObjectNew: objUnlabeled})).To(BeFalse())
+				Expect(selectorPredicate.Delete(event.DeleteEvent{Object: objUnlabeled})).To(BeFalse())
+				Expect(selectorPredicate.Generic(event.GenericEvent{Object: objUnlabeled})).To(BeFalse())
 			})
 		})
 	})
@@ -1485,6 +1489,45 @@ var _ = Describe("Reconciler", func() {
 								By("ensuring the finalizer is removed and the CR is deleted", func() {
 									err := mgr.GetAPIReader().Get(ctx, objKey, obj)
 									Expect(apierrors.IsNotFound(err)).To(BeTrue())
+								})
+							})
+						})
+						When("label selector set", func() {
+							It("reconcile only matching CR", func() {
+								By("adding selector to the reconciler", func() {
+									selectorFoo := metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}}
+									Expect(WithSelector(selectorFoo)(r)).To(Succeed())
+								})
+
+								By("adding not matching label to the CR", func() {
+									Expect(mgr.GetClient().Get(ctx, objKey, obj)).To(Succeed())
+									obj.SetLabels(map[string]string{"app": "bar"})
+									Expect(mgr.GetClient().Update(ctx, obj)).To(Succeed())
+								})
+
+								By("reconciling skiped and no actions for the release", func() {
+									res, err := r.Reconcile(ctx, req)
+									Expect(res).To(Equal(reconcile.Result{}))
+									Expect(err).ToNot(HaveOccurred())
+								})
+
+								By("verifying the release has not changed", func() {
+									rel, err := ac.Get(obj.GetName())
+									Expect(err).ToNot(HaveOccurred())
+									Expect(rel).NotTo(BeNil())
+									Expect(*rel).To(Equal(*currentRelease))
+								})
+
+								By("adding matching label to the CR", func() {
+									Expect(mgr.GetClient().Get(ctx, objKey, obj)).To(Succeed())
+									obj.SetLabels(map[string]string{"app": "foo"})
+									Expect(mgr.GetClient().Update(ctx, obj)).To(Succeed())
+								})
+
+								By("successfully reconciling with correct labels", func() {
+									res, err := r.Reconcile(ctx, req)
+									Expect(res).To(Equal(reconcile.Result{}))
+									Expect(err).ToNot(HaveOccurred())
 								})
 							})
 						})
