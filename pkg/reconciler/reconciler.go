@@ -35,6 +35,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/record"
@@ -74,7 +75,7 @@ type Reconciler struct {
 	log                              logr.Logger
 	gvk                              *schema.GroupVersionKind
 	chrt                             *chart.Chart
-	selectorPredicate                predicate.Predicate
+	labelSelector                    metav1.LabelSelector
 	overrideValues                   map[string]string
 	skipDependentWatches             bool
 	maxConcurrentReconciles          int
@@ -523,15 +524,11 @@ func WithValueMapper(m values.Mapper) Option {
 	}
 }
 
-// WithSelector is an Option that configures the reconciler to creates a
-// predicate that is used to filter resources based on the specified selector
+// WithSelector is an Option that configures label selector for the reconciler.
+// The label selector is used to filter watch resources.
 func WithSelector(s metav1.LabelSelector) Option {
 	return func(r *Reconciler) error {
-		p, err := predicate.LabelSelectorPredicate(s)
-		if err != nil {
-			return err
-		}
-		r.selectorPredicate = p
+		r.labelSelector = s
 		return nil
 	}
 }
@@ -1028,8 +1025,18 @@ func (r *Reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) err
 	obj.SetGroupVersionKind(*r.gvk)
 
 	var preds []predicate.Predicate
-	if r.selectorPredicate != nil {
-		preds = append(preds, r.selectorPredicate)
+	var secretPreds []predicate.TypedPredicate[*corev1.Secret]
+	if r.labelSelector.MatchLabels != nil {
+		selectorPredicate, err := predicate.LabelSelectorPredicate(r.labelSelector)
+		if err != nil {
+			return err
+		}
+		secretPred, err := createSecretPredicate(&r.labelSelector)
+		if err != nil {
+			return err
+		}
+		preds = append(preds, selectorPredicate)
+		secretPreds = append(secretPreds, secretPred)
 	}
 
 	if err := c.Watch(
@@ -1060,6 +1067,7 @@ func (r *Reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) err
 				obj,
 				handler.OnlyControllerOwner(),
 			),
+			secretPreds...,
 		),
 	); err != nil {
 		return err
@@ -1085,4 +1093,15 @@ func ensureDeployedRelease(u *updater.Updater, rel *release.Release) {
 		updater.EnsureCondition(conditions.Deployed(corev1.ConditionTrue, reason, message)),
 		updater.EnsureDeployedRelease(rel),
 	)
+}
+
+func createSecretPredicate(labelSelector *metav1.LabelSelector) (predicate.TypedPredicate[*corev1.Secret], error) {
+	selector, err := metav1.LabelSelectorAsSelector(labelSelector)
+	if err != nil {
+		return nil, err
+	}
+	tp := predicate.NewTypedPredicateFuncs(func(s *corev1.Secret) bool {
+		return selector.Matches(labels.Set(s.GetLabels()))
+	})
+	return tp, nil
 }
