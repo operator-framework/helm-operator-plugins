@@ -35,7 +35,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/record"
@@ -1025,18 +1024,13 @@ func (r *Reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) err
 	obj.SetGroupVersionKind(*r.gvk)
 
 	var preds []predicate.Predicate
-	var secretPreds []predicate.TypedPredicate[*corev1.Secret]
+
 	if r.labelSelector.MatchLabels != nil {
 		selectorPredicate, err := predicate.LabelSelectorPredicate(r.labelSelector)
 		if err != nil {
 			return err
 		}
-		secretPred, err := createSecretPredicate(&r.labelSelector)
-		if err != nil {
-			return err
-		}
 		preds = append(preds, selectorPredicate)
-		secretPreds = append(secretPreds, secretPred)
 	}
 
 	if err := c.Watch(
@@ -1060,14 +1054,14 @@ func (r *Reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) err
 	if err := c.Watch(
 		source.Kind(
 			mgr.GetCache(),
-			secret,
-			handler.TypedEnqueueRequestForOwner[*corev1.Secret](
+			client.Object(secret),
+			handler.TypedEnqueueRequestForOwner[client.Object](
 				mgr.GetScheme(),
 				mgr.GetRESTMapper(),
 				obj,
 				handler.OnlyControllerOwner(),
 			),
-			secretPreds...,
+			preds...,
 		),
 	); err != nil {
 		return err
@@ -1093,15 +1087,4 @@ func ensureDeployedRelease(u *updater.Updater, rel *release.Release) {
 		updater.EnsureCondition(conditions.Deployed(corev1.ConditionTrue, reason, message)),
 		updater.EnsureDeployedRelease(rel),
 	)
-}
-
-func createSecretPredicate(labelSelector *metav1.LabelSelector) (predicate.TypedPredicate[*corev1.Secret], error) {
-	selector, err := metav1.LabelSelectorAsSelector(labelSelector)
-	if err != nil {
-		return nil, err
-	}
-	tp := predicate.NewTypedPredicateFuncs(func(s *corev1.Secret) bool {
-		return selector.Matches(labels.Set(s.GetLabels()))
-	})
-	return tp, nil
 }
