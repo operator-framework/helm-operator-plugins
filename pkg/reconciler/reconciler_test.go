@@ -1505,7 +1505,7 @@ var _ = Describe("Reconciler", func() {
 									Expect(mgr.GetClient().Update(ctx, obj)).To(Succeed())
 								})
 
-								By("reconciling skiped and no actions for the release", func() {
+								By("reconciling skipped and no actions for the release", func() {
 									res, err := r.Reconcile(ctx, req)
 									Expect(res).To(Equal(reconcile.Result{}))
 									Expect(err).ToNot(HaveOccurred())
