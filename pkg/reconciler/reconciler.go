@@ -74,7 +74,7 @@ type Reconciler struct {
 	log                              logr.Logger
 	gvk                              *schema.GroupVersionKind
 	chrt                             *chart.Chart
-	selectorPredicate                predicate.Predicate
+	labelSelector                    metav1.LabelSelector
 	overrideValues                   map[string]string
 	skipDependentWatches             bool
 	maxConcurrentReconciles          int
@@ -523,15 +523,11 @@ func WithValueMapper(m values.Mapper) Option {
 	}
 }
 
-// WithSelector is an Option that configures the reconciler to creates a
-// predicate that is used to filter resources based on the specified selector
+// WithSelector is an Option that configures label selector for the reconciler.
+// The label selector is used to filter watch resources.
 func WithSelector(s metav1.LabelSelector) Option {
 	return func(r *Reconciler) error {
-		p, err := predicate.LabelSelectorPredicate(s)
-		if err != nil {
-			return err
-		}
-		r.selectorPredicate = p
+		r.labelSelector = s
 		return nil
 	}
 }
@@ -1028,8 +1024,13 @@ func (r *Reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) err
 	obj.SetGroupVersionKind(*r.gvk)
 
 	var preds []predicate.Predicate
-	if r.selectorPredicate != nil {
-		preds = append(preds, r.selectorPredicate)
+
+	if r.labelSelector.MatchLabels != nil {
+		selectorPredicate, err := predicate.LabelSelectorPredicate(r.labelSelector)
+		if err != nil {
+			return err
+		}
+		preds = append(preds, selectorPredicate)
 	}
 
 	if err := c.Watch(
@@ -1053,13 +1054,14 @@ func (r *Reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) err
 	if err := c.Watch(
 		source.Kind(
 			mgr.GetCache(),
-			secret,
-			handler.TypedEnqueueRequestForOwner[*corev1.Secret](
+			client.Object(secret),
+			handler.TypedEnqueueRequestForOwner[client.Object](
 				mgr.GetScheme(),
 				mgr.GetRESTMapper(),
 				obj,
 				handler.OnlyControllerOwner(),
 			),
+			preds...,
 		),
 	); err != nil {
 		return err
