@@ -1025,7 +1025,7 @@ func (r *Reconciler) setupWatches(mgr ctrl.Manager, c controller.Controller) err
 
 	var preds []predicate.Predicate
 
-	if r.labelSelector.MatchLabels != nil {
+	if r.labelSelector.Size() > 0 {
 		selectorPredicate, err := predicate.LabelSelectorPredicate(r.labelSelector)
 		if err != nil {
 			return err
