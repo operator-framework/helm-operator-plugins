@@ -18,7 +18,9 @@ package predicate
 
 import (
 	"reflect"
+	"slices"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -69,6 +71,9 @@ func DependentPredicateFuncs() crtpredicate.TypedFuncs[*unstructured.Unstructure
 			old.SetResourceVersion("")
 			updated.SetResourceVersion("")
 
+			removeStatusManagedField(old)
+			removeStatusManagedField(updated)
+
 			if reflect.DeepEqual(old.Object, updated.Object) {
 				return false
 			}
@@ -78,4 +83,12 @@ func DependentPredicateFuncs() crtpredicate.TypedFuncs[*unstructured.Unstructure
 	}
 
 	return dependentPredicate
+}
+
+func removeStatusManagedField(obj *unstructured.Unstructured) {
+	obj.SetManagedFields(slices.DeleteFunc(obj.GetManagedFields(), isStatusSubresource))
+}
+
+func isStatusSubresource(f metav1.ManagedFieldsEntry) bool {
+	return f.Subresource == "status"
 }
