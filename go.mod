@@ -13,7 +13,7 @@ require (
 	github.com/sergi/go-diff v1.4.0
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.9
-	github.com/stretchr/testify v1.11.0
+	github.com/stretchr/testify v1.11.1
 	gomodules.xyz/jsonpatch/v2 v2.5.0
 	helm.sh/helm/v3 v3.17.4
 	k8s.io/api v0.32.2
