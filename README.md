@@ -41,3 +41,55 @@ if err := reconciler.SetupWithManager(mgr); err != nil {
  panic(fmt.Sprintf("unable to create reconciler: %s", err))
 }
 ```
+
+### Creating a Helm reconciler with multiple namespace installation
+
+Add the WATCH_NAMESPACE to the manager files to restrict the namespace to observe where the operator is installed
+
+```json
+name: manager
+env:
+  - name: WATCH_NAMESPACE
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.namespace
+```
+
+Filter the events to the namespace where the operator is installed
+
+```go
+// Operator's main.go
+watchNamespace = os.Getenv("WATCH_NAMESPACE")
+
+var cacheOpts cache.Options
+if watchNamespace != "" {
+	setupLog.Info("Watching specific namespace", "namespace", watchNamespace)
+	cacheOpts = cache.Options{
+		DefaultNamespaces: map[string]cache.Config{
+			watchNamespace: {},
+		},
+	}
+} else {
+	setupLog.Info("Watching all namespaces")
+}
+
+mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+        ...
+		Cache:                  cacheOpts,
+})
+
+...
+chart, err := loader.Load("path/to/chart")
+if err != nil {
+ panic(err)
+}
+
+reconciler := reconciler.New(
+ reconciler.WithChart(*chart),
+ reconciler.WithGroupVersionKind(gvk),
+)
+
+if err := reconciler.SetupWithManager(mgr); err != nil {
+ panic(fmt.Sprintf("unable to create reconciler: %s", err))
+}
+```
