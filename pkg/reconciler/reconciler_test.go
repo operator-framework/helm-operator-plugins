@@ -22,6 +22,8 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
+	"sync"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -49,6 +51,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/config"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -1492,45 +1495,6 @@ var _ = Describe("Reconciler", func() {
 								})
 							})
 						})
-						When("label selector set", func() {
-							It("reconcile only matching CR", func() {
-								By("adding selector to the reconciler", func() {
-									selectorFoo := metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}}
-									Expect(WithSelector(selectorFoo)(r)).To(Succeed())
-								})
-
-								By("adding not matching label to the CR", func() {
-									Expect(mgr.GetClient().Get(ctx, objKey, obj)).To(Succeed())
-									obj.SetLabels(map[string]string{"app": "bar"})
-									Expect(mgr.GetClient().Update(ctx, obj)).To(Succeed())
-								})
-
-								By("reconciling skipped and no actions for the release", func() {
-									res, err := r.Reconcile(ctx, req)
-									Expect(res).To(Equal(reconcile.Result{}))
-									Expect(err).ToNot(HaveOccurred())
-								})
-
-								By("verifying the release has not changed", func() {
-									rel, err := ac.Get(obj.GetName())
-									Expect(err).ToNot(HaveOccurred())
-									Expect(rel).NotTo(BeNil())
-									Expect(*rel).To(Equal(*currentRelease))
-								})
-
-								By("adding matching label to the CR", func() {
-									Expect(mgr.GetClient().Get(ctx, objKey, obj)).To(Succeed())
-									obj.SetLabels(map[string]string{"app": "foo"})
-									Expect(mgr.GetClient().Update(ctx, obj)).To(Succeed())
-								})
-
-								By("successfully reconciling with correct labels", func() {
-									res, err := r.Reconcile(ctx, req)
-									Expect(res).To(Equal(reconcile.Result{}))
-									Expect(err).ToNot(HaveOccurred())
-								})
-							})
-						})
 					})
 				})
 			})
@@ -1542,6 +1506,141 @@ var _ = Describe("Reconciler", func() {
 
 		When("custom type GVK scheme setup ", func() {
 			parameterizedReconcilerTests(reconcilerTestSuiteOpts{customGVKSchemeSetup: true})
+		})
+	})
+
+	_ = Describe("WithSelector integration test", func() {
+		var (
+			mgr                manager.Manager
+			ctx                context.Context
+			cancel             context.CancelFunc
+			reconciledCRs      []string
+			reconciledCRsMutex sync.Mutex
+			labeledObj         *unstructured.Unstructured
+			unlabeledObj       *unstructured.Unstructured
+			labeledObjKey      types.NamespacedName
+			unlabeledObjKey    types.NamespacedName
+		)
+
+		BeforeEach(func() {
+			reconciledCRs = []string{}
+			mgr = getManagerOrFail()
+			matchingLabels := map[string]string{"app": "foo"}
+
+			r, err := New(
+				WithGroupVersionKind(gvk),
+				WithChart(chrt),
+				WithSelector(metav1.LabelSelector{MatchLabels: matchingLabels}),
+			)
+			Expect(err).ToNot(HaveOccurred())
+
+			originalReconciler := r
+			wrappedReconciler := &Reconciler{}
+			*wrappedReconciler = *originalReconciler
+			wrappedReconciler.client = mgr.GetClient()
+
+			// Override Reconcile to track reconciliations
+			reconciler := reconcile.Func(func(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
+				reconciledCRsMutex.Lock()
+				reconciledCRs = append(reconciledCRs, req.NamespacedName.String())
+				reconciledCRsMutex.Unlock()
+				return wrappedReconciler.Reconcile(ctx, req)
+			})
+
+			controllerName := fmt.Sprintf("%v-controller", strings.ToLower(gvk.Kind))
+			Expect(wrappedReconciler.addDefaults(mgr, controllerName)).To(Succeed())
+			wrappedReconciler.setupScheme(mgr)
+
+			c, err := controller.New(controllerName, mgr, controller.Options{
+				Reconciler:              reconciler,
+				MaxConcurrentReconciles: 1,
+			})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(wrappedReconciler.setupWatches(mgr, c)).To(Succeed())
+
+			labeledObj = testutil.BuildTestCR(gvk)
+			labeledObj.SetName("labeled-cr")
+			labeledObj.SetLabels(matchingLabels)
+			labeledObjKey = types.NamespacedName{Namespace: labeledObj.GetNamespace(), Name: labeledObj.GetName()}
+
+			unlabeledObj = testutil.BuildTestCR(gvk)
+			unlabeledObj.SetName("unlabeled-cr")
+			unlabeledObjKey = types.NamespacedName{Namespace: unlabeledObj.GetNamespace(), Name: unlabeledObj.GetName()}
+
+			ctx, cancel = context.WithCancel(context.Background())
+			go func() {
+				Expect(mgr.Start(ctx)).To(Succeed())
+			}()
+			Expect(mgr.GetCache().WaitForCacheSync(ctx)).To(BeTrue())
+		})
+
+		AfterEach(func() {
+			By("ensuring the labeled CR is deleted", func() {
+				err := mgr.GetAPIReader().Get(ctx, labeledObjKey, labeledObj)
+				if !apierrors.IsNotFound(err) {
+					Expect(err).ToNot(HaveOccurred())
+					labeledObj.SetFinalizers([]string{})
+					Expect(mgr.GetClient().Update(ctx, labeledObj)).To(Succeed())
+					Expect(mgr.GetClient().Delete(ctx, labeledObj)).To(Succeed())
+				}
+			})
+
+			By("ensuring the unlabeled CR is deleted", func() {
+				err := mgr.GetAPIReader().Get(ctx, unlabeledObjKey, unlabeledObj)
+				if !apierrors.IsNotFound(err) {
+					Expect(err).ToNot(HaveOccurred())
+					unlabeledObj.SetFinalizers([]string{})
+					Expect(mgr.GetClient().Update(ctx, unlabeledObj)).To(Succeed())
+					Expect(mgr.GetClient().Delete(ctx, unlabeledObj)).To(Succeed())
+				}
+			})
+
+			cancel()
+		})
+
+		It("should only reconcile CRs matching the label selector", func() {
+			By("creating a CR with matching labels", func() {
+				Expect(mgr.GetClient().Create(ctx, labeledObj)).To(Succeed())
+			})
+
+			By("creating a CR without matching labels", func() {
+				Expect(mgr.GetClient().Create(ctx, unlabeledObj)).To(Succeed())
+			})
+
+			By("waiting for reconciliations to complete", func() {
+				Eventually(func() []string {
+					reconciledCRsMutex.Lock()
+					defer reconciledCRsMutex.Unlock()
+					return reconciledCRs
+				}, "5s", "100ms").Should(ContainElement(labeledObjKey.String()))
+			})
+
+			By("verifying only the labeled CR was reconciled", func() {
+				reconciledCRsMutex.Lock()
+				defer reconciledCRsMutex.Unlock()
+				Expect(reconciledCRs).To(ContainElement(labeledObjKey.String()))
+				Expect(reconciledCRs).NotTo(ContainElement(unlabeledObjKey.String()))
+			})
+
+			By("updating the unlabeled CR to have matching labels", func() {
+				Expect(mgr.GetClient().Get(ctx, unlabeledObjKey, unlabeledObj)).To(Succeed())
+				unlabeledObj.SetLabels(map[string]string{"app": "foo"})
+				Expect(mgr.GetClient().Update(ctx, unlabeledObj)).To(Succeed())
+			})
+
+			By("waiting for the previously unlabeled CR to be reconciled", func() {
+				Eventually(func() []string {
+					reconciledCRsMutex.Lock()
+					defer reconciledCRsMutex.Unlock()
+					return reconciledCRs
+				}, "5s", "100ms").Should(ContainElement(unlabeledObjKey.String()))
+			})
+
+			By("verifying the previously unlabeled CR was reconciled after label change", func() {
+				reconciledCRsMutex.Lock()
+				defer reconciledCRsMutex.Unlock()
+				Expect(reconciledCRs).To(ContainElement(unlabeledObjKey.String()))
+			})
 		})
 	})
 
