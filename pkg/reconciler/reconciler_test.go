@@ -1534,29 +1534,24 @@ var _ = Describe("Reconciler", func() {
 			)
 			Expect(err).ToNot(HaveOccurred())
 
-			originalReconciler := r
-			wrappedReconciler := &Reconciler{}
-			*wrappedReconciler = *originalReconciler
-			wrappedReconciler.client = mgr.GetClient()
-
-			// Override Reconcile to track reconciliations
+			// Wrap the Reconcile method to track reconciliations
 			reconciler := reconcile.Func(func(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
 				reconciledCRsMutex.Lock()
 				reconciledCRs = append(reconciledCRs, req.NamespacedName.String())
 				reconciledCRsMutex.Unlock()
-				return wrappedReconciler.Reconcile(ctx, req)
+				return r.Reconcile(ctx, req)
 			})
 
 			controllerName := fmt.Sprintf("%v-controller", strings.ToLower(gvk.Kind))
-			Expect(wrappedReconciler.addDefaults(mgr, controllerName)).To(Succeed())
-			wrappedReconciler.setupScheme(mgr)
+			Expect(r.addDefaults(mgr, controllerName)).To(Succeed())
+			r.setupScheme(mgr)
 
 			c, err := controller.New(controllerName, mgr, controller.Options{
 				Reconciler:              reconciler,
 				MaxConcurrentReconciles: 1,
 			})
 			Expect(err).ToNot(HaveOccurred())
-			Expect(wrappedReconciler.setupWatches(mgr, c)).To(Succeed())
+			Expect(r.setupWatches(mgr, c)).To(Succeed())
 
 			labeledObj = testutil.BuildTestCR(gvk)
 			labeledObj.SetName("labeled-cr")
