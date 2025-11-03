@@ -1509,7 +1509,7 @@ var _ = Describe("Reconciler", func() {
 		})
 	})
 
-	_ = Describe("WithSelector integration test", func() {
+	_ = Describe("WithSelector test", func() {
 		var (
 			mgr                manager.Manager
 			ctx                context.Context
@@ -1534,7 +1534,6 @@ var _ = Describe("Reconciler", func() {
 			)
 			Expect(err).ToNot(HaveOccurred())
 
-			// Wrap the Reconcile method to track reconciliations
 			reconciler := reconcile.Func(func(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
 				reconciledCRsMutex.Lock()
 				reconciledCRs = append(reconciledCRs, req.NamespacedName.String())
