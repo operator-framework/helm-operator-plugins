@@ -1515,6 +1515,7 @@ var _ = Describe("Reconciler", func() {
 			ctx                context.Context
 			cancel             context.CancelFunc
 			reconciledCRs      []string
+			matchingLabels     map[string]string
 			reconciledCRsMutex sync.Mutex
 			labeledObj         *unstructured.Unstructured
 			unlabeledObj       *unstructured.Unstructured
@@ -1525,7 +1526,7 @@ var _ = Describe("Reconciler", func() {
 		BeforeEach(func() {
 			reconciledCRs = []string{}
 			mgr = getManagerOrFail()
-			matchingLabels := map[string]string{"app": "foo"}
+			matchingLabels = map[string]string{"app": "foo"}
 
 			r, err := New(
 				WithGroupVersionKind(gvk),
@@ -1571,22 +1572,24 @@ var _ = Describe("Reconciler", func() {
 		AfterEach(func() {
 			By("ensuring the labeled CR is deleted", func() {
 				err := mgr.GetAPIReader().Get(ctx, labeledObjKey, labeledObj)
-				if !apierrors.IsNotFound(err) {
-					Expect(err).ToNot(HaveOccurred())
-					labeledObj.SetFinalizers([]string{})
-					Expect(mgr.GetClient().Update(ctx, labeledObj)).To(Succeed())
-					Expect(mgr.GetClient().Delete(ctx, labeledObj)).To(Succeed())
+				if apierrors.IsNotFound(err) {
+					return
 				}
+				Expect(err).ToNot(HaveOccurred())
+				labeledObj.SetFinalizers([]string{})
+				Expect(mgr.GetClient().Update(ctx, labeledObj)).To(Succeed())
+				Expect(mgr.GetClient().Delete(ctx, labeledObj)).To(Succeed())
 			})
 
 			By("ensuring the unlabeled CR is deleted", func() {
 				err := mgr.GetAPIReader().Get(ctx, unlabeledObjKey, unlabeledObj)
-				if !apierrors.IsNotFound(err) {
-					Expect(err).ToNot(HaveOccurred())
-					unlabeledObj.SetFinalizers([]string{})
-					Expect(mgr.GetClient().Update(ctx, unlabeledObj)).To(Succeed())
-					Expect(mgr.GetClient().Delete(ctx, unlabeledObj)).To(Succeed())
+				if apierrors.IsNotFound(err) {
+					return
 				}
+				Expect(err).ToNot(HaveOccurred())
+				unlabeledObj.SetFinalizers([]string{})
+				Expect(mgr.GetClient().Update(ctx, unlabeledObj)).To(Succeed())
+				Expect(mgr.GetClient().Delete(ctx, unlabeledObj)).To(Succeed())
 			})
 
 			cancel()
@@ -1618,7 +1621,7 @@ var _ = Describe("Reconciler", func() {
 
 			By("updating the unlabeled CR to have matching labels", func() {
 				Expect(mgr.GetClient().Get(ctx, unlabeledObjKey, unlabeledObj)).To(Succeed())
-				unlabeledObj.SetLabels(map[string]string{"app": "foo"})
+				unlabeledObj.SetLabels(matchingLabels)
 				Expect(mgr.GetClient().Update(ctx, unlabeledObj)).To(Succeed())
 			})
 
