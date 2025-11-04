@@ -1509,7 +1509,7 @@ var _ = Describe("Reconciler", func() {
 		})
 	})
 
-	_ = Describe("WithSelector test", func() {
+	_ = Describe("WithSelector", func() {
 		var (
 			mgr                manager.Manager
 			ctx                context.Context
