@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -1537,10 +1538,12 @@ var _ = Describe("Reconciler", func() {
 			trackingHook := hook.PostHookFunc(func(obj *unstructured.Unstructured, _ release.Release, _ logr.Logger) error {
 				mu.Lock()
 				defer mu.Unlock()
-				reconciledCRs = append(reconciledCRs, obj.GetName())
+				if !slices.Contains(reconciledCRs, obj.GetName()) {
+					reconciledCRs = append(reconciledCRs, obj.GetName())
+				}
 				return nil
 			})
-			mgr = setupManagerWithPostHook(ctx, trackingHook, matchingLabels)
+			mgr = setupManagerWithSelectorAndPostHook(ctx, trackingHook, matchingLabels)
 
 			labeledObj = testutil.BuildTestCR(gvk)
 			labeledObj.SetName("labeled-cr")
@@ -1608,10 +1611,12 @@ var _ = Describe("Reconciler", func() {
 				postHook := hook.PostHookFunc(func(obj *unstructured.Unstructured, _ release.Release, _ logr.Logger) error {
 					mu.Lock()
 					defer mu.Unlock()
-					anotherReconciledCRs = append(anotherReconciledCRs, obj.GetName())
+					if !slices.Contains(anotherReconciledCRs, obj.GetName()) {
+						anotherReconciledCRs = append(anotherReconciledCRs, obj.GetName())
+					}
 					return nil
 				})
-				_ = setupManagerWithPostHook(ctx, postHook, anotherMatchingLabels)
+				_ = setupManagerWithSelectorAndPostHook(ctx, postHook, anotherMatchingLabels)
 			})
 
 			By("creating a CR with matching labels for the first manager", func() {
@@ -1633,8 +1638,10 @@ var _ = Describe("Reconciler", func() {
 			})
 
 			By("creating a CR with matching labels for the second manager", func() {
-				anotherObj.SetLabels(anotherMatchingLabels)
 				Expect(mgr.GetClient().Create(ctx, anotherObj)).To(Succeed())
+				Expect(mgr.GetClient().Get(ctx, anotherObjKey, anotherObj)).To(Succeed())
+				anotherObj.SetLabels(anotherMatchingLabels)
+				Expect(mgr.GetClient().Update(ctx, anotherObj)).To(Succeed())
 			})
 
 			By("verifying that both managers reconcile only matching labels CRs", func() {
@@ -1863,7 +1870,7 @@ func ensureDeleteCR(ctx context.Context, mgr manager.Manager, crKey types.Namesp
 	Expect(mgr.GetClient().Delete(ctx, cr)).To(Succeed())
 }
 
-func setupManagerWithPostHook(ctx context.Context, postHook hook.PostHook, matchingLabels map[string]string) manager.Manager {
+func setupManagerWithSelectorAndPostHook(ctx context.Context, postHook hook.PostHook, matchingLabels map[string]string) manager.Manager {
 	mgr := getManagerOrFail()
 	r, err := New(
 		WithGroupVersionKind(gvk),
