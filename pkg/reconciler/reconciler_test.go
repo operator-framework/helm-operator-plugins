@@ -1534,7 +1534,7 @@ var _ = Describe("Reconciler", func() {
 			matchingLabels = map[string]string{"app": "foo"}
 			anotherMatchingLabels = map[string]string{"app": "bar"}
 
-			trackingHook := hook.PostHookFunc(func(obj *unstructured.Unstructured, rel release.Release, log logr.Logger) error {
+			trackingHook := hook.PostHookFunc(func(obj *unstructured.Unstructured, _ release.Release, _ logr.Logger) error {
 				mu.Lock()
 				defer mu.Unlock()
 				reconciledCRs = append(reconciledCRs, obj.GetName())
@@ -1605,7 +1605,7 @@ var _ = Describe("Reconciler", func() {
 
 		It("should reconcile CRs independently when using two managers with different label selectors", func() {
 			By("creating another manager with a different label selector", func() {
-				postHook := hook.PostHookFunc(func(obj *unstructured.Unstructured, rel release.Release, log logr.Logger) error {
+				postHook := hook.PostHookFunc(func(obj *unstructured.Unstructured, _ release.Release, _ logr.Logger) error {
 					mu.Lock()
 					defer mu.Unlock()
 					anotherReconciledCRs = append(anotherReconciledCRs, obj.GetName())
