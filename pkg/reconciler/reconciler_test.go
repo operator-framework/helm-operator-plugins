@@ -1584,6 +1584,9 @@ var _ = Describe("Reconciler", func() {
 				Expect(mgr.GetClient().Create(ctx, anotherObj)).To(Succeed())
 			})
 
+			// There is no robust way to check whether controller-runtime will never do something.
+			// So there is a low chance that the unlabeled CR could be reconciled.
+			// See: https://kubernetes.slack.com/archives/C02MRBMN00Z/p1762251589740719
 			By("verifying that the labeled reconciler does not reconcile CR without labels", func() {
 				Consistently(func() bool {
 					mu.Lock()
