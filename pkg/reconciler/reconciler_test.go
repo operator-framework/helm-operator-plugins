@@ -21,7 +21,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
+	"sync"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -1492,45 +1494,6 @@ var _ = Describe("Reconciler", func() {
 								})
 							})
 						})
-						When("label selector set", func() {
-							It("reconcile only matching CR", func() {
-								By("adding selector to the reconciler", func() {
-									selectorFoo := metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}}
-									Expect(WithSelector(selectorFoo)(r)).To(Succeed())
-								})
-
-								By("adding not matching label to the CR", func() {
-									Expect(mgr.GetClient().Get(ctx, objKey, obj)).To(Succeed())
-									obj.SetLabels(map[string]string{"app": "bar"})
-									Expect(mgr.GetClient().Update(ctx, obj)).To(Succeed())
-								})
-
-								By("reconciling skipped and no actions for the release", func() {
-									res, err := r.Reconcile(ctx, req)
-									Expect(res).To(Equal(reconcile.Result{}))
-									Expect(err).ToNot(HaveOccurred())
-								})
-
-								By("verifying the release has not changed", func() {
-									rel, err := ac.Get(obj.GetName())
-									Expect(err).ToNot(HaveOccurred())
-									Expect(rel).NotTo(BeNil())
-									Expect(*rel).To(Equal(*currentRelease))
-								})
-
-								By("adding matching label to the CR", func() {
-									Expect(mgr.GetClient().Get(ctx, objKey, obj)).To(Succeed())
-									obj.SetLabels(map[string]string{"app": "foo"})
-									Expect(mgr.GetClient().Update(ctx, obj)).To(Succeed())
-								})
-
-								By("successfully reconciling with correct labels", func() {
-									res, err := r.Reconcile(ctx, req)
-									Expect(res).To(Equal(reconcile.Result{}))
-									Expect(err).ToNot(HaveOccurred())
-								})
-							})
-						})
 					})
 				})
 			})
@@ -1542,6 +1505,184 @@ var _ = Describe("Reconciler", func() {
 
 		When("custom type GVK scheme setup ", func() {
 			parameterizedReconcilerTests(reconcilerTestSuiteOpts{customGVKSchemeSetup: true})
+		})
+	})
+
+	_ = Describe("WithSelector", func() {
+		var (
+			ctx                   context.Context
+			cancel                context.CancelFunc
+			matchingLabels        map[string]string
+			anotherMatchingLabels map[string]string
+			mu                    sync.Mutex
+			doneChans             []chan struct{}
+		)
+
+		BeforeEach(func() {
+			matchingLabels = map[string]string{"app": "foo"}
+			anotherMatchingLabels = map[string]string{"app": "bar"}
+			doneChans = nil
+			ctx, cancel = context.WithCancel(context.Background())
+
+			cleanupMgr := getManagerOrFail()
+			cleanupClient := cleanupMgr.GetClient()
+			crList := &unstructured.UnstructuredList{}
+			crList.SetGroupVersionKind(gvk)
+			Expect(cleanupClient.List(ctx, crList)).To(Succeed())
+
+			for i := range crList.Items {
+				cr := &crList.Items[i]
+				// Remove all finalizers to allow CR deletion
+				cr.SetFinalizers([]string{})
+				Expect(cleanupClient.Update(ctx, cr)).To(Succeed())
+				Expect(cleanupClient.Delete(ctx, cr)).To(Succeed())
+			}
+
+			// Wait for all CRs to be deleted
+			Eventually(func() bool {
+				crList := &unstructured.UnstructuredList{}
+				crList.SetGroupVersionKind(gvk)
+				if err := cleanupClient.List(ctx, crList); err != nil {
+					return false
+				}
+				return len(crList.Items) == 0
+			}, "10s", "100ms").Should(BeTrue())
+		})
+
+		AfterEach(func() {
+			// Cancel the context to stop all managers
+			if cancel != nil {
+				cancel()
+			}
+			// Wait for all managers to shut down completely
+			for _, done := range doneChans {
+				select {
+				case <-done:
+					// Manager has shut down
+				case <-time.After(5 * time.Second):
+					// Timeout waiting for manager shutdown
+				}
+			}
+		})
+
+		It("should only reconcile CRs matching the label selector", func() {
+			labeledObj := testutil.BuildTestCR(gvk)
+			labeledObj.SetName("labeled-cr-test1")
+			labeledObj.SetLabels(matchingLabels)
+			labeledObjKey := types.NamespacedName{Namespace: labeledObj.GetNamespace(), Name: labeledObj.GetName()}
+
+			anotherObj := testutil.BuildTestCR(gvk)
+			anotherObj.SetName("another-cr-test1")
+			anotherObjKey := types.NamespacedName{Namespace: anotherObj.GetNamespace(), Name: anotherObj.GetName()}
+
+			var reconciledCRs []string
+			postHook := makePostHook(&mu, &reconciledCRs)
+			mgr, done := setupManagerWithSelectorAndPostHook(ctx, postHook, matchingLabels)
+			doneChans = append(doneChans, done)
+
+			By("creating a CR without matching labels", func() {
+				Expect(mgr.GetClient().Create(ctx, anotherObj)).To(Succeed())
+			})
+
+			// There is no robust way to check whether controller-runtime will never do something.
+			// So there is a low chance that the unlabeled CR could be reconciled.
+			// See: https://kubernetes.slack.com/archives/C02MRBMN00Z/p1762251589740719
+			By("verifying that the labeled reconciler does not reconcile CR without labels", func() {
+				Consistently(func() bool {
+					mu.Lock()
+					defer mu.Unlock()
+					return len(reconciledCRs) == 0
+				}, "2s", "100ms").Should(BeTrue())
+			})
+
+			By("creating a CR with matching labels", func() {
+				Expect(mgr.GetClient().Create(ctx, labeledObj)).To(Succeed())
+			})
+
+			By("verifying only the labeled CR was reconciled", func() {
+				Eventually(func() bool {
+					mu.Lock()
+					defer mu.Unlock()
+					return len(reconciledCRs) == 1 && reconciledCRs[0] == labeledObjKey.Name
+				}).Should(BeTrue())
+			})
+
+			By("updating the unlabeled CR to have matching labels", func() {
+				Expect(mgr.GetClient().Get(ctx, anotherObjKey, anotherObj)).To(Succeed())
+				anotherObj.SetLabels(matchingLabels)
+				Expect(mgr.GetClient().Update(ctx, anotherObj)).To(Succeed())
+			})
+
+			By("verifying that both CRs were reconciled after setting label to the unlabeled CR", func() {
+				Eventually(func() bool {
+					mu.Lock()
+					defer mu.Unlock()
+					return len(reconciledCRs) == 2 &&
+						slices.Contains(reconciledCRs, labeledObjKey.Name) &&
+						slices.Contains(reconciledCRs, anotherObjKey.Name)
+				}, "10s", "100ms").Should(BeTrue())
+			})
+		})
+
+		It("should reconcile CRs independently when using two managers with different label selectors", func() {
+			labeledObj := testutil.BuildTestCR(gvk)
+			labeledObj.SetName("labeled-cr-test2")
+			labeledObj.SetLabels(matchingLabels)
+			labeledObjKey := types.NamespacedName{Namespace: labeledObj.GetNamespace(), Name: labeledObj.GetName()}
+
+			anotherObj := testutil.BuildTestCR(gvk)
+			anotherObj.SetName("another-cr-test2")
+			anotherObjKey := types.NamespacedName{Namespace: anotherObj.GetNamespace(), Name: anotherObj.GetName()}
+
+			var reconciledCRs []string
+			var anotherReconciledCRs []string
+
+			postHook := makePostHook(&mu, &reconciledCRs)
+			mgr, done := setupManagerWithSelectorAndPostHook(ctx, postHook, matchingLabels)
+			doneChans = append(doneChans, done)
+
+			postHook2 := makePostHook(&mu, &anotherReconciledCRs)
+			_, done2 := setupManagerWithSelectorAndPostHook(ctx, postHook2, anotherMatchingLabels)
+			doneChans = append(doneChans, done2)
+
+			By("creating a CR with matching labels for the first manager", func() {
+				Expect(mgr.GetClient().Create(ctx, labeledObj)).To(Succeed())
+			})
+
+			By("verifying that only the first manager reconciled the CR", func() {
+				Eventually(func() bool {
+					mu.Lock()
+					defer mu.Unlock()
+					return len(reconciledCRs) == 1 && reconciledCRs[0] == labeledObjKey.Name
+				}, "10s", "100ms").Should(BeTrue())
+
+				Consistently(func() bool {
+					mu.Lock()
+					defer mu.Unlock()
+					return len(anotherReconciledCRs) == 0
+				}, "2s", "100ms").Should(BeTrue())
+			})
+
+			By("creating a CR with matching labels for the second manager", func() {
+				Expect(mgr.GetClient().Create(ctx, anotherObj)).To(Succeed())
+				Expect(mgr.GetClient().Get(ctx, anotherObjKey, anotherObj)).To(Succeed())
+				anotherObj.SetLabels(anotherMatchingLabels)
+				Expect(mgr.GetClient().Update(ctx, anotherObj)).To(Succeed())
+			})
+
+			By("verifying that both managers reconcile only matching labels CRs", func() {
+				Eventually(func() bool {
+					mu.Lock()
+					defer mu.Unlock()
+					return len(reconciledCRs) == 1 && reconciledCRs[0] == labeledObjKey.Name
+				}, "10s", "100ms").Should(BeTrue())
+
+				Eventually(func() bool {
+					mu.Lock()
+					defer mu.Unlock()
+					return len(anotherReconciledCRs) == 1 && anotherReconciledCRs[0] == anotherObjKey.Name
+				}, "10s", "100ms").Should(BeTrue())
+			})
 		})
 	})
 
@@ -1742,4 +1883,35 @@ func verifyEvent(ctx context.Context, cl client.Reader, obj metav1.Object, event
 	Type: %q
 	Reason: %q
 	Message: %q`, eventType, reason, message))
+}
+
+func makePostHook(mu *sync.Mutex, reconciledCRs *[]string) hook.PostHook {
+	return hook.PostHookFunc(func(obj *unstructured.Unstructured, _ release.Release, _ logr.Logger) error {
+		mu.Lock()
+		defer mu.Unlock()
+		if !slices.Contains(*reconciledCRs, obj.GetName()) {
+			*reconciledCRs = append(*reconciledCRs, obj.GetName())
+		}
+		return nil
+	})
+}
+
+func setupManagerWithSelectorAndPostHook(ctx context.Context, postHook hook.PostHook, matchingLabels map[string]string) (manager.Manager, chan struct{}) {
+	mgr := getManagerOrFail()
+	r, err := New(
+		WithGroupVersionKind(gvk),
+		WithChart(chrt),
+		WithSelector(metav1.LabelSelector{MatchLabels: matchingLabels}),
+		WithPostHook(postHook),
+	)
+	Expect(err).ToNot(HaveOccurred())
+	Expect(r.SetupWithManager(mgr)).To(Succeed())
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		Expect(mgr.Start(ctx)).To(Succeed())
+	}()
+	Expect(mgr.GetCache().WaitForCacheSync(ctx)).To(BeTrue())
+	return mgr, done
 }
