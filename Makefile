@@ -72,7 +72,7 @@ bingo-upgrade: $(BINGO) #EXHELP Upgrade tools
 	done
 
 .PHONY: release
-release: GORELEASER_ARGS ?= --snapshot --clean --skip-sign
+release: GORELEASER_ARGS ?= --snapshot --clean --skip=sign
 release: $(GORELEASER)
 	$(GORELEASER) $(GORELEASER_ARGS)
 
