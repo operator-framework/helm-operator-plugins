@@ -37,7 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -67,7 +67,7 @@ type Reconciler struct {
 	actionClientGetter helmclient.ActionClientGetter
 	valueTranslator    values.Translator
 	valueMapper        values.Mapper // nolint:staticcheck
-	eventRecorder      record.EventRecorder
+	eventRecorder      events.EventRecorder
 	preHooks           []hook.PreHook
 	postHooks          []hook.PostHook
 
@@ -197,7 +197,7 @@ func WithActionClientGetter(actionClientGetter helmclient.ActionClientGetter) Op
 //
 // By default, manager.GetEventRecorderFor() is used if this option is not
 // configured.
-func WithEventRecorder(er record.EventRecorder) Option {
+func WithEventRecorder(er events.EventRecorder) Option {
 	return func(r *Reconciler) error {
 		r.eventRecorder = er
 		return nil
@@ -907,7 +907,7 @@ func (r *Reconciler) doUpgrade(actionClient helmclient.ActionInterface, u *updat
 
 func (r *Reconciler) reportOverrideEvents(obj runtime.Object) {
 	for k, v := range r.overrideValues {
-		r.eventRecorder.Eventf(obj, "Warning", "ValueOverridden",
+		r.eventRecorder.Eventf(obj, nil, "Warning", "ValueOverridden",
 			"Chart value %q overridden to %q by operator", k, v)
 	}
 }
@@ -994,7 +994,7 @@ func (r *Reconciler) addDefaults(mgr ctrl.Manager, controllerName string) error 
 		}
 	}
 	if r.eventRecorder == nil {
-		r.eventRecorder = mgr.GetEventRecorderFor(controllerName)
+		r.eventRecorder = mgr.GetEventRecorder(controllerName)
 	}
 	if r.valueTranslator == nil {
 		r.valueTranslator = internalvalues.DefaultTranslator

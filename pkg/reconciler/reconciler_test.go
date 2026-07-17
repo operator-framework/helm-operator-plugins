@@ -29,6 +29,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gstruct"
+	"k8s.io/client-go/tools/events"
 
 	"github.com/go-logr/logr"
 	"helm.sh/helm/v3/pkg/action"
@@ -45,7 +46,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -155,7 +155,7 @@ var _ = Describe("Reconciler", func() {
 		})
 		_ = Describe("WithEventRecorder", func() {
 			It("should set the reconciler event recorder", func() {
-				rec := record.NewFakeRecorder(0)
+				rec := events.NewFakeRecorder(0)
 				Expect(WithEventRecorder(rec)(r)).To(Succeed())
 				Expect(r.eventRecorder).To(Equal(rec))
 			})
