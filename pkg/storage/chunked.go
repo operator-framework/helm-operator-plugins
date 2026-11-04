@@ -398,6 +398,9 @@ func (c *chunkedSecrets) decodeRelease(ctx context.Context, indexSecret *corev1.
 	}
 
 	pr, pw := io.Pipe()
+	// Close the read side when decoding returns so that the writer goroutine
+	// does not block forever if decoding stops before all chunk data is read.
+	defer pr.Close()
 	go func() {
 		defer pw.Close()
 		firstChunkData, ok := indexSecret.Data["chunk"]
