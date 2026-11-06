@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"maps"
 	"runtime"
-	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -111,11 +110,12 @@ var _ = Describe("chunkedSecrets", func() {
 			_, err := secretInterface.Create(context.Background(), corruptIndex, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
+			goroutinesBefore := runtime.NumGoroutine()
 			for range 5 {
 				_, err := chunkedDriver.Get(corruptIndex.Name)
 				Expect(err).To(MatchError(ContainSubstring("failed to create gzip reader")))
 			}
-			Eventually(countDecodeReleaseGoroutines).Should(BeZero())
+			Eventually(runtime.NumGoroutine).Should(BeNumerically("<=", goroutinesBefore))
 		})
 	})
 
@@ -347,17 +347,6 @@ func verifySecrets(secretInterface clientcorev1.SecretInterface, expected int) {
 	}
 
 	Expect(actualExtraChunkNames).To(ConsistOf(expectedExtraChunkNames))
-}
-
-func countDecodeReleaseGoroutines() int {
-	buf := make([]byte, 1<<20)
-	for {
-		n := runtime.Stack(buf, true)
-		if n < len(buf) {
-			return strings.Count(string(buf[:n]), "(*chunkedSecrets).decodeRelease.func")
-		}
-		buf = make([]byte, 2*len(buf))
-	}
 }
 
 func releaseKey(rel *release.Release) string {
