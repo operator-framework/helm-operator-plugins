@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"runtime"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -94,6 +95,27 @@ var _ = Describe("chunkedSecrets", func() {
 			})
 			_, err := maxReadDriver.Get(releaseKey(rel))
 			Expect(err).To(MatchError(ContainSubstring("release too large")))
+		})
+		It("should not leak goroutines if the release fails to decode", func() {
+			corruptIndex := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: "corrupt-release.v1"},
+				Type:       SecretTypeChunkedIndex,
+				Data: map[string][]byte{
+					"extraChunks": []byte("[]"),
+					// Larger than the gzip reader's read buffer, so the
+					// reader stops before consuming all of the chunk data.
+					"chunk": make([]byte, 10*chunkSize),
+				},
+			}
+			_, err := secretInterface.Create(context.Background(), corruptIndex, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
+
+			goroutinesBefore := runtime.NumGoroutine()
+			for range 5 {
+				_, err := chunkedDriver.Get(corruptIndex.Name)
+				Expect(err).To(MatchError(ContainSubstring("failed to create gzip reader")))
+			}
+			Eventually(runtime.NumGoroutine).Should(BeNumerically("<=", goroutinesBefore))
 		})
 	})
 

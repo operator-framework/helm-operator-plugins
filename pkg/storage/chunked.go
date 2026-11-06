@@ -427,6 +427,9 @@ func (c *chunkedSecrets) decodeRelease(ctx context.Context, indexSecret *corev1.
 		}
 	}()
 
+	// Close the read side when decoding returns so that the writer goroutine
+	// does not block forever if decoding stops before all chunk data is read.
+	defer pr.Close()
 	gzr, err := gzip.NewReader(pr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gzip reader: %w", err)
