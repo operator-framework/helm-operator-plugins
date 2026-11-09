@@ -57,6 +57,10 @@ type chunkedSecrets struct {
 	hashMu       sync.Mutex
 	hash         hash.Hash64
 	hashEncoding *base32.Encoding
+
+	// chunkWriters tracks the goroutines started by decodeRelease that feed
+	// chunk data into the decoder, so tests can check that they all exit.
+	chunkWriters sync.WaitGroup
 }
 
 func (c *chunkedSecrets) Create(key string, rls *release.Release) error {
@@ -398,7 +402,9 @@ func (c *chunkedSecrets) decodeRelease(ctx context.Context, indexSecret *corev1.
 	}
 
 	pr, pw := io.Pipe()
+	c.chunkWriters.Add(1)
 	go func() {
+		defer c.chunkWriters.Done()
 		defer pw.Close()
 		firstChunkData, ok := indexSecret.Data["chunk"]
 		if !ok {

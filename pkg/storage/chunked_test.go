@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
-	"runtime"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -110,12 +109,19 @@ var _ = Describe("chunkedSecrets", func() {
 			_, err := secretInterface.Create(context.Background(), corruptIndex, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
-			goroutinesBefore := runtime.NumGoroutine()
 			for range 5 {
 				_, err := chunkedDriver.Get(corruptIndex.Name)
 				Expect(err).To(MatchError(ContainSubstring("failed to create gzip reader")))
 			}
-			Eventually(runtime.NumGoroutine).Should(BeNumerically("<=", goroutinesBefore))
+
+			// Wait only for the chunk writer goroutines started by this
+			// driver, so unrelated goroutines cannot affect the result.
+			writersDone := make(chan struct{})
+			go func() {
+				chunkedDriver.(*chunkedSecrets).chunkWriters.Wait()
+				close(writersDone)
+			}()
+			Eventually(writersDone).Should(BeClosed())
 		})
 	})
 
