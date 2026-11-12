@@ -397,8 +397,10 @@ func (c *chunkedSecrets) decodeRelease(ctx context.Context, indexSecret *corev1.
 		return nil, fmt.Errorf("release too large: %q consists of %d chunks, which exceeds the maximum of %d", indexSecret.Name, 1+len(extraChunkNames), c.MaxReadChunks)
 	}
 
+	ctx, cancel := context.WithCancel(ctx)
 	pr, pw := io.Pipe()
-	go func() {
+	var chunkWriter sync.WaitGroup
+	chunkWriter.Go(func() {
 		defer pw.Close()
 		firstChunkData, ok := indexSecret.Data["chunk"]
 		if !ok {
@@ -425,8 +427,16 @@ func (c *chunkedSecrets) decodeRelease(ctx context.Context, indexSecret *corev1.
 				return
 			}
 		}
-	}()
+	})
 
+	// Make sure the writer goroutine has exited before returning. If decoding
+	// stops before all chunk data is read, the writer is unblocked by closing
+	// the read side (for a pending pw.Write) and by cancelling ctx (for an
+	// in-flight chunk Get). Deferred calls run in reverse order, so both
+	// happen before the Wait.
+	defer chunkWriter.Wait()
+	defer cancel()
+	defer pr.Close()
 	gzr, err := gzip.NewReader(pr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gzip reader: %w", err)
