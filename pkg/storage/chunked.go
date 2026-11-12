@@ -57,10 +57,6 @@ type chunkedSecrets struct {
 	hashMu       sync.Mutex
 	hash         hash.Hash64
 	hashEncoding *base32.Encoding
-
-	// chunkWriters tracks the goroutines started by decodeRelease that feed
-	// chunk data into the decoder, so tests can check that they all exit.
-	chunkWriters sync.WaitGroup
 }
 
 func (c *chunkedSecrets) Create(key string, rls *release.Release) error {
@@ -401,10 +397,10 @@ func (c *chunkedSecrets) decodeRelease(ctx context.Context, indexSecret *corev1.
 		return nil, fmt.Errorf("release too large: %q consists of %d chunks, which exceeds the maximum of %d", indexSecret.Name, 1+len(extraChunkNames), c.MaxReadChunks)
 	}
 
+	ctx, cancel := context.WithCancel(ctx)
 	pr, pw := io.Pipe()
-	c.chunkWriters.Add(1)
-	go func() {
-		defer c.chunkWriters.Done()
+	var chunkWriter sync.WaitGroup
+	chunkWriter.Go(func() {
 		defer pw.Close()
 		firstChunkData, ok := indexSecret.Data["chunk"]
 		if !ok {
@@ -431,10 +427,15 @@ func (c *chunkedSecrets) decodeRelease(ctx context.Context, indexSecret *corev1.
 				return
 			}
 		}
-	}()
+	})
 
-	// Close the read side when decoding returns so that the writer goroutine
-	// does not block forever if decoding stops before all chunk data is read.
+	// Make sure the writer goroutine has exited before returning. If decoding
+	// stops before all chunk data is read, the writer is unblocked by closing
+	// the read side (for a pending pw.Write) and by cancelling ctx (for an
+	// in-flight chunk Get). Deferred calls run in reverse order, so both
+	// happen before the Wait.
+	defer chunkWriter.Wait()
+	defer cancel()
 	defer pr.Close()
 	gzr, err := gzip.NewReader(pr)
 	if err != nil {

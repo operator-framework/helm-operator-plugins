@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -95,7 +96,7 @@ var _ = Describe("chunkedSecrets", func() {
 			_, err := maxReadDriver.Get(releaseKey(rel))
 			Expect(err).To(MatchError(ContainSubstring("release too large")))
 		})
-		It("should not leak goroutines if the release fails to decode", func() {
+		It("should return once the chunk writer has stopped if the release fails to decode", func() {
 			corruptIndex := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{Name: "corrupt-release.v1"},
 				Type:       SecretTypeChunkedIndex,
@@ -109,19 +110,30 @@ var _ = Describe("chunkedSecrets", func() {
 			_, err := secretInterface.Create(context.Background(), corruptIndex, metav1.CreateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
-			for range 5 {
-				_, err := chunkedDriver.Get(corruptIndex.Name)
-				Expect(err).To(MatchError(ContainSubstring("failed to create gzip reader")))
+			// Get waits for the chunk writer goroutine, so it would block
+			// forever if the writer stayed stuck on the pipe.
+			Expect(getWithTimeout(chunkedDriver, corruptIndex.Name)).To(MatchError(ContainSubstring("failed to create gzip reader")))
+		})
+		It("should cancel an in-flight chunk request if the release fails to decode", func() {
+			corruptIndex := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: "corrupt-release.v1"},
+				Type:       SecretTypeChunkedIndex,
+				Data: map[string][]byte{
+					"extraChunks": []byte(`["corrupt-release.v1.2"]`),
+					"chunk":       []byte("not gzip data"),
+				},
 			}
+			_, err := secretInterface.Create(context.Background(), corruptIndex, metav1.CreateOptions{})
+			Expect(err).ToNot(HaveOccurred())
 
-			// Wait only for the chunk writer goroutines started by this
-			// driver, so unrelated goroutines cannot affect the result.
-			writersDone := make(chan struct{})
-			go func() {
-				chunkedDriver.(*chunkedSecrets).chunkWriters.Wait()
-				close(writersDone)
-			}()
-			Eventually(writersDone).Should(BeClosed())
+			blockingDriver := NewChunkedSecrets(&blockingChunkGetter{
+				SecretInterface: secretInterface,
+				blockName:       "corrupt-release.v1.2",
+			}, "test-owner", ChunkedSecretsConfig{ChunkSize: chunkSize})
+
+			// Without cancellation, the writer would stay in the blocking Get
+			// and Get would never return.
+			Expect(getWithTimeout(blockingDriver, corruptIndex.Name)).To(MatchError(ContainSubstring("failed to create gzip reader")))
 		})
 	})
 
@@ -373,4 +385,31 @@ func genRelease(name string, version int, status release.Status, extraLabels map
 		Info:   &release.Info{Status: status},
 		Labels: lbls,
 	}
+}
+
+// getWithTimeout calls drv.Get in a separate goroutine and fails the test if it
+// does not return in time, so a hang shows up as a test failure.
+func getWithTimeout(drv driver.Driver, key string) error {
+	errCh := make(chan error, 1)
+	go func() {
+		_, err := drv.Get(key)
+		errCh <- err
+	}()
+	var err error
+	EventuallyWithOffset(1, errCh).WithTimeout(10 * time.Second).Should(Receive(&err))
+	return err
+}
+
+// blockingChunkGetter blocks Get for blockName until the context is cancelled.
+type blockingChunkGetter struct {
+	clientcorev1.SecretInterface
+	blockName string
+}
+
+func (b *blockingChunkGetter) Get(ctx context.Context, name string, opts metav1.GetOptions) (*corev1.Secret, error) {
+	if name == b.blockName {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
+	return b.SecretInterface.Get(ctx, name, opts)
 }
